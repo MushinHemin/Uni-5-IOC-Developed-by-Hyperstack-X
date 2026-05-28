@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>雷霆大蜘蛛🕷⚡️</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    body { background: linear-gradient(180deg, #0a0a2a, #1a1a3a); color: #e0f0ff; }
+    .message { animation: fadeIn 0.3s; }
+    img.chat-img { max-width: 280px; max-height: 280px; border-radius: 12px; cursor: pointer; }
+    .system { animation: fadeIn 0.3s; }
+    .quoted { opacity: 0.75; font-size: 0.9em; border-left: 4px solid #f59e0b; padding-left: 10px; margin-top: 6px; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+  <div class="w-full max-w-2xl bg-[#112233]/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-cyan-400/30 overflow-hidden">
+    <div class="bg-[#0a1a2a] px-6 py-4 flex items-center justify-between border-b border-cyan-400/30">
+      <div class="flex items-center gap-3">
+        <span class="text-3xl">🕷</span>
+        <div>
+          <h1 class="text-xl font-bold text-cyan-300">吃什么呢。。。。。</h1>
+          <p class="text-xs text-cyan-200/70">91 俱乐部</p>
+        </div>
+      </div>
+      <div id="online" class="flex items-center gap-2 text-sm text-emerald-400"></div>
+    </div>
+
+    <div id="messages" class="h-96 overflow-y-auto p-6 space-y-4"></div>
+    <div id="typing" class="px-6 text-xs text-cyan-300/70 italic h-8"></div>
+
+    <div class="p-4 bg-[#0a1a2a] flex gap-3 border-t border-cyan-400/30 items-center">
+      <input id="input" class="flex-1 bg-[#112233] text-white placeholder-cyan-200/50 rounded-2xl px-5 py-3 focus:outline-none focus:ring-2 focus:ring-cyan-400" placeholder="所以说到底吃什么呢！！！..." autocomplete="off">
+      
+      <button id="atBtn" class="bg-[#1a2a44] hover:bg-[#223355] text-white px-5 py-3 rounded-2xl flex items-center gap-1 text-lg">@</button>
+      
+      <label id="imageLabel" class="bg-[#1a2a44] hover:bg-[#223355] text-white px-5 py-3 rounded-2xl cursor-pointer flex items-center gap-2">
+        🖼
+        <input type="file" id="imageInput" accept="image/*" class="hidden">
+      </label>
+
+      <button id="send" class="bg-cyan-400 hover:bg-cyan-300 text-[#0a1a2a] font-bold px-8 rounded-2xl transition">发送 ⚡</button>
+    </div>
+  </div>
+
+  <div id="atList" class="hidden absolute bottom-20 left-1/2 -translate-x-1/2 bg-[#112233] border border-cyan-400 rounded-3xl shadow-2xl p-3 max-h-64 overflow-y-auto z-50"></div>
+
+  <script>
+    const socket = io();
+    let myUsername = "";
+
+    function tryJoin() {
+      myUsername = prompt("你特么谁啊") || "沐沐";
+      socket.emit('join', myUsername);
+    }
+
+    socket.on('nameError', (msg) => { alert(msg); tryJoin(); });
+    tryJoin();
+
+    const messagesDiv = document.getElementById('messages');
+    const input = document.getElementById('input');
+    const sendBtn = document.getElementById('send');
+    const onlineDiv = document.getElementById('online');
+    const typingDiv = document.getElementById('typing');
+    const imageInput = document.getElementById('imageInput');
+    const imageLabel = document.getElementById('imageLabel');
+    const atBtn = document.getElementById('atBtn');
+    const atList = document.getElementById('atList');
+
+    socket.on('history', (msgs) => {
+      messagesDiv.innerHTML = '';
+      msgs.forEach(m => appendMessage(m));
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    });
+
+    socket.on('chat message', (data) => {
+      appendMessage(data);
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    });
+
+    socket.on('onlineUsers', (users) => {
+      const count = users.length;
+      onlineDiv.innerHTML = `<div class="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div><span>在线：${count}人 (${users.join('、')})</span>`;
+    });
+
+    socket.on('system', (data) => {
+      const div = document.createElement('div');
+      div.className = 'system text-center my-2 text-sm';
+      if (data.type === 'join') div.innerHTML = `<span class="text-emerald-400">🟢 ${data.username} 加入了 91 俱乐部</span>`;
+      if (data.type === 'leave') div.innerHTML = `<span class="text-red-400">🔴 ${data.username} 离开了 91 俱乐部</span>`;
+      messagesDiv.appendChild(div);
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    });
+
+    function appendMessage(data) {
+      const time = new Date(data.timestamp).toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit'});
+      const isMe = data.username === myUsername;
+      const div = document.createElement('div');
+      div.className = `message flex ${isMe ? 'justify-end' : 'justify-start'} group`;
+
+      if (data.type === 'image') {
+        div.innerHTML = `
+          <div class="${isMe ? 'bg-cyan-400 text-[#0a1a2a]' : 'bg-[#1a2a44]'} max-w-[75%] px-4 py-3 rounded-3xl rounded-${isMe ? 'tr' : 'tl'}-none">
+            <div class="text-xs opacity-70 mb-1">${data.username} · ${time}</div>
+            <img src="${data.content}" class="chat-img" onclick="window.open(this.src)">
+            <div class="flex gap-4 mt-2 text-xs opacity-60">
+              <button onclick="quoteMessage(this)" class="hover:text-white">引用</button>
+              <button onclick="readMessage(this)" class="hover:text-white">朗读</button>
+            </div>
+          </div>
+        `;
+      } else {
+        div.innerHTML = `
+          <div class="${isMe ? 'bg-cyan-400 text-[#0a1a2a]' : 'bg-[#1a2a44]'} max-w-[75%] px-4 py-3 rounded-3xl rounded-${isMe ? 'tr' : 'tl'}-none">
+            <div class="text-xs opacity-70 mb-1">${data.username} · ${time}</div>
+            <div>${data.content}</div>
+            <div class="flex gap-4 mt-2 text-xs opacity-60">
+              <button onclick="quoteMessage(this)" class="hover:text-white">引用</button>
+              <button onclick="readMessage(this)" class="hover:text-white">朗读</button>
+            </div>
+          </div>
+        `;
+      }
+      messagesDiv.appendChild(div);
+    }
+
+    function sendMessage() {
+      const msg = input.value.trim();
+      if (msg) {
+        socket.emit('chat message', msg);
+        input.value = '';
+      }
+    }
+
+    sendBtn.addEventListener('click', sendMessage);
+    input.addEventListener('keypress', e => { if (e.key === 'Enter') sendMessage(); });
+
+    // 图片发送
+    let canSendImage = true;
+    imageInput.addEventListener('change', (e) => {
+      if (!canSendImage) return;
+      const file = e.target.files[0];
+      if (!file) return;
+      if (file.size > 5*1024*1024) { alert('图片最大只能5MB'); return; }
+      canSendImage = false;
+      imageLabel.textContent = '压缩中...';
+      const reader = new FileReader();
+      reader.onload = function(ev) {
+        const img = new Image();
+        img.onload = function() {
+          const canvas = document.createElement('canvas');
+          let w = img.width, h = img.height;
+          const max = 800;
+          if (w > max || h > max) {
+            if (w > h) { h = Math.round(h*max/w); w = max; }
+            else { w = Math.round(w*max/h); h = max; }
+          }
+          canvas.width = w; canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          socket.emit('chat image', { base64: canvas.toDataURL('image/jpeg', 0.75) });
+          imageInput.value = '';
+          let cd = 5;
+          const t = setInterval(() => {
+            cd--;
+            imageLabel.textContent = `冷却 ${cd}s`;
+            if (cd <= 0) {
+              clearInterval(t);
+              canSendImage = true;
+              imageLabel.textContent = '🖼';
+            }
+          }, 1000);
+        };
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+
+    // 朗读
+    window.readMessage = function(btn) {
+      if (!canRead) return;
+      canRead = false;
+      const bubble = btn.closest('.message');
+      const text = bubble.querySelector('div:last-child > div:not(.text-xs):not(.flex)')?.innerText || '';
+      if (text) {
+        const u = new SpeechSynthesisUtterance(text);
+        u.lang = 'zh-CN';
+        speechSynthesis.speak(u);
+      }
+      btn.textContent = '朗读中...';
+      setTimeout(() => { canRead = true; btn.textContent = '朗读'; }, 3000);
+    };
+
+    // 引用
+    window.quoteMessage = function(btn) {
+      const bubble = btn.closest('.message');
+      const content = bubble.querySelector('div:last-child > div:not(.text-xs):not(.flex)')?.innerText || '';
+      const quoteDiv = document.createElement('div');
+      quoteDiv.className = 'quoted bg-[#1a2a44] p-3 rounded-2xl mx-8 my-2';
+      quoteDiv.innerHTML = `被引用：<br>${content}`;
+      messagesDiv.appendChild(quoteDiv);
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+      setTimeout(() => quoteDiv.remove(), 10000);
+    };
+
+    // @按钮
+    atBtn.addEventListener('click', () => {
+      if (atList.classList.contains('hidden')) {
+        const match = onlineDiv.textContent.match(/\((.+)\)/);
+        if (match) {
+          const users = match[1].split('、');
+          atList.innerHTML = users.map(u => `<div onclick="selectUser('${u}')" class="px-5 py-2 hover:bg-[#223355] rounded-2xl cursor-pointer">${u}</div>`).join('');
+          atList.classList.remove('hidden');
+        }
+      } else {
+        atList.classList.add('hidden');
+      }
+    });
+
+    window.selectUser = function(user) {
+      input.value += `@${user} `;
+      input.focus();
+      atList.classList.add('hidden');
+    };
+
+    document.addEventListener('click', e => {
+      if (!atBtn.contains(e.target) && !atList.contains(e.target)) atList.classList.add('hidden');
+    });
+  </script>
+</body>
+</html>
