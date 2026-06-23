@@ -35,6 +35,8 @@
       --line: rgba(60, 60, 67, 0.16);
       --brand: #007aff;
       --brand-dark: #005ecb;
+      --avatar-default-bg: #3b82f6;
+      --avatar-default-text: #ffffff;
       --sent-top: #eaf4ff;
       --sent: #e8f2ff;
       --received: rgba(255, 255, 255, 0.78);
@@ -82,6 +84,8 @@
       --line: rgba(255, 255, 255, 0.14);
       --brand: #66aaff;
       --brand-dark: #8fc2ff;
+      --avatar-default-bg: #3b82f6;
+      --avatar-default-text: #ffffff;
       --sent-top: rgba(57, 118, 194, 0.66);
       --sent: rgba(45, 105, 180, 0.54);
       --received: rgba(20, 27, 44, 0.72);
@@ -375,8 +379,8 @@
       place-items: center;
       flex: 0 0 auto;
       border-radius: var(--radius-icon);
-      color: #fff;
-      background: var(--avatar-bg, linear-gradient(135deg, var(--brand), var(--accent)));
+      color: var(--avatar-default-text);
+      background: var(--avatar-default-bg);
       font-size: 13px;
       font-weight: 800;
       overflow: hidden;
@@ -520,7 +524,8 @@
     }
 
     .switch-user-btn,
-    .theme-toggle-btn {
+    .theme-toggle-btn,
+    .settings-toggle-btn {
       min-height: 36px;
       padding: 0 12px;
       display: inline-flex;
@@ -542,25 +547,33 @@
     }
 
     .switch-user-btn:hover,
-    .theme-toggle-btn:hover {
+    .theme-toggle-btn:hover,
+    .settings-toggle-btn:hover {
       transform: translateY(-1px) scale(1.02);
       border-color: rgba(0, 122, 255, 0.24);
       background: var(--glass-bg-light);
     }
 
     .switch-user-btn:active,
-    .theme-toggle-btn:active {
+    .theme-toggle-btn:active,
+    .settings-toggle-btn:active {
       transform: translateY(0) scale(0.97);
     }
 
     .switch-user-btn .icon,
-    .theme-toggle-btn .icon {
+    .theme-toggle-btn .icon,
+    .settings-toggle-btn .icon {
       width: 17px;
       height: 17px;
     }
 
     .theme-toggle-btn {
       position: relative;
+      width: 42px;
+      padding: 0;
+    }
+
+    .settings-toggle-btn {
       width: 42px;
       padding: 0;
     }
@@ -676,6 +689,21 @@
       transform-origin: right bottom;
     }
 
+    .message-avatar {
+      width: 38px;
+      height: 38px;
+      align-self: flex-end;
+      margin-bottom: 2px;
+    }
+
+    .message-row.is-me .message-avatar {
+      order: 2;
+    }
+
+    .message-row.is-recalled .message-avatar {
+      opacity: 0.55;
+    }
+
     .message-row.is-history {
       animation: none;
     }
@@ -735,13 +763,6 @@
       margin-bottom: 7px;
       color: var(--muted);
       font-size: 12px;
-    }
-
-    .meta .avatar {
-      width: 24px;
-      height: 24px;
-      font-size: 12px;
-      border-radius: 999px;
     }
 
     .content {
@@ -1201,6 +1222,73 @@
       min-height: 18px;
       color: var(--muted);
       font-size: 12px;
+    }
+
+    .crop-card {
+      width: min(520px, 100%);
+      display: grid;
+      gap: 14px;
+    }
+
+    .crop-stage {
+      position: relative;
+      width: min(360px, calc(100vw - 88px));
+      aspect-ratio: 1;
+      justify-self: center;
+      overflow: hidden;
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-xl);
+      background:
+        linear-gradient(45deg, rgba(120, 120, 128, 0.16) 25%, transparent 25%),
+        linear-gradient(-45deg, rgba(120, 120, 128, 0.16) 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, rgba(120, 120, 128, 0.16) 75%),
+        linear-gradient(-45deg, transparent 75%, rgba(120, 120, 128, 0.16) 75%);
+      background-size: 22px 22px;
+      background-position: 0 0, 0 11px, 11px -11px, -11px 0;
+      touch-action: none;
+      cursor: grab;
+      box-shadow: inset 0 1px 0 var(--glass-highlight), 0 16px 40px rgba(31, 48, 86, 0.12);
+    }
+
+    .crop-stage:active {
+      cursor: grabbing;
+    }
+
+    .crop-stage img {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      max-width: none;
+      user-select: none;
+      pointer-events: none;
+      transform-origin: center;
+      will-change: transform;
+    }
+
+    .crop-stage::after {
+      content: "";
+      position: absolute;
+      inset: 12px;
+      border: 2px solid rgba(255, 255, 255, 0.82);
+      border-radius: var(--radius-lg);
+      box-shadow: 0 0 0 999px rgba(8, 12, 24, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+      pointer-events: none;
+    }
+
+    .crop-controls {
+      display: grid;
+      gap: 8px;
+    }
+
+    .crop-controls label {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .crop-controls input[type="range"] {
+      width: 100%;
+      accent-color: var(--brand);
     }
 
     .confirm-modal.is-closing .confirm-card {
@@ -2191,9 +2279,12 @@
             <span id="subtitle">选择频道开始</span>
           </div>
           <div class="header-actions">
-            <button class="theme-toggle-btn" data-theme-toggle data-settings-open type="button" aria-label="外观与设置" title="外观与设置">
+            <button class="theme-toggle-btn" data-theme-toggle type="button" aria-label="切换外观" title="切换外观">
               <svg class="icon theme-icon moon-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 14.6A7.6 7.6 0 0 1 9.4 3 8.8 8.8 0 1 0 21 14.6z"/></svg>
               <svg class="icon theme-icon sun-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="M4.93 4.93l1.41 1.41"/><path d="M17.66 17.66l1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="M4.93 19.07l1.41-1.41"/><path d="M17.66 6.34l1.41-1.41"/></svg>
+            </button>
+            <button class="settings-toggle-btn" data-settings-open type="button" aria-label="系统设置" title="系统设置">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.05.05a2 2 0 0 1-2.83 2.83l-.05-.05a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 0 1-4 0v-.07A1.7 1.7 0 0 0 9 19.37a1.7 1.7 0 0 0-1.88.34l-.05.05a2 2 0 1 1-2.83-2.83l.05-.05A1.7 1.7 0 0 0 4.63 15 1.7 1.7 0 0 0 3.07 14H3a2 2 0 0 1 0-4h.07A1.7 1.7 0 0 0 4.63 9a1.7 1.7 0 0 0-.34-1.88l-.05-.05a2 2 0 1 1 2.83-2.83l.05.05A1.7 1.7 0 0 0 9 4.63 1.7 1.7 0 0 0 10 3.07V3a2 2 0 0 1 4 0v.07A1.7 1.7 0 0 0 15 4.63a1.7 1.7 0 0 0 1.88-.34l.05-.05a2 2 0 0 1 2.83 2.83l-.05.05A1.7 1.7 0 0 0 19.37 9c.22.61.8 1 1.56 1H21a2 2 0 0 1 0 4h-.07A1.7 1.7 0 0 0 19.4 15z"/></svg>
             </button>
             <button class="switch-user-btn" data-switch-user type="button" aria-label="切换用户">
               <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7h9l-3-3"/><path d="M17 7l-3 3"/><path d="M16 17H7l3 3"/><path d="M7 17l3-3"/><circle cx="12" cy="12" r="3"/></svg>
@@ -2264,9 +2355,12 @@
   <section id="login" class="login page-layer" data-view="auth" aria-label="加入聊天">
     <div class="login-panel">
       <div class="login-topbar">
-        <button class="theme-toggle-btn" data-theme-toggle data-settings-open type="button" aria-label="外观与设置" title="外观与设置">
+        <button class="theme-toggle-btn" data-theme-toggle type="button" aria-label="切换外观" title="切换外观">
           <svg class="icon theme-icon moon-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 14.6A7.6 7.6 0 0 1 9.4 3 8.8 8.8 0 1 0 21 14.6z"/></svg>
           <svg class="icon theme-icon sun-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="M4.93 4.93l1.41 1.41"/><path d="M17.66 17.66l1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="M4.93 19.07l1.41-1.41"/><path d="M17.66 6.34l1.41-1.41"/></svg>
+        </button>
+        <button class="settings-toggle-btn" data-settings-open type="button" aria-label="系统设置" title="系统设置">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.05.05a2 2 0 0 1-2.83 2.83l-.05-.05a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 0 1-4 0v-.07A1.7 1.7 0 0 0 9 19.37a1.7 1.7 0 0 0-1.88.34l-.05.05a2 2 0 1 1-2.83-2.83l.05-.05A1.7 1.7 0 0 0 4.63 15 1.7 1.7 0 0 0 3.07 14H3a2 2 0 0 1 0-4h.07A1.7 1.7 0 0 0 4.63 9a1.7 1.7 0 0 0-.34-1.88l-.05-.05a2 2 0 1 1 2.83-2.83l.05.05A1.7 1.7 0 0 0 9 4.63 1.7 1.7 0 0 0 10 3.07V3a2 2 0 0 1 4 0v.07A1.7 1.7 0 0 0 15 4.63a1.7 1.7 0 0 0 1.88-.34l.05-.05a2 2 0 0 1 2.83 2.83l-.05.05A1.7 1.7 0 0 0 19.37 9c.22.61.8 1 1.56 1H21a2 2 0 0 1 0 4h-.07A1.7 1.7 0 0 0 19.4 15z"/></svg>
         </button>
         <button class="switch-user-btn" data-switch-user type="button" aria-label="切换用户">
           <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7h9l-3-3"/><path d="M17 7l-3 3"/><path d="M16 17H7l3 3"/><path d="M7 17l3-3"/><circle cx="12" cy="12" r="3"/></svg>
@@ -2308,9 +2402,12 @@
           <div id="lobbyStatus" class="status">选择频道或在线用户。</div>
         </div>
         <div class="admin-actions">
-          <button class="theme-toggle-btn" data-theme-toggle data-settings-open type="button" aria-label="外观与设置" title="外观与设置">
+          <button class="theme-toggle-btn" data-theme-toggle type="button" aria-label="切换外观" title="切换外观">
             <svg class="icon theme-icon moon-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 14.6A7.6 7.6 0 0 1 9.4 3 8.8 8.8 0 1 0 21 14.6z"/></svg>
             <svg class="icon theme-icon sun-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="M4.93 4.93l1.41 1.41"/><path d="M17.66 17.66l1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="M4.93 19.07l1.41-1.41"/><path d="M17.66 6.34l1.41-1.41"/></svg>
+          </button>
+          <button class="settings-toggle-btn" data-settings-open type="button" aria-label="系统设置" title="系统设置">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.05.05a2 2 0 0 1-2.83 2.83l-.05-.05a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 0 1-4 0v-.07A1.7 1.7 0 0 0 9 19.37a1.7 1.7 0 0 0-1.88.34l-.05.05a2 2 0 1 1-2.83-2.83l.05-.05A1.7 1.7 0 0 0 4.63 15 1.7 1.7 0 0 0 3.07 14H3a2 2 0 0 1 0-4h.07A1.7 1.7 0 0 0 4.63 9a1.7 1.7 0 0 0-.34-1.88l-.05-.05a2 2 0 1 1 2.83-2.83l.05.05A1.7 1.7 0 0 0 9 4.63 1.7 1.7 0 0 0 10 3.07V3a2 2 0 0 1 4 0v.07A1.7 1.7 0 0 0 15 4.63a1.7 1.7 0 0 0 1.88-.34l.05-.05a2 2 0 0 1 2.83 2.83l-.05.05A1.7 1.7 0 0 0 19.37 9c.22.61.8 1 1.56 1H21a2 2 0 0 1 0 4h-.07A1.7 1.7 0 0 0 19.4 15z"/></svg>
           </button>
           <button class="switch-user-btn" data-switch-user type="button" aria-label="切换用户">
             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7h9l-3-3"/><path d="M17 7l-3 3"/><path d="M16 17H7l3 3"/><path d="M7 17l3-3"/><circle cx="12" cy="12" r="3"/></svg>
@@ -2352,9 +2449,12 @@
       <header class="admin-header">
         <h2>管理后台</h2>
         <div class="admin-actions">
-          <button class="theme-toggle-btn" data-theme-toggle data-settings-open type="button" aria-label="外观与设置" title="外观与设置">
+          <button class="theme-toggle-btn" data-theme-toggle type="button" aria-label="切换外观" title="切换外观">
             <svg class="icon theme-icon moon-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 14.6A7.6 7.6 0 0 1 9.4 3 8.8 8.8 0 1 0 21 14.6z"/></svg>
             <svg class="icon theme-icon sun-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="M4.93 4.93l1.41 1.41"/><path d="M17.66 17.66l1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="M4.93 19.07l1.41-1.41"/><path d="M17.66 6.34l1.41-1.41"/></svg>
+          </button>
+          <button class="settings-toggle-btn" data-settings-open type="button" aria-label="系统设置" title="系统设置">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.05.05a2 2 0 0 1-2.83 2.83l-.05-.05a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 0 1-4 0v-.07A1.7 1.7 0 0 0 9 19.37a1.7 1.7 0 0 0-1.88.34l-.05.05a2 2 0 1 1-2.83-2.83l.05-.05A1.7 1.7 0 0 0 4.63 15 1.7 1.7 0 0 0 3.07 14H3a2 2 0 0 1 0-4h.07A1.7 1.7 0 0 0 4.63 9a1.7 1.7 0 0 0-.34-1.88l-.05-.05a2 2 0 1 1 2.83-2.83l.05.05A1.7 1.7 0 0 0 9 4.63 1.7 1.7 0 0 0 10 3.07V3a2 2 0 0 1 4 0v.07A1.7 1.7 0 0 0 15 4.63a1.7 1.7 0 0 0 1.88-.34l.05-.05a2 2 0 0 1 2.83 2.83l-.05.05A1.7 1.7 0 0 0 19.37 9c.22.61.8 1 1.56 1H21a2 2 0 0 1 0 4h-.07A1.7 1.7 0 0 0 19.4 15z"/></svg>
           </button>
           <button class="switch-user-btn" data-switch-user type="button" aria-label="切换用户">
             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7h9l-3-3"/><path d="M17 7l-3 3"/><path d="M16 17H7l3 3"/><path d="M7 17l3-3"/><circle cx="12" cy="12" r="3"/></svg>
@@ -2424,11 +2524,11 @@
   <div id="settingsModal" class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle" hidden>
     <div class="confirm-card settings-card">
       <div>
-        <h3 id="settingsTitle">设置</h3>
+        <h3 id="settingsTitle">系统设置</h3>
         <p>管理头像、外观与消息提醒。</p>
       </div>
       <section class="settings-section">
-        <h4>个人头像</h4>
+        <h4>个人资料</h4>
         <div class="profile-settings">
           <span id="settingsAvatarPreview"></span>
           <div>
@@ -2474,6 +2574,26 @@
       </div>
     </div>
   </div>
+  <div id="avatarCropModal" class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="avatarCropTitle" hidden>
+    <div class="confirm-card crop-card">
+      <div>
+        <h3 id="avatarCropTitle">裁剪头像</h3>
+        <p>拖动图片选择位置，使用滑杆缩放，然后确认上传。</p>
+      </div>
+      <div id="avatarCropStage" class="crop-stage" aria-label="头像裁剪区域">
+        <img id="avatarCropImage" alt="头像裁剪预览">
+      </div>
+      <div class="crop-controls">
+        <label for="avatarCropScale">缩放</label>
+        <input id="avatarCropScale" type="range" min="1" max="3" step="0.01" value="1">
+      </div>
+      <div id="avatarCropStatus" class="settings-status">建议让脸或主体居中。</div>
+      <div class="confirm-actions">
+        <button id="avatarCropCancel" class="admin-btn" type="button">取消</button>
+        <button id="avatarCropConfirm" class="admin-btn primary" type="button">确认裁剪</button>
+      </div>
+    </div>
+  </div>
 
   <script>
     const socket = io();
@@ -2499,6 +2619,7 @@
       messageCount: 0,
       imageCooldown: 0,
       pendingAvatar: null,
+      avatarCrop: null,
       isRecording: false,
       recorder: null,
       recordStartedAt: 0,
@@ -2596,6 +2717,13 @@
     const avatarReset = document.getElementById('avatarReset');
     const avatarInput = document.getElementById('avatarInput');
     const avatarStatus = document.getElementById('avatarStatus');
+    const avatarCropModal = document.getElementById('avatarCropModal');
+    const avatarCropStage = document.getElementById('avatarCropStage');
+    const avatarCropImage = document.getElementById('avatarCropImage');
+    const avatarCropScale = document.getElementById('avatarCropScale');
+    const avatarCropStatus = document.getElementById('avatarCropStatus');
+    const avatarCropCancel = document.getElementById('avatarCropCancel');
+    const avatarCropConfirm = document.getElementById('avatarCropConfirm');
     const themeStatus = document.getElementById('themeStatus');
     const soundToggle = document.getElementById('soundToggle');
     const soundToggleText = document.getElementById('soundToggleText');
@@ -2634,7 +2762,7 @@
     }
 
     function updateThemeButtons(mode = readThemeMode(), theme = document.documentElement.dataset.theme || 'light') {
-      const label = `外观与设置：${mode === 'system' ? '跟随系统' : theme === 'dark' ? '深色' : '浅色'}`;
+      const label = `切换外观：当前${mode === 'system' ? '跟随系统' : theme === 'dark' ? '深色' : '浅色'}`;
       themeToggleButtons.forEach((button) => {
         button.setAttribute('aria-label', label);
         button.title = label;
@@ -3148,6 +3276,12 @@
     settingsOpenButtons.forEach((button) => {
       button.addEventListener('click', openSettingsModal);
     });
+    themeToggleButtons.forEach((button) => {
+      button.addEventListener('click', () => {
+        const nextMode = (document.documentElement.dataset.theme || 'light') === 'dark' ? 'light' : 'dark';
+        setThemeMode(nextMode);
+      });
+    });
     themeModeButtons.forEach((button) => {
       button.addEventListener('click', () => setThemeMode(button.dataset.themeMode));
     });
@@ -3179,6 +3313,7 @@
     document.addEventListener('keydown', (event) => {
       if (event.key === 'Escape' && !switchUserModal.hidden) closeSwitchUserModal();
       if (event.key === 'Escape' && !settingsModal.hidden) closeSettingsModal();
+      if (event.key === 'Escape' && !avatarCropModal.hidden) closeAvatarCropModal();
     });
 
     settingsClose.addEventListener('click', closeSettingsModal);
@@ -3210,6 +3345,20 @@
       avatarStatus.textContent = '正在恢复默认头像...';
       socket.emit('avatar reset');
     });
+    avatarCropScale.addEventListener('input', () => {
+      if (!state.avatarCrop) return;
+      state.avatarCrop.scale = Number(avatarCropScale.value) || 1;
+      renderAvatarCrop();
+    });
+    avatarCropCancel.addEventListener('click', closeAvatarCropModal);
+    avatarCropConfirm.addEventListener('click', confirmAvatarCrop);
+    avatarCropModal.addEventListener('click', (event) => {
+      if (event.target === avatarCropModal) closeAvatarCropModal();
+    });
+    avatarCropStage.addEventListener('pointerdown', startAvatarDrag);
+    avatarCropStage.addEventListener('pointermove', moveAvatarDrag);
+    avatarCropStage.addEventListener('pointerup', endAvatarDrag);
+    avatarCropStage.addEventListener('pointercancel', endAvatarDrag);
 
     adminRefresh.addEventListener('click', () => {
       if (state.isAdmin) socket.emit('admin get dashboard');
@@ -3324,6 +3473,9 @@
       if (options.animate === false) row.classList.add('is-history');
       row.dataset.messageId = message.id;
 
+      const avatar = createAvatar(message.avatar || message.username, message.username);
+      avatar.classList.add('message-avatar');
+
       const bubble = document.createElement('article');
       bubble.className = 'bubble';
       bubble.dataset.content = message.type === 'text' ? message.content : '';
@@ -3345,8 +3497,6 @@
 
       const meta = document.createElement('div');
       meta.className = 'meta';
-      meta.append(createAvatar(message.avatar || message.username, message.username));
-
       const metaText = document.createElement('span');
       metaText.textContent = `${message.username} · ${formatTime(message.timestamp)}`;
       meta.append(metaText);
@@ -3391,7 +3541,8 @@
         bubble.append(content);
       }
 
-      row.append(bubble);
+      if (isMe) row.append(bubble, avatar);
+      else row.append(avatar, bubble);
       messagesDiv.append(row);
       return row;
     }
@@ -3442,7 +3593,6 @@
       const seed = label || raw || '?';
       const avatar = document.createElement('span');
       avatar.className = `avatar${large ? ' is-large' : ''}`;
-      avatar.style.setProperty('--avatar-bg', avatarGradient(seed));
       if (raw.startsWith('/uploads/avatars/')) {
         const img = document.createElement('img');
         img.src = raw;
@@ -3466,17 +3616,7 @@
 
     function avatarInitial(value) {
       const text = String(value || '?').trim();
-      return text.slice(0, 1).toUpperCase() || '?';
-    }
-
-    function avatarGradient(seed) {
-      let hash = 0;
-      String(seed || '?').split('').forEach((char) => {
-        hash = (hash * 31 + char.charCodeAt(0)) % 360;
-      });
-      const hueA = hash;
-      const hueB = (hash + 42) % 360;
-      return `linear-gradient(135deg, hsl(${hueA} 72% 56%), hsl(${hueB} 78% 48%))`;
+      return text.slice(0, 1).toUpperCase() || 'U';
     }
 
     function quoteMessage(message) {
@@ -3838,13 +3978,123 @@
       }
       try {
         const base64 = await readFileAsDataUrl(file);
-        state.pendingAvatar = { base64, name: file.name || '头像图片', size: file.size };
-        avatarStatus.textContent = `${state.pendingAvatar.name} · ${formatFileSize(file.size)}`;
-        renderSettingsProfile();
+        openAvatarCropModal(base64, file.name || '头像图片');
       } catch (error) {
         avatarStatus.textContent = '头像读取失败';
         showToast('头像读取失败');
       }
+    }
+
+    function openAvatarCropModal(base64, name) {
+      const image = new Image();
+      image.onload = () => {
+        state.avatarCrop = {
+          base64,
+          name,
+          image,
+          x: 0,
+          y: 0,
+          scale: 1,
+          dragging: false,
+          dragStartX: 0,
+          dragStartY: 0,
+          startX: 0,
+          startY: 0
+        };
+        avatarCropImage.src = base64;
+        avatarCropScale.value = '1';
+        avatarCropStatus.textContent = '拖动图片调整位置，使用滑杆缩放。';
+        avatarCropModal.classList.remove('is-closing');
+        avatarCropModal.hidden = false;
+        requestAnimationFrame(renderAvatarCrop);
+      };
+      image.onerror = () => {
+        avatarStatus.textContent = '头像图片无法读取';
+        showToast('头像图片无法读取');
+      };
+      image.src = base64;
+    }
+
+    function closeAvatarCropModal() {
+      if (avatarCropModal.hidden) return;
+      avatarCropModal.classList.add('is-closing');
+      const delay = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 20 : 220;
+      window.setTimeout(() => {
+        avatarCropModal.hidden = true;
+        avatarCropModal.classList.remove('is-closing');
+        state.avatarCrop = null;
+        avatarCropImage.removeAttribute('src');
+        avatarInput.value = '';
+      }, delay);
+    }
+
+    function renderAvatarCrop() {
+      const crop = state.avatarCrop;
+      if (!crop || !crop.image) return;
+      const rect = avatarCropStage.getBoundingClientRect();
+      const baseScale = Math.max(rect.width / crop.image.naturalWidth, rect.height / crop.image.naturalHeight);
+      const width = crop.image.naturalWidth * baseScale * crop.scale;
+      const height = crop.image.naturalHeight * baseScale * crop.scale;
+      avatarCropImage.style.width = `${width}px`;
+      avatarCropImage.style.height = `${height}px`;
+      avatarCropImage.style.transform = `translate(calc(-50% + ${crop.x}px), calc(-50% + ${crop.y}px))`;
+    }
+
+    function startAvatarDrag(event) {
+      if (!state.avatarCrop) return;
+      state.avatarCrop.dragging = true;
+      state.avatarCrop.dragStartX = event.clientX;
+      state.avatarCrop.dragStartY = event.clientY;
+      state.avatarCrop.startX = state.avatarCrop.x;
+      state.avatarCrop.startY = state.avatarCrop.y;
+      avatarCropStage.setPointerCapture(event.pointerId);
+    }
+
+    function moveAvatarDrag(event) {
+      const crop = state.avatarCrop;
+      if (!crop || !crop.dragging) return;
+      crop.x = crop.startX + event.clientX - crop.dragStartX;
+      crop.y = crop.startY + event.clientY - crop.dragStartY;
+      renderAvatarCrop();
+    }
+
+    function endAvatarDrag(event) {
+      if (!state.avatarCrop) return;
+      state.avatarCrop.dragging = false;
+      if (avatarCropStage.hasPointerCapture(event.pointerId)) {
+        avatarCropStage.releasePointerCapture(event.pointerId);
+      }
+    }
+
+    async function confirmAvatarCrop() {
+      const crop = state.avatarCrop;
+      if (!crop || !crop.image) return;
+      const rect = avatarCropStage.getBoundingClientRect();
+      const outputSize = 512;
+      const canvas = document.createElement('canvas');
+      canvas.width = outputSize;
+      canvas.height = outputSize;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      const baseScale = Math.max(rect.width / crop.image.naturalWidth, rect.height / crop.image.naturalHeight);
+      const drawScale = (outputSize / rect.width) * baseScale * crop.scale;
+      const drawWidth = crop.image.naturalWidth * drawScale;
+      const drawHeight = crop.image.naturalHeight * drawScale;
+      const drawX = outputSize / 2 - drawWidth / 2 + crop.x * (outputSize / rect.width);
+      const drawY = outputSize / 2 - drawHeight / 2 + crop.y * (outputSize / rect.width);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, outputSize, outputSize);
+      ctx.drawImage(crop.image, drawX, drawY, drawWidth, drawHeight);
+      const base64 = canvas.toDataURL('image/webp', 0.86);
+      const approxBytes = Math.ceil((base64.length - base64.indexOf(',') - 1) * 3 / 4);
+      if (approxBytes > MAX_AVATAR_BYTES) {
+        avatarCropStatus.textContent = '裁剪后的头像仍然太大，请缩小图片后再试。';
+        return;
+      }
+      state.pendingAvatar = { base64, name: crop.name, size: approxBytes };
+      avatarStatus.textContent = `${crop.name} · 已裁剪 · ${formatFileSize(approxBytes)}`;
+      renderSettingsProfile();
+      closeAvatarCropModal();
     }
 
     function readFileAsDataUrl(file) {

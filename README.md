@@ -37,6 +37,13 @@ Improved:
 - Theme preference persistence and system theme syncing
 - Comfort settings inside a glass-style settings panel
 
+Fixes:
+
+- System settings now use a dedicated gear entry instead of the theme shortcut button
+- Avatar upload includes a lightweight crop step before upload
+- Chat message avatars render beside bubbles in both group and private chats
+- Default avatars use a consistent blue background with the user's initial
+
 ## Tech Stack
 
 - Node.js
