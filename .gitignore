@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+
+# Environment and local secrets
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Runtime data
+users.json
+chat-history.json
+beluga-chat.sqlite
+beluga-chat.sqlite-*
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.sqlite-journal
+uploads/
+
+# macOS and archives
+.DS_Store
+__MACOSX/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Android / Capacitor local build output
+android/local.properties
+android/.gradle/
+android/app/build/
+android/build/
+
+# Temporary scratch files
+200
+可连接

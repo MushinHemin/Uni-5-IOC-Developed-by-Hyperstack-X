@@ -1,0 +1,20 @@
+{
+  "name": "beluga-chat",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A small realtime web chat app.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "android:add": "npx cap add android",
+    "android:sync": "npx cap sync android",
+    "android:open": "npx cap open android"
+  },
+  "dependencies": {
+    "@capacitor/android": "^7.4.4",
+    "@capacitor/cli": "^7.4.4",
+    "@capacitor/core": "^7.4.4",
+    "express": "^5.2.1",
+    "socket.io": "^4.8.3"
+  }
+}

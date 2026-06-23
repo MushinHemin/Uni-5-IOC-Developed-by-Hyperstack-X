@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1800 1200" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="sky" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#dbeafe"/>
+      <stop offset="0.38" stop-color="#e0f2fe"/>
+      <stop offset="0.72" stop-color="#f8fafc"/>
+      <stop offset="1" stop-color="#d1fae5"/>
+    </linearGradient>
+    <radialGradient id="sun" cx="28%" cy="20%" r="42%">
+      <stop offset="0" stop-color="#fff7ed" stop-opacity="0.95"/>
+      <stop offset="0.34" stop-color="#bfdbfe" stop-opacity="0.42"/>
+      <stop offset="1" stop-color="#bfdbfe" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="water" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#bae6fd"/>
+      <stop offset="0.5" stop-color="#93c5fd"/>
+      <stop offset="1" stop-color="#c7d2fe"/>
+    </linearGradient>
+    <linearGradient id="mountainA" x1="0" x2="1">
+      <stop offset="0" stop-color="#64748b"/>
+      <stop offset="1" stop-color="#94a3b8"/>
+    </linearGradient>
+    <linearGradient id="mountainB" x1="0" x2="1">
+      <stop offset="0" stop-color="#38bdf8"/>
+      <stop offset="1" stop-color="#818cf8"/>
+    </linearGradient>
+    <filter id="soft">
+      <feGaussianBlur stdDeviation="18"/>
+    </filter>
+  </defs>
+  <rect width="1800" height="1200" fill="url(#sky)"/>
+  <rect width="1800" height="1200" fill="url(#sun)"/>
+  <circle cx="1420" cy="170" r="260" fill="#ffffff" opacity="0.3" filter="url(#soft)"/>
+  <path d="M0 660 C220 550 360 610 520 490 C710 345 860 520 1030 390 C1190 270 1340 510 1510 410 C1640 335 1730 360 1800 330 L1800 1200 L0 1200 Z" fill="url(#mountainA)" opacity="0.34"/>
+  <path d="M0 720 C180 650 330 720 520 590 C690 475 850 630 1000 540 C1200 420 1330 670 1530 560 C1650 490 1740 500 1800 468 L1800 1200 L0 1200 Z" fill="url(#mountainB)" opacity="0.36"/>
+  <path d="M0 760 C300 720 470 790 720 745 C1010 695 1140 750 1380 710 C1570 680 1690 710 1800 690 L1800 1200 L0 1200 Z" fill="url(#water)" opacity="0.62"/>
+  <path d="M0 835 C290 800 520 870 805 822 C1090 775 1380 840 1800 785 L1800 1200 L0 1200 Z" fill="#ffffff" opacity="0.22"/>
+  <path d="M0 900 C340 940 590 880 860 930 C1120 980 1380 895 1800 940 L1800 1200 L0 1200 Z" fill="#f8fafc" opacity="0.28"/>
+</svg>

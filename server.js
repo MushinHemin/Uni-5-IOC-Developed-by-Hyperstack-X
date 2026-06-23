@@ -3,71 +3,1319 @@ const http = require('http');
 const { Server } = require('socket.io');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
+const { DatabaseSync } = require('node:sqlite');
+
+loadDotEnv();
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
 
 const DATA_FILE = path.join(__dirname, 'chat-history.json');
+const USERS_FILE = path.join(__dirname, 'users.json');
+const DB_FILE = path.join(__dirname, 'beluga-chat.sqlite');
+const JSON_FILE_MODE = 0o600;
+const MAX_MESSAGE_LENGTH = 1000;
+const MAX_USERNAME_LENGTH = 20;
+const MAX_ACCOUNT_LENGTH = 24;
+const MIN_PASSWORD_LENGTH = 6;
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const MAX_VOICE_BYTES = 3 * 1024 * 1024;
+const MAX_HISTORY_MESSAGES = 300;
+const TYPING_TIMEOUT_MS = 3000;
+const AUTH_WINDOW_MS = 60 * 1000;
+const AUTH_MAX_ATTEMPTS = 8;
+const ADMIN_ACCOUNT = cleanEnv(process.env.ADMIN_ACCOUNT) || 'admin';
+const ADMIN_PASSWORD = cleanEnv(process.env.ADMIN_PASSWORD) || 'change-me-admin-password';
+const ADMIN_USERNAME = cleanEnv(process.env.ADMIN_USERNAME) || 'Administrator';
+const DEFAULT_ROOM_ID = 'club-91';
+const DEFAULT_ROOM_NAME = 'UniIOC World Channel';
+const RECALL_WINDOW_MS = 2 * 60 * 1000;
+const GROUP_CODE_WINDOW_MS = 10 * 60 * 1000;
+const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp']);
+const ALLOWED_AUDIO_TYPES = new Set(['audio/webm', 'audio/mp4', 'audio/mpeg', 'audio/ogg', 'audio/wav']);
+let db;
+
+function loadDotEnv() {
+  const envPath = path.join(__dirname, '.env');
+  if (!fs.existsSync(envPath)) return;
+
+  const lines = fs.readFileSync(envPath, 'utf8').split(/\r?\n/);
+  lines.forEach((line) => {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) return;
+    const equalAt = trimmed.indexOf('=');
+    if (equalAt === -1) return;
+    const key = trimmed.slice(0, equalAt).trim();
+    let value = trimmed.slice(equalAt + 1).trim();
+    if (!key || process.env[key] !== undefined) return;
+    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+      value = value.slice(1, -1);
+    }
+    process.env[key] = value;
+  });
+}
+
+function cleanEnv(value) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function atomicWriteJsonSync(filePath, value) {
+  const dir = path.dirname(filePath);
+  const tempPath = path.join(dir, `.${path.basename(filePath)}.${process.pid}.${Date.now()}.tmp`);
+  fs.writeFileSync(tempPath, JSON.stringify(value, null, 2), { mode: JSON_FILE_MODE });
+  fs.renameSync(tempPath, filePath);
+}
+
+async function atomicWriteJson(filePath, value) {
+  const dir = path.dirname(filePath);
+  const tempPath = path.join(dir, `.${path.basename(filePath)}.${process.pid}.${Date.now()}.${crypto.randomUUID()}.tmp`);
+  await fs.promises.writeFile(tempPath, JSON.stringify(value, null, 2), { mode: JSON_FILE_MODE });
+  await fs.promises.rename(tempPath, filePath);
+}
+
+function backupBadJson(filePath) {
+  if (!fs.existsSync(filePath)) return;
+  const backupPath = `${filePath}.bad-${Date.now()}`;
+  try {
+    fs.renameSync(filePath, backupPath);
+    console.error(`已备份损坏数据文件: ${backupPath}`);
+  } catch (error) {
+    console.error(`备份损坏数据文件失败: ${error.message}`);
+  }
+}
+
+function readJsonArray(filePath, label) {
+  try {
+    if (!fs.existsSync(filePath)) {
+      atomicWriteJsonSync(filePath, []);
+      return [];
+    }
+
+    const raw = fs.readFileSync(filePath, 'utf8').trim();
+    if (!raw) {
+      atomicWriteJsonSync(filePath, []);
+      return [];
+    }
+
+    const data = JSON.parse(raw);
+    if (!Array.isArray(data)) {
+      backupBadJson(filePath);
+      atomicWriteJsonSync(filePath, []);
+      return [];
+    }
+
+    return data;
+  } catch (error) {
+    console.error(`读取${label}失败:`, error.message);
+    backupBadJson(filePath);
+    atomicWriteJsonSync(filePath, []);
+    return [];
+  }
+}
 
 function loadHistory() {
-  if (fs.existsSync(DATA_FILE)) {
-    try { return JSON.parse(fs.readFileSync(DATA_FILE, 'utf8')); } catch(e) {}
-  }
-  return [];
+  const rows = db.prepare(`
+    SELECT * FROM (
+      SELECT * FROM messages ORDER BY created_at DESC LIMIT ?
+    ) ORDER BY created_at ASC
+  `).all(MAX_HISTORY_MESSAGES);
+  if (rows.length > 0) return rows.map(rowToMessage).filter(Boolean);
+
+  const history = trimHistory(readJsonArray(DATA_FILE, '聊天记录').map(normalizeMessage).filter(Boolean));
+  history.forEach(upsertMessage);
+  return history;
+}
+
+let saveQueue = Promise.resolve();
+let userSaveQueue = Promise.resolve();
+
+function loadUsers() {
+  const rows = db.prepare('SELECT * FROM users ORDER BY created_at ASC').all();
+  if (rows.length > 0) return rows.map(rowToUser).filter(Boolean);
+
+  const migratedUsers = readJsonArray(USERS_FILE, '用户数据').map(normalizeUser).filter(Boolean);
+  migratedUsers.forEach(upsertUser);
+  return migratedUsers;
+}
+
+function loadRooms() {
+  const rows = db.prepare('SELECT * FROM rooms ORDER BY created_at ASC').all();
+  return rows.map(rowToRoom).filter(Boolean);
 }
 
 function saveHistory(messages) {
-  fs.writeFileSync(DATA_FILE, JSON.stringify(messages, null, 2));
+  try {
+    trimHistory(messages).forEach(upsertMessage);
+  } catch (error) {
+    console.error('保存聊天记录失败:', error.message);
+  }
 }
 
-let messages = loadHistory();
-const onlineUsers = new Map();
+function saveUsers() {
+  try {
+    users.forEach(upsertUser);
+  } catch (error) {
+    console.error('保存用户数据失败:', error.message);
+  }
+}
 
-app.use(express.static('public'));
+function cleanText(value, maxLength = MAX_MESSAGE_LENGTH) {
+  if (typeof value !== 'string') return '';
+  return value.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim().slice(0, maxLength);
+}
+
+function cleanUsername(value) {
+  return cleanText(value, MAX_USERNAME_LENGTH).replace(/\s+/g, ' ');
+}
+
+function cleanAccount(value) {
+  if (typeof value !== 'string') return '';
+  return value.trim().toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, MAX_ACCOUNT_LENGTH);
+}
+
+function cleanRoomName(value) {
+  return cleanText(value, 28).replace(/\s+/g, ' ');
+}
+
+function cleanRoomId(value) {
+  if (typeof value !== 'string') return '';
+  return value.trim().replace(/[^a-zA-Z0-9:_-]/g, '').slice(0, 80);
+}
+
+function makeAvatar(name) {
+  return (cleanUsername(name) || '?').slice(0, 1).toUpperCase();
+}
+
+function normalizeUser(user) {
+  if (!user || typeof user !== 'object') return null;
+  const account = cleanAccount(user.account);
+  const username = cleanUsername(user.username) || account;
+  const passwordHash = typeof user.passwordHash === 'string' ? user.passwordHash : '';
+  if (!user.id || !account || !passwordHash.includes(':')) return null;
+  return {
+    id: String(user.id),
+    account,
+    username,
+    avatar: cleanText(user.avatar, 4) || makeAvatar(username),
+    passwordHash,
+    createdAt: Number.isNaN(Date.parse(user.createdAt)) ? new Date().toISOString() : user.createdAt,
+    lastIp: typeof user.lastIp === 'string' ? user.lastIp : '',
+    lastLoginAt: Number.isNaN(Date.parse(user.lastLoginAt)) ? '' : user.lastLoginAt
+  };
+}
+
+function normalizeMessage(message) {
+  if (!message || typeof message !== 'object') return null;
+
+  const username = cleanUsername(message.username) || '匿名';
+  const content = typeof message.content === 'string'
+    ? message.content
+    : typeof message.message === 'string'
+      ? message.message
+      : '';
+  const type = ['image', 'voice', 'recalled'].includes(message.type) ? message.type : 'text';
+  const timestamp = Number.isNaN(Date.parse(message.timestamp))
+    ? new Date().toISOString()
+    : message.timestamp;
+  const recalled = Boolean(message.recalled);
+  const roomId = cleanRoomId(message.roomId || message.room_id || DEFAULT_ROOM_ID) || DEFAULT_ROOM_ID;
+
+  if (recalled) {
+    return {
+      id: message.id || crypto.randomUUID(),
+      roomId,
+      type: 'recalled',
+      userId: message.userId || null,
+      username,
+      avatar: message.avatar || makeAvatar(username),
+      content: '',
+      timestamp,
+      recalled: true
+    };
+  }
+
+  if (type === 'image') {
+    if (!isValidImageData(content)) return null;
+    return {
+      id: message.id || crypto.randomUUID(),
+      roomId,
+      type,
+      userId: message.userId || null,
+      username,
+      avatar: message.avatar || makeAvatar(username),
+      content,
+      timestamp,
+      recalled: false
+    };
+  }
+
+  if (type === 'voice') {
+    if (!isValidVoiceData(content)) return null;
+    return {
+      id: message.id || crypto.randomUUID(),
+      roomId,
+      type,
+      userId: message.userId || null,
+      username,
+      avatar: message.avatar || makeAvatar(username),
+      content,
+      duration: Number.isFinite(Number(message.duration)) ? Number(message.duration) : 0,
+      timestamp,
+      recalled: false
+    };
+  }
+
+  const text = cleanText(content);
+  if (!text) return null;
+  return {
+    id: message.id || crypto.randomUUID(),
+    roomId,
+    type: 'text',
+    userId: message.userId || null,
+    username,
+    avatar: message.avatar || makeAvatar(username),
+    content: text,
+    timestamp,
+    recalled: false
+  };
+}
+
+function broadcastOnlineUsers() {
+  const list = Array.from(onlineUsers.values()).map(publicUser);
+  io.emit('onlineUsers', { count: list.length, users: list });
+  broadcastLobby();
+}
+
+function trimHistory(history) {
+  return history.slice(-MAX_HISTORY_MESSAGES);
+}
+
+function publicUser(user) {
+  return {
+    id: user.id,
+    username: user.username,
+    avatar: user.avatar || makeAvatar(user.username),
+    isAdmin: isAdminUser(user)
+  };
+}
+
+function privateUser(user) {
+  return {
+    id: user.id,
+    account: user.account,
+    username: user.username,
+    avatar: user.avatar || makeAvatar(user.username),
+    passwordHash: user.passwordHash,
+    createdAt: user.createdAt,
+    lastIp: user.lastIp || '',
+    lastLoginAt: user.lastLoginAt || ''
+  };
+}
+
+function initDatabase() {
+  db = new DatabaseSync(DB_FILE);
+  db.exec(`
+    PRAGMA journal_mode = WAL;
+    PRAGMA foreign_keys = ON;
+
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      account TEXT NOT NULL UNIQUE,
+      username TEXT NOT NULL,
+      avatar TEXT NOT NULL,
+      password_hash TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      last_ip TEXT NOT NULL DEFAULT '',
+      last_login_at TEXT NOT NULL DEFAULT ''
+    );
+
+    CREATE TABLE IF NOT EXISTS messages (
+      id TEXT PRIMARY KEY,
+      room_id TEXT NOT NULL DEFAULT 'club-91',
+      type TEXT NOT NULL,
+      user_id TEXT,
+      username TEXT NOT NULL,
+      avatar TEXT NOT NULL,
+      content TEXT NOT NULL DEFAULT '',
+      duration REAL NOT NULL DEFAULT 0,
+      recalled INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS rooms (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      type TEXT NOT NULL DEFAULT 'group',
+      created_by TEXT,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS room_members (
+      room_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      joined_at TEXT NOT NULL,
+      PRIMARY KEY (room_id, user_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at);
+    CREATE INDEX IF NOT EXISTS idx_messages_user_id ON messages(user_id);
+    CREATE INDEX IF NOT EXISTS idx_room_members_user_id ON room_members(user_id);
+  `);
+  ensureColumn('users', 'last_ip', "TEXT NOT NULL DEFAULT ''");
+  ensureColumn('users', 'last_login_at', "TEXT NOT NULL DEFAULT ''");
+  ensureColumn('messages', 'room_id', `TEXT NOT NULL DEFAULT '${DEFAULT_ROOM_ID}'`);
+  db.exec('CREATE INDEX IF NOT EXISTS idx_messages_room_id ON messages(room_id)');
+  ensureDefaultRoom();
+}
+
+function ensureColumn(tableName, columnName, definition) {
+  const columns = db.prepare(`PRAGMA table_info(${tableName})`).all();
+  if (columns.some((column) => column.name === columnName)) return;
+  db.exec(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${definition}`);
+}
+
+function rowToUser(row) {
+  if (!row) return null;
+  return normalizeUser({
+    id: row.id,
+    account: row.account,
+    username: row.username,
+    avatar: row.avatar,
+    passwordHash: row.password_hash,
+    createdAt: row.created_at,
+    lastIp: row.last_ip,
+    lastLoginAt: row.last_login_at
+  });
+}
+
+function rowToRoom(row) {
+  if (!row) return null;
+  const id = cleanRoomId(row.id);
+  const name = cleanRoomName(row.name);
+  const type = row.type === 'private' ? 'private' : 'group';
+  if (!id || !name) return null;
+  return {
+    id,
+    name,
+    type,
+    createdBy: row.created_by || '',
+    createdAt: row.created_at || new Date().toISOString()
+  };
+}
+
+function rowToMessage(row) {
+  if (!row) return null;
+  return normalizeMessage({
+    id: row.id,
+    roomId: row.room_id,
+    type: row.recalled ? 'recalled' : row.type,
+    userId: row.user_id,
+    username: row.username,
+    avatar: row.avatar,
+    content: row.content,
+    duration: row.duration,
+    timestamp: row.created_at,
+    recalled: Boolean(row.recalled)
+  });
+}
+
+function upsertUser(user) {
+  db.prepare(`
+    INSERT INTO users (id, account, username, avatar, password_hash, created_at, last_ip, last_login_at)
+    VALUES (@id, @account, @username, @avatar, @passwordHash, @createdAt, @lastIp, @lastLoginAt)
+    ON CONFLICT(id) DO UPDATE SET
+      account = excluded.account,
+      username = excluded.username,
+      avatar = excluded.avatar,
+      password_hash = excluded.password_hash,
+      created_at = excluded.created_at,
+      last_ip = excluded.last_ip,
+      last_login_at = excluded.last_login_at
+  `).run({
+    id: user.id,
+    account: user.account,
+    username: user.username,
+    avatar: user.avatar || makeAvatar(user.username),
+    passwordHash: user.passwordHash,
+    createdAt: user.createdAt,
+    lastIp: user.lastIp || '',
+    lastLoginAt: user.lastLoginAt || ''
+  });
+}
+
+function upsertRoom(room) {
+  db.prepare(`
+    INSERT INTO rooms (id, name, type, created_by, created_at)
+    VALUES (@id, @name, @type, @createdBy, @createdAt)
+    ON CONFLICT(id) DO UPDATE SET
+      name = excluded.name,
+      type = excluded.type,
+      created_by = excluded.created_by,
+      created_at = excluded.created_at
+  `).run(room);
+}
+
+function ensureDefaultRoom() {
+  db.prepare(`
+    INSERT INTO rooms (id, name, type, created_by, created_at)
+    VALUES (?, ?, 'group', '', ?)
+    ON CONFLICT(id) DO NOTHING
+  `).run(DEFAULT_ROOM_ID, DEFAULT_ROOM_NAME, new Date().toISOString());
+  db.prepare('UPDATE rooms SET name = ? WHERE id = ?').run(DEFAULT_ROOM_NAME, DEFAULT_ROOM_ID);
+  db.prepare('UPDATE messages SET room_id = ? WHERE room_id IS NULL OR room_id = ?').run(DEFAULT_ROOM_ID, '');
+}
+
+function upsertMessage(message) {
+  const payload = publicMessage(message);
+  if (!payload) return;
+  db.prepare(`
+    INSERT INTO messages (id, room_id, type, user_id, username, avatar, content, duration, recalled, created_at)
+    VALUES (@id, @roomId, @type, @userId, @username, @avatar, @content, @duration, @recalled, @timestamp)
+    ON CONFLICT(id) DO UPDATE SET
+      room_id = excluded.room_id,
+      type = excluded.type,
+      user_id = excluded.user_id,
+      username = excluded.username,
+      avatar = excluded.avatar,
+      content = excluded.content,
+      duration = excluded.duration,
+      recalled = excluded.recalled,
+      created_at = excluded.created_at
+  `).run({
+    ...payload,
+    recalled: payload.recalled ? 1 : 0
+  });
+}
+
+function publicMessage(message) {
+  if (!message) return null;
+  if (!message.recalled) {
+    return {
+      id: message.id,
+      roomId: message.roomId || DEFAULT_ROOM_ID,
+      type: message.type,
+      userId: message.userId,
+      username: message.username,
+      avatar: message.avatar || makeAvatar(message.username),
+      content: message.content,
+      duration: message.duration || 0,
+      timestamp: message.timestamp,
+      recalled: false
+    };
+  }
+
+  return {
+    id: message.id,
+    roomId: message.roomId || DEFAULT_ROOM_ID,
+    type: 'recalled',
+    userId: message.userId,
+    username: message.username,
+    avatar: message.avatar,
+    content: '',
+    duration: 0,
+    timestamp: message.timestamp,
+    recalled: true
+  };
+}
+
+function hashPassword(password, salt = crypto.randomBytes(16).toString('hex')) {
+  const hash = crypto.scryptSync(password, salt, 64).toString('hex');
+  return `${salt}:${hash}`;
+}
+
+function verifyPassword(password, storedHash) {
+  const [salt, hash] = String(storedHash || '').split(':');
+  if (!salt || !hash) return false;
+  const candidate = crypto.scryptSync(password, salt, 64);
+  const stored = Buffer.from(hash, 'hex');
+  return stored.length === candidate.length && crypto.timingSafeEqual(stored, candidate);
+}
+
+const authAttempts = new Map();
+
+function authLimitKey(socket) {
+  return socket.handshake.address || socket.id;
+}
+
+function checkAuthLimit(socket) {
+  const key = authLimitKey(socket);
+  const now = Date.now();
+  const record = authAttempts.get(key) || { count: 0, resetAt: now + AUTH_WINDOW_MS };
+
+  if (record.resetAt <= now) {
+    record.count = 0;
+    record.resetAt = now + AUTH_WINDOW_MS;
+  }
+
+  record.count += 1;
+  authAttempts.set(key, record);
+  return record.count <= AUTH_MAX_ATTEMPTS;
+}
+
+function clearAuthLimit(socket) {
+  authAttempts.delete(authLimitKey(socket));
+}
+
+function findUserByAccount(account) {
+  return users.find((user) => user.account === account);
+}
+
+function findRoom(roomId) {
+  return rooms.find((room) => room.id === roomId && room.type === 'group');
+}
+
+function isAdminUser(user) {
+  return Boolean(user && user.account === ADMIN_ACCOUNT);
+}
+
+function getClientIp(socket) {
+  const forwarded = socket.handshake.headers['x-forwarded-for'];
+  if (typeof forwarded === 'string' && forwarded.trim()) {
+    return forwarded.split(',')[0].trim();
+  }
+  const realIp = socket.handshake.headers['x-real-ip'];
+  if (typeof realIp === 'string' && realIp.trim()) return realIp.trim();
+  return socket.handshake.address || '';
+}
+
+function recordLogin(socket, user) {
+  user.lastIp = getClientIp(socket);
+  user.lastLoginAt = new Date().toISOString();
+  saveUsers();
+}
+
+function bindUser(socket, user) {
+  socket.user = user;
+  onlineUsers.set(socket.id, user);
+}
+
+function roomChannel(roomId) {
+  return `room:${roomId}`;
+}
+
+function privateRoomId(userIdA, userIdB) {
+  return `dm:${[userIdA, userIdB].sort().join(':')}`;
+}
+
+function privateRoomName(userA, userB) {
+  return `${userA.username} 和 ${userB.username}`;
+}
+
+function privateRoomUsers(roomId) {
+  if (typeof roomId !== 'string' || !roomId.startsWith('dm:')) return [];
+  return roomId.slice(3).split(':').filter(Boolean);
+}
+
+function socketsForUser(userId) {
+  return Array.from(io.sockets.sockets.values()).filter((connectedSocket) => (
+    connectedSocket.user && connectedSocket.user.id === userId
+  ));
+}
+
+function notifyPrivateRecipients(message) {
+  const ids = privateRoomUsers(message.roomId);
+  if (ids.length !== 2) return;
+  const targetId = ids.find((id) => id !== message.userId);
+  if (!targetId) return;
+  const target = users.find((user) => user.id === targetId);
+  if (!target) return;
+
+  socketsForUser(targetId).forEach((targetSocket) => {
+    if (targetSocket.currentRoomId === message.roomId) return;
+    targetSocket.emit('private notification', {
+      room: {
+        id: message.roomId,
+        name: privateRoomName(messageUser(message), target),
+        type: 'private',
+        targetUserId: message.userId
+      },
+      from: {
+        id: message.userId,
+        username: message.username,
+        avatar: message.avatar
+      },
+      message: publicMessage(message)
+    });
+  });
+}
+
+function messageUser(message) {
+  return users.find((user) => user.id === message.userId) || {
+    id: message.userId,
+    username: message.username,
+    avatar: message.avatar
+  };
+}
+
+function leaveCurrentRoom(socket) {
+  if (!socket.currentRoomId) return;
+  socket.leave(roomChannel(socket.currentRoomId));
+  clearTyping(socket);
+}
+
+function joinSocketRoom(socket, roomId) {
+  leaveCurrentRoom(socket);
+  socket.currentRoomId = roomId;
+  socket.join(roomChannel(roomId));
+}
+
+function ensureRoomMember(roomId, userId) {
+  db.prepare(`
+    INSERT INTO room_members (room_id, user_id, joined_at)
+    VALUES (?, ?, ?)
+    ON CONFLICT(room_id, user_id) DO NOTHING
+  `).run(roomId, userId, new Date().toISOString());
+}
+
+function groupMemberCount(roomId) {
+  return db.prepare('SELECT COUNT(*) AS count FROM room_members WHERE room_id = ?').get(roomId).count || 0;
+}
+
+function groupOnlineCount(roomId) {
+  const onlineIds = new Set();
+  io.sockets.sockets.forEach((connectedSocket) => {
+    if (connectedSocket.user && connectedSocket.currentRoomId === roomId) {
+      onlineIds.add(connectedSocket.user.id);
+    }
+  });
+  return onlineIds.size;
+}
+
+function messagesForRoom(roomId) {
+  return messages
+    .filter((message) => message.roomId === roomId)
+    .slice(-MAX_HISTORY_MESSAGES)
+    .map(publicMessage)
+    .filter(Boolean);
+}
+
+function publicRoom(room) {
+  return {
+    id: room.id,
+    name: room.name,
+    type: room.type,
+    joinedCount: groupMemberCount(room.id),
+    onlineCount: groupOnlineCount(room.id),
+    createdAt: room.createdAt
+  };
+}
+
+function publicOnlineUsers() {
+  const seen = new Map();
+  Array.from(onlineUsers.values()).forEach((user) => {
+    seen.set(user.id, publicUser(user));
+  });
+  return Array.from(seen.values());
+}
+
+function buildLobbyPayload() {
+  return {
+    rooms: rooms.filter((room) => room.type === 'group').map(publicRoom),
+    users: publicOnlineUsers()
+  };
+}
+
+function emitLobby(socket) {
+  socket.emit('lobby', buildLobbyPayload());
+}
+
+function broadcastLobby() {
+  io.emit('lobby', buildLobbyPayload());
+}
+
+function refreshOpenRooms() {
+  io.sockets.sockets.forEach((connectedSocket) => {
+    if (connectedSocket.currentRoomId) {
+      connectedSocket.emit('history', messagesForRoom(connectedSocket.currentRoomId));
+    }
+  });
+}
+
+function requireAdmin(socket) {
+  if (socket.user && isAdminUser(socket.user)) return true;
+  socket.emit('admin error', '没有管理员权限');
+  return false;
+}
+
+function ensureAdminUser() {
+  const existing = findUserByAccount(ADMIN_ACCOUNT);
+  if (existing) {
+    let changed = false;
+    if (existing.username !== ADMIN_USERNAME) {
+      existing.username = ADMIN_USERNAME;
+      existing.avatar = makeAvatar(ADMIN_USERNAME);
+      changed = true;
+    }
+    if (!verifyPassword(ADMIN_PASSWORD, existing.passwordHash)) {
+      existing.passwordHash = hashPassword(ADMIN_PASSWORD);
+      changed = true;
+    }
+    if (changed) saveUsers();
+    return;
+  }
+
+  const admin = {
+    id: crypto.randomUUID(),
+    account: ADMIN_ACCOUNT,
+    username: ADMIN_USERNAME,
+    avatar: makeAvatar(ADMIN_USERNAME),
+    passwordHash: hashPassword(ADMIN_PASSWORD),
+    createdAt: new Date().toISOString(),
+    lastIp: '',
+    lastLoginAt: ''
+  };
+  users.push(admin);
+  saveUsers();
+}
+
+function validateAuthPayload(payload, isRegister = false) {
+  const account = cleanAccount(payload && payload.account);
+  const password = typeof (payload && payload.password) === 'string' ? payload.password : '';
+  const username = cleanUsername(payload && payload.username) || account;
+  if (!account) return { error: '账号只能用英文、数字、下划线' };
+  if (password.length < MIN_PASSWORD_LENGTH) return { error: `密码至少 ${MIN_PASSWORD_LENGTH} 位` };
+  if (isRegister && !username) return { error: '请输入昵称' };
+  return { account, password, username };
+}
+
+function requireAuth(socket, action = '操作') {
+  if (socket.user) return true;
+  socket.emit('authError', `请先登录后再${action}`);
+  return false;
+}
+
+function adminUserPayload(user) {
+  const userMessages = messages.filter((message) => message.userId === user.id);
+  return {
+    id: user.id,
+    account: user.account,
+    username: user.username,
+    avatar: user.avatar || makeAvatar(user.username),
+    isAdmin: isAdminUser(user),
+    createdAt: user.createdAt,
+    lastIp: user.lastIp || '',
+    lastLoginAt: user.lastLoginAt || '',
+    online: Array.from(onlineUsers.values()).some((onlineUser) => onlineUser.id === user.id),
+    messageCount: userMessages.length,
+    passwordStoredAs: 'scrypt hash + salt'
+  };
+}
+
+function adminMessagePayload(message) {
+  const payload = publicMessage(message);
+  if (!payload) return null;
+  return {
+    ...payload,
+    account: users.find((user) => user.id === payload.userId)?.account || ''
+  };
+}
+
+function buildAdminDashboard() {
+  return {
+    users: users.map(adminUserPayload),
+    messages: messages.map(adminMessagePayload).filter(Boolean),
+    rooms: rooms.filter((room) => room.type === 'group').map(publicRoom),
+    groupCode: groupCodeInfo(),
+    messageCount: messages.length,
+    onlineCount: onlineUsers.size
+  };
+}
+
+function emitAdminDashboard(socket) {
+  socket.emit('admin dashboard', buildAdminDashboard());
+}
+
+function groupCodeInfo(now = Date.now()) {
+  const bucket = Math.floor(now / GROUP_CODE_WINDOW_MS);
+  const hash = crypto.createHash('sha256').update(`beluga:${bucket}:${ADMIN_ACCOUNT}`).digest('hex');
+  const digits = hash.replace(/\D/g, '').padEnd(6, '0').slice(0, 6);
+  return {
+    code: digits,
+    expiresAt: new Date((bucket + 1) * GROUP_CODE_WINDOW_MS).toISOString()
+  };
+}
+
+function isValidGroupCode(code) {
+  return String(code || '').trim() === groupCodeInfo().code;
+}
+
+function broadcastAdminDashboards() {
+  io.sockets.sockets.forEach((connectedSocket) => {
+    if (connectedSocket.user && isAdminUser(connectedSocket.user)) {
+      emitAdminDashboard(connectedSocket);
+    }
+  });
+}
+
+function isValidImageData(value) {
+  if (typeof value !== 'string') return false;
+  const match = value.match(/^data:(image\/[a-z0-9.+-]+);base64,([a-z0-9+/=\s]+)$/i);
+  if (!match || !ALLOWED_IMAGE_TYPES.has(match[1].toLowerCase())) return false;
+
+  const base64 = match[2].replace(/\s/g, '');
+  if (!base64 || base64.length % 4 !== 0) return false;
+
+  try {
+    return Buffer.byteLength(base64, 'base64') <= MAX_IMAGE_BYTES;
+  } catch (error) {
+    return false;
+  }
+}
+
+function isValidVoiceData(value) {
+  if (typeof value !== 'string') return false;
+  const match = value.match(/^data:(audio\/[a-z0-9.+-]+);base64,([a-z0-9+/=\s]+)$/i);
+  if (!match || !ALLOWED_AUDIO_TYPES.has(match[1].toLowerCase())) return false;
+
+  const base64 = match[2].replace(/\s/g, '');
+  if (!base64 || base64.length % 4 !== 0) return false;
+
+  try {
+    return Buffer.byteLength(base64, 'base64') <= MAX_VOICE_BYTES;
+  } catch (error) {
+    return false;
+  }
+}
+
+initDatabase();
+let messages = loadHistory();
+let users = loadUsers();
+ensureAdminUser();
+let rooms = loadRooms();
+const onlineUsers = new Map();
+const typingTimers = new Map();
+
+app.use(express.static(path.join(__dirname, 'public')));
 
 io.on('connection', (socket) => {
-  socket.on('join', (username) => {
-    if (!username || username.trim() === '') return;
-    const name = username.trim();
-    if (Array.from(onlineUsers.values()).some(n => n === name)) {
-      socket.emit('nameError', '别盗你爹号，换一个名字');
+  socket.emit('onlineUsers', { count: onlineUsers.size, users: Array.from(onlineUsers.values()).map(publicUser) });
+  emitLobby(socket);
+
+  socket.on('register', (payload) => {
+    if (!checkAuthLimit(socket)) {
+      socket.emit('authError', '尝试次数太多了，请稍后再试');
       return;
     }
-    socket.username = name;
-    onlineUsers.set(socket.id, name);
-    socket.emit('joinSuccess');
-    socket.emit('history', messages);
-    io.emit('onlineUsers', Array.from(onlineUsers.values()));
-    io.emit('system', { type: 'join', username: name });
+
+    const input = validateAuthPayload(payload, true);
+    if (input.error) {
+      socket.emit('authError', input.error);
+      return;
+    }
+
+    if (findUserByAccount(input.account)) {
+      socket.emit('authError', '这个账号已经被注册了');
+      return;
+    }
+
+    const user = {
+      id: crypto.randomUUID(),
+      account: input.account,
+      username: input.username,
+      avatar: makeAvatar(input.username),
+      passwordHash: hashPassword(input.password),
+      createdAt: new Date().toISOString()
+    };
+    users.push(user);
+    recordLogin(socket, user);
+    bindUser(socket, user);
+    clearAuthLimit(socket);
+    socket.emit('authSuccess', { user: publicUser(user) });
+    emitLobby(socket);
+    broadcastOnlineUsers();
+    broadcastAdminDashboards();
+  });
+
+  socket.on('login', (payload) => {
+    if (!checkAuthLimit(socket)) {
+      socket.emit('authError', '尝试次数太多了，请稍后再试');
+      return;
+    }
+
+    const input = validateAuthPayload(payload);
+    if (input.error) {
+      socket.emit('authError', input.error);
+      return;
+    }
+
+    const user = findUserByAccount(input.account);
+    if (!user || !verifyPassword(input.password, user.passwordHash)) {
+      socket.emit('authError', '账号或密码不对');
+      return;
+    }
+
+    recordLogin(socket, user);
+    bindUser(socket, user);
+    clearAuthLimit(socket);
+    socket.emit('authSuccess', { user: publicUser(user) });
+    emitLobby(socket);
+    broadcastOnlineUsers();
+    broadcastAdminDashboards();
+  });
+
+  socket.on('get lobby', () => {
+    if (!requireAuth(socket, '查看聊天列表')) return;
+    emitLobby(socket);
+  });
+
+  socket.on('join room', (roomIdValue) => {
+    if (!requireAuth(socket, '进入聊天组')) return;
+    const roomId = cleanRoomId(roomIdValue);
+    const room = findRoom(roomId);
+    if (!room) {
+      socket.emit('messageError', '聊天组不存在');
+      return;
+    }
+
+    joinSocketRoom(socket, room.id);
+    ensureRoomMember(room.id, socket.user.id);
+    socket.emit('room joined', { room: publicRoom(room), messages: messagesForRoom(room.id) });
+    io.to(roomChannel(room.id)).emit('system', { type: 'join', username: socket.user.username, roomId: room.id });
+    broadcastLobby();
+    broadcastAdminDashboards();
+  });
+
+  socket.on('open private chat', (targetUserId) => {
+    if (!requireAuth(socket, '私聊')) return;
+    const target = users.find((user) => user.id === targetUserId);
+    if (!target || target.id === socket.user.id) {
+      socket.emit('messageError', '无法打开这个私聊');
+      return;
+    }
+
+    const roomId = privateRoomId(socket.user.id, target.id);
+    joinSocketRoom(socket, roomId);
+    socket.emit('room joined', {
+      room: {
+        id: roomId,
+        name: privateRoomName(socket.user, target),
+        type: 'private',
+        targetUserId: target.id,
+        joinedCount: 2,
+        onlineCount: [socket.user.id, target.id].filter((id) => publicOnlineUsers().some((user) => user.id === id)).length
+      },
+      messages: messagesForRoom(roomId)
+    });
+  });
+
+  socket.on('create room', (payload) => {
+    if (!requireAuth(socket, '创建聊天组')) return;
+    const name = cleanRoomName(payload && payload.name);
+    const code = payload && payload.code;
+    const isAdmin = isAdminUser(socket.user);
+    if (!name) {
+      socket.emit('messageError', '请输入聊天组名称');
+      return;
+    }
+    if (!isAdmin && !isValidGroupCode(code)) {
+      socket.emit('messageError', '建组码不正确或已过期');
+      return;
+    }
+
+    const id = `group:${crypto.randomUUID()}`;
+    const room = {
+      id,
+      name,
+      type: 'group',
+      createdBy: socket.user.id,
+      createdAt: new Date().toISOString()
+    };
+    rooms.push(room);
+    upsertRoom(room);
+    ensureRoomMember(room.id, socket.user.id);
+    joinSocketRoom(socket, room.id);
+    socket.emit('room created', { room: publicRoom(room) });
+    socket.emit('room joined', { room: publicRoom(room), messages: messagesForRoom(room.id) });
+    broadcastLobby();
+    broadcastAdminDashboards();
+  });
+
+  socket.on('leave room', () => {
+    if (!requireAuth(socket, '返回')) return;
+    leaveCurrentRoom(socket);
+    socket.currentRoomId = '';
+    emitLobby(socket);
+    broadcastLobby();
+  });
+
+  socket.on('logout', () => {
+    if (!socket.user) {
+      socket.emit('loggedOut');
+      return;
+    }
+
+    const roomId = socket.currentRoomId;
+    const username = socket.user.username;
+    clearTyping(socket);
+    if (roomId) {
+      socket.leave(roomChannel(roomId));
+      io.to(roomChannel(roomId)).emit('system', { type: 'leave', username, roomId });
+    }
+    socket.currentRoomId = '';
+    socket.user = null;
+    onlineUsers.delete(socket.id);
+    socket.emit('loggedOut');
+    emitLobby(socket);
+    broadcastOnlineUsers();
+    broadcastAdminDashboards();
   });
 
   socket.on('chat message', (msg) => {
-    if (!socket.username || typeof msg !== 'string' || !msg.trim()) return;
-    const data = { type: 'text', username: socket.username, content: msg.trim(), timestamp: new Date().toISOString() };
-    messages.push(data);
+    const content = cleanText(msg);
+    if (!requireAuth(socket, '发消息') || !content) return;
+    if (!socket.currentRoomId) {
+      socket.emit('messageError', '请先选择聊天组或私聊');
+      return;
+    }
+    clearTyping(socket);
+    const data = {
+      id: crypto.randomUUID(),
+      roomId: socket.currentRoomId,
+      type: 'text',
+      userId: socket.user.id,
+      username: socket.user.username,
+      avatar: socket.user.avatar,
+      content,
+      timestamp: new Date().toISOString(),
+      recalled: false
+    };
+    messages = trimHistory([...messages, data]);
     saveHistory(messages);
-    io.emit('chat message', data);
+    io.to(roomChannel(socket.currentRoomId)).emit('chat message', data);
+    notifyPrivateRecipients(data);
+    broadcastAdminDashboards();
   });
 
   socket.on('chat image', (data) => {
-    if (!socket.username || !data.base64) return;
-    const imageData = { type: 'image', username: socket.username, content: data.base64, timestamp: new Date().toISOString() };
-    messages.push(imageData);
+    const base64 = data && typeof data.base64 === 'string' ? data.base64 : '';
+    if (!requireAuth(socket, '发图片')) return;
+    if (!socket.currentRoomId) {
+      socket.emit('messageError', '请先选择聊天组或私聊');
+      return;
+    }
+    if (!isValidImageData(base64)) {
+      socket.emit('messageError', '图片格式不支持或超过 5MB');
+      return;
+    }
+    clearTyping(socket);
+    const imageData = {
+      id: crypto.randomUUID(),
+      roomId: socket.currentRoomId,
+      type: 'image',
+      userId: socket.user.id,
+      username: socket.user.username,
+      avatar: socket.user.avatar,
+      content: base64,
+      timestamp: new Date().toISOString(),
+      recalled: false
+    };
+    messages = trimHistory([...messages, imageData]);
     saveHistory(messages);
-    io.emit('chat message', imageData);
+    io.to(roomChannel(socket.currentRoomId)).emit('chat message', imageData);
+    notifyPrivateRecipients(imageData);
+    broadcastAdminDashboards();
+  });
+
+  socket.on('chat voice', (data) => {
+    const base64 = data && typeof data.base64 === 'string' ? data.base64 : '';
+    const duration = Number(data && data.duration);
+    if (!requireAuth(socket, '发语音')) return;
+    if (!socket.currentRoomId) {
+      socket.emit('messageError', '请先选择聊天组或私聊');
+      return;
+    }
+    if (!isValidVoiceData(base64)) {
+      socket.emit('messageError', '语音格式不支持或超过 3MB');
+      return;
+    }
+    clearTyping(socket);
+    const voiceData = {
+      id: crypto.randomUUID(),
+      roomId: socket.currentRoomId,
+      type: 'voice',
+      userId: socket.user.id,
+      username: socket.user.username,
+      avatar: socket.user.avatar,
+      content: base64,
+      duration: Number.isFinite(duration) ? Math.max(0, Math.round(duration)) : 0,
+      timestamp: new Date().toISOString(),
+      recalled: false
+    };
+    messages = trimHistory([...messages, voiceData]);
+    saveHistory(messages);
+    io.to(roomChannel(socket.currentRoomId)).emit('chat message', voiceData);
+    notifyPrivateRecipients(voiceData);
+    broadcastAdminDashboards();
+  });
+
+  socket.on('recall message', (messageId) => {
+    if (!requireAuth(socket, '撤回消息') || typeof messageId !== 'string') return;
+    const message = messages.find((item) => item.id === messageId);
+    if (!message || message.userId !== socket.user.id || message.recalled || message.roomId !== socket.currentRoomId) {
+      socket.emit('messageError', '只能撤回自己发出的消息');
+      return;
+    }
+    if (Date.now() - new Date(message.timestamp).getTime() > RECALL_WINDOW_MS) {
+      socket.emit('messageError', '消息超过 2 分钟后不可撤回');
+      return;
+    }
+
+    message.recalled = true;
+    message.content = '';
+    saveHistory(messages);
+    io.to(roomChannel(message.roomId)).emit('message recalled', publicMessage(message));
+    broadcastAdminDashboards();
+  });
+
+  socket.on('admin get dashboard', () => {
+    if (!requireAdmin(socket)) return;
+    emitAdminDashboard(socket);
+  });
+
+  socket.on('admin clear history', () => {
+    if (!requireAdmin(socket)) return;
+    messages = [];
+    try {
+      db.exec('DELETE FROM messages');
+    } catch (error) {
+      socket.emit('admin error', '清空聊天记录失败');
+      return;
+    }
+    refreshOpenRooms();
+    broadcastAdminDashboards();
+  });
+
+  socket.on('admin update username', (payload) => {
+    if (!requireAdmin(socket)) return;
+    const userId = payload && typeof payload.userId === 'string' ? payload.userId : '';
+    const username = cleanUsername(payload && payload.username);
+    if (!userId || !username) {
+      socket.emit('admin error', '请输入有效昵称');
+      return;
+    }
+
+    const user = users.find((item) => item.id === userId);
+    if (!user) {
+      socket.emit('admin error', '用户不存在');
+      return;
+    }
+
+    const previousUsername = user.username;
+    user.username = username;
+    user.avatar = makeAvatar(username);
+    messages = messages.map((message) => (
+      message.userId === user.id
+        ? { ...message, username: user.username, avatar: user.avatar }
+        : message
+    ));
+
+    try {
+      saveUsers();
+      db.prepare('UPDATE messages SET username = ?, avatar = ? WHERE user_id = ?').run(user.username, user.avatar, user.id);
+    } catch (error) {
+      socket.emit('admin error', '修改昵称失败');
+      return;
+    }
+
+    broadcastOnlineUsers();
+    refreshOpenRooms();
+    io.emit('system', { type: 'rename', previousUsername, username: user.username });
+    broadcastAdminDashboards();
+  });
+
+  socket.on('admin reset password', (payload) => {
+    if (!requireAdmin(socket)) return;
+    const userId = payload && typeof payload.userId === 'string' ? payload.userId : '';
+    const password = typeof (payload && payload.password) === 'string' ? payload.password : '';
+    if (!userId || password.length < MIN_PASSWORD_LENGTH) {
+      socket.emit('admin error', `密码至少 ${MIN_PASSWORD_LENGTH} 位`);
+      return;
+    }
+
+    const user = users.find((item) => item.id === userId);
+    if (!user) {
+      socket.emit('admin error', '用户不存在');
+      return;
+    }
+
+    user.passwordHash = hashPassword(password);
+    saveUsers();
+    socket.emit('admin notice', `已重置 ${user.username} 的密码`);
+    broadcastAdminDashboards();
+  });
+
+  socket.on('admin delete room', (roomIdValue) => {
+    if (!requireAdmin(socket)) return;
+    const roomId = cleanRoomId(roomIdValue);
+    if (!roomId || roomId === DEFAULT_ROOM_ID) {
+      socket.emit('admin error', '默认群组不能删除');
+      return;
+    }
+    const room = rooms.find((item) => item.id === roomId && item.type === 'group');
+    if (!room) {
+      socket.emit('admin error', '群组不存在');
+      return;
+    }
+
+    try {
+      db.prepare('DELETE FROM rooms WHERE id = ?').run(roomId);
+      db.prepare('DELETE FROM room_members WHERE room_id = ?').run(roomId);
+      db.prepare('DELETE FROM messages WHERE room_id = ?').run(roomId);
+    } catch (error) {
+      socket.emit('admin error', '删除群组失败');
+      return;
+    }
+    rooms = rooms.filter((item) => item.id !== roomId);
+    messages = messages.filter((message) => message.roomId !== roomId);
+
+    io.sockets.sockets.forEach((connectedSocket) => {
+      if (connectedSocket.currentRoomId !== roomId) return;
+      connectedSocket.leave(roomChannel(roomId));
+      connectedSocket.currentRoomId = '';
+      connectedSocket.emit('room deleted', { roomId, name: room.name });
+      emitLobby(connectedSocket);
+    });
+    socket.emit('admin notice', `已删除群组 ${room.name}`);
+    broadcastLobby();
+    broadcastAdminDashboards();
+  });
+
+  socket.on('typing', (isTyping) => {
+    if (!socket.user || !socket.currentRoomId) return;
+
+    if (isTyping) {
+      socket.to(roomChannel(socket.currentRoomId)).emit('typing', { username: socket.user.username, isTyping: true, roomId: socket.currentRoomId });
+      clearTimeout(typingTimers.get(socket.id));
+      typingTimers.set(socket.id, setTimeout(() => clearTyping(socket), TYPING_TIMEOUT_MS));
+      return;
+    }
+
+    clearTyping(socket);
   });
 
   socket.on('disconnect', () => {
-    if (socket.username) {
-      io.emit('system', { type: 'leave', username: socket.username });
+    if (socket.user) {
+      const roomId = socket.currentRoomId;
+      clearTyping(socket);
+      if (roomId) io.to(roomChannel(roomId)).emit('system', { type: 'leave', username: socket.user.username, roomId });
       onlineUsers.delete(socket.id);
-      io.emit('onlineUsers', Array.from(onlineUsers.values()));
+      broadcastOnlineUsers();
+      broadcastAdminDashboards();
     }
   });
 });
 
+function clearTyping(socket) {
+  clearTimeout(typingTimers.get(socket.id));
+  typingTimers.delete(socket.id);
+  if (socket.user && socket.currentRoomId) {
+    socket.to(roomChannel(socket.currentRoomId)).emit('typing', { username: socket.user.username, isTyping: false, roomId: socket.currentRoomId });
+  }
+}
+
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-  console.log(`🌌 深海聊天室已启动 → 端口 ${PORT}`);
+  console.log(`Uni 5 已启动 -> 端口 ${PORT}`);
 });
