@@ -4,41 +4,108 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Uni 5</title>
+  <script>
+    (() => {
+      try {
+        const savedMode = localStorage.getItem('uni5-theme-mode');
+        const legacyTheme = localStorage.getItem('uni5-theme');
+        const mode = ['light', 'dark', 'system'].includes(savedMode)
+          ? savedMode
+          : legacyTheme === 'light' || legacyTheme === 'dark'
+          ? legacyTheme
+          : 'system';
+        const fallback = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        document.documentElement.dataset.themeMode = mode;
+        document.documentElement.dataset.theme = mode === 'system' ? fallback : mode;
+      } catch (error) {
+        document.documentElement.dataset.themeMode = 'system';
+        document.documentElement.dataset.theme = 'light';
+      }
+    })();
+  </script>
   <script src="/socket.io/socket.io.js"></script>
   <style>
     :root {
       color-scheme: light;
       --bg: #f5f5f7;
       --panel: rgba(255, 255, 255, 0.88);
-      --panel-soft: #f2f2f7;
+      --panel-soft: rgba(242, 242, 247, 0.72);
       --ink: #1d1d1f;
       --muted: #6e6e73;
       --line: rgba(60, 60, 67, 0.16);
       --brand: #007aff;
       --brand-dark: #005ecb;
+      --sent-top: #eaf4ff;
       --sent: #e8f2ff;
-      --received: #ffffff;
+      --received: rgba(255, 255, 255, 0.78);
       --accent: #30b0c7;
       --danger: #ff3b30;
-      --shadow: 0 24px 80px rgba(0, 0, 0, 0.14);
-      --glass-bg-light: rgba(255, 255, 255, 0.68);
-      --glass-bg-soft: rgba(255, 255, 255, 0.48);
-      --glass-border: rgba(255, 255, 255, 0.46);
-      --glass-shadow: 0 24px 80px rgba(31, 48, 86, 0.18);
-      --glass-blur-sm: 12px;
-      --glass-blur-md: 20px;
-      --glass-blur-lg: 32px;
+      --shadow: 0 18px 54px rgba(40, 60, 120, 0.14);
+      --bg-filter: blur(10px) saturate(0.92) brightness(0.98) contrast(1.02);
+      --bg-overlay:
+        radial-gradient(circle at 14% 12%, rgba(255, 255, 255, 0.34), transparent 24%),
+        radial-gradient(circle at 82% 18%, rgba(0, 122, 255, 0.12), transparent 34%),
+        radial-gradient(circle at 44% 88%, rgba(52, 199, 89, 0.1), transparent 35%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0.2));
+      --glass-bg-light: rgba(255, 255, 255, 0.62);
+      --glass-bg: rgba(255, 255, 255, 0.52);
+      --glass-bg-soft: rgba(255, 255, 255, 0.38);
+      --glass-border: rgba(255, 255, 255, 0.48);
+      --glass-highlight: rgba(255, 255, 255, 0.68);
+      --glass-shadow: 0 18px 52px rgba(40, 60, 120, 0.16);
+      --glass-blur-sm: 8px;
+      --glass-blur-md: 14px;
+      --glass-blur-lg: 20px;
+      --field-bg: rgba(255, 255, 255, 0.76);
+      --field-focus-bg: rgba(255, 255, 255, 0.9);
+      --message-surface: linear-gradient(180deg, rgba(255, 255, 255, 0.54), rgba(245, 247, 250, 0.34));
       --ease: cubic-bezier(0.16, 1, 0.3, 1);
       --ease-smooth: cubic-bezier(0.22, 1, 0.36, 1);
       --ease-pop: cubic-bezier(0.34, 1.56, 0.64, 1);
       --duration-fast: 160ms;
-      --duration-normal: 280ms;
-      --duration-slow: 680ms;
+      --duration-normal: 240ms;
+      --duration-slow: 520ms;
       --radius-sm: 10px;
       --radius-md: 16px;
       --radius-lg: 24px;
       --radius-xl: 32px;
       --radius-icon: 26%;
+    }
+
+    html[data-theme="dark"] {
+      color-scheme: dark;
+      --bg: #0b1020;
+      --panel: rgba(20, 26, 42, 0.78);
+      --panel-soft: rgba(255, 255, 255, 0.08);
+      --ink: #f5f7fb;
+      --muted: rgba(235, 240, 255, 0.66);
+      --line: rgba(255, 255, 255, 0.14);
+      --brand: #66aaff;
+      --brand-dark: #8fc2ff;
+      --sent-top: rgba(57, 118, 194, 0.66);
+      --sent: rgba(45, 105, 180, 0.54);
+      --received: rgba(20, 27, 44, 0.72);
+      --accent: #5ac8fa;
+      --danger: #ff453a;
+      --shadow: 0 18px 54px rgba(0, 0, 0, 0.32);
+      --bg-filter: blur(10px) saturate(0.82) brightness(0.58) contrast(1.04);
+      --bg-overlay:
+        radial-gradient(circle at 14% 12%, rgba(170, 205, 255, 0.16), transparent 26%),
+        radial-gradient(circle at 82% 18%, rgba(0, 122, 255, 0.2), transparent 34%),
+        radial-gradient(circle at 44% 88%, rgba(90, 200, 250, 0.08), transparent 35%),
+        linear-gradient(180deg, rgba(8, 12, 24, 0.42), rgba(8, 12, 24, 0.58));
+      --glass-bg-light: rgba(22, 29, 48, 0.68);
+      --glass-bg: rgba(20, 27, 44, 0.58);
+      --glass-bg-soft: rgba(18, 25, 42, 0.42);
+      --glass-border: rgba(255, 255, 255, 0.16);
+      --glass-highlight: rgba(255, 255, 255, 0.1);
+      --glass-shadow: 0 18px 52px rgba(0, 0, 0, 0.34);
+      --glass-blur-sm: 8px;
+      --glass-blur-md: 14px;
+      --glass-blur-lg: 20px;
+      --field-bg: rgba(18, 25, 42, 0.74);
+      --field-focus-bg: rgba(24, 34, 56, 0.86);
+      --message-surface: linear-gradient(180deg, rgba(16, 23, 38, 0.54), rgba(10, 16, 30, 0.34));
     }
 
     * {
@@ -57,9 +124,10 @@
       min-height: 100%;
       font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       color: var(--ink);
-      background: #dbeafe;
+      background: var(--bg);
       perspective: 1200px;
       transform-style: preserve-3d;
+      transition: background var(--duration-normal) var(--ease-smooth), color var(--duration-normal) var(--ease-smooth);
     }
 
     body::before {
@@ -68,12 +136,11 @@
       inset: -28px;
       pointer-events: none;
       background:
-        linear-gradient(135deg, rgba(255, 255, 255, 0.2), rgba(0, 122, 255, 0.12) 42%, rgba(255, 255, 255, 0.24)),
+        linear-gradient(135deg, rgba(255, 255, 255, 0.16), rgba(0, 122, 255, 0.1) 42%, rgba(255, 255, 255, 0.18)),
         url("/assets/backgrounds/sonoma.jpg") center / cover no-repeat;
-      filter: blur(12px) saturate(0.92) brightness(0.98) contrast(1.02);
+      filter: var(--bg-filter);
       opacity: 1;
       transform: scale(1.04);
-      animation: ambientFlow 28s var(--ease-smooth) infinite alternate;
       z-index: 0;
     }
 
@@ -82,12 +149,9 @@
       position: fixed;
       inset: 0;
       pointer-events: none;
-      background:
-        radial-gradient(circle at 14% 12%, rgba(255, 255, 255, 0.34), transparent 24%),
-        radial-gradient(circle at 82% 18%, rgba(0, 122, 255, 0.12), transparent 34%),
-        radial-gradient(circle at 44% 88%, rgba(52, 199, 89, 0.1), transparent 35%),
-        linear-gradient(180deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.18));
+      background: var(--bg-overlay);
       z-index: 0;
+      transition: background var(--duration-normal) var(--ease-smooth);
     }
 
     button,
@@ -115,11 +179,13 @@
 
     .page-layer {
       transform-style: preserve-3d;
-      will-change: transform, opacity, filter;
       transition:
         transform var(--duration-slow) var(--ease-smooth),
-        opacity var(--duration-slow) var(--ease-smooth),
-        filter var(--duration-slow) var(--ease-smooth);
+        opacity var(--duration-slow) var(--ease-smooth);
+    }
+
+    body.is-page-transitioning .page-layer {
+      will-change: transform, opacity;
     }
 
     body.is-page-transitioning .page-layer {
@@ -128,23 +194,20 @@
 
     body.view-auth .app,
     body.view-lobby .app {
-      opacity: 0.5;
-      transform: translate3d(0, 44px, -150px) scale(0.88);
-      filter: blur(22px) saturate(1.08);
+      opacity: 0.58;
+      transform: translate3d(0, 38px, -130px) scale(0.9);
       pointer-events: none;
     }
 
     body.view-admin .app {
-      opacity: 0.48;
-      transform: translate3d(0, 42px, -140px) scale(0.9);
-      filter: blur(20px) saturate(1.08);
+      opacity: 0.52;
+      transform: translate3d(0, 36px, -120px) scale(0.91);
       pointer-events: none;
     }
 
     body.view-chat .app {
       opacity: 1;
       transform: translate3d(0, 0, 0) scale(1);
-      filter: blur(0);
       pointer-events: auto;
     }
 
@@ -153,13 +216,10 @@
     .admin-page {
       opacity: 0;
       pointer-events: none;
-      transform: translate3d(0, 48px, -150px) scale(0.88);
-      filter: blur(24px) saturate(1.08);
+      transform: translate3d(0, 42px, -130px) scale(0.9);
       transition:
         transform var(--duration-slow) var(--ease-smooth),
-        opacity var(--duration-slow) var(--ease-smooth),
-        filter var(--duration-slow) var(--ease-smooth);
-      will-change: transform, opacity, filter;
+        opacity var(--duration-slow) var(--ease-smooth);
       transform-style: preserve-3d;
     }
 
@@ -168,15 +228,13 @@
     body.view-admin .admin-page {
       opacity: 1;
       transform: translate3d(0, 0, 0) scale(1);
-      filter: blur(0);
       pointer-events: auto;
     }
 
     body.view-lobby .login,
     body.view-chat .lobby {
       opacity: 0;
-      transform: translate3d(0, -86px, 190px) scale(1.1);
-      filter: blur(16px) saturate(1.02);
+      transform: translate3d(0, -72px, 160px) scale(1.08);
       pointer-events: none;
     }
 
@@ -185,16 +243,14 @@
     body.view-chat .admin-page,
     body.view-auth .admin-page {
       opacity: 0;
-      transform: translate3d(0, 48px, -150px) scale(0.88);
-      filter: blur(24px) saturate(1.08);
+      transform: translate3d(0, 42px, -130px) scale(0.9);
       pointer-events: none;
     }
 
     body.view-admin .login,
     body.view-admin .lobby {
-      opacity: 0.5;
-      transform: translate3d(0, 44px, -150px) scale(0.9);
-      filter: blur(22px) saturate(1.08);
+      opacity: 0.52;
+      transform: translate3d(0, 38px, -130px) scale(0.91);
       pointer-events: none;
     }
 
@@ -207,9 +263,8 @@
       overflow: hidden;
       border: 1px solid var(--glass-border);
       border-radius: var(--radius-xl);
-      background: linear-gradient(180deg, var(--glass-bg-light), rgba(255, 255, 255, 0.54));
-      box-shadow: var(--glass-shadow), 0 1px 0 rgba(255, 255, 255, 0.58) inset;
-      animation: pageIn 0.36s var(--ease);
+      background: linear-gradient(180deg, var(--glass-bg-light), var(--glass-bg));
+      box-shadow: var(--glass-shadow), 0 1px 0 var(--glass-highlight) inset;
       backdrop-filter: blur(var(--glass-blur-sm)) saturate(1.18);
     }
 
@@ -219,8 +274,8 @@
       min-height: 0;
       min-width: 0;
       border-right: 1px solid var(--line);
-      background: rgba(250, 250, 252, 0.7);
-      animation: slideInLeft var(--duration-slow) var(--ease-smooth) both;
+      background: var(--glass-bg-soft);
+      backdrop-filter: blur(var(--glass-blur-sm)) saturate(1.08);
     }
 
     .brand {
@@ -272,7 +327,8 @@
       padding: 12px;
       border: 1px solid var(--line);
       border-radius: var(--radius-md);
-      background: var(--panel);
+      background: var(--glass-bg-soft);
+      box-shadow: inset 0 1px 0 var(--glass-highlight);
     }
 
     .metric-label {
@@ -320,9 +376,61 @@
       flex: 0 0 auto;
       border-radius: var(--radius-icon);
       color: #fff;
-      background: var(--accent);
+      background: var(--avatar-bg, linear-gradient(135deg, var(--brand), var(--accent)));
       font-size: 13px;
       font-weight: 800;
+      overflow: hidden;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.34), 0 8px 18px rgba(0, 122, 255, 0.12);
+      transition: transform var(--duration-fast) var(--ease-pop), box-shadow var(--duration-normal) var(--ease-smooth);
+    }
+
+    .avatar img {
+      width: 100%;
+      height: 100%;
+      display: block;
+      object-fit: cover;
+    }
+
+    .avatar.is-large {
+      width: 78px;
+      height: 78px;
+      border-radius: var(--radius-lg);
+      font-size: 28px;
+    }
+
+    .profile-chip {
+      width: calc(100% - 28px);
+      margin: 0 14px 14px;
+      min-height: 54px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 10px;
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-lg);
+      color: var(--ink);
+      background: var(--glass-bg-soft);
+      text-align: left;
+      box-shadow: inset 0 1px 0 var(--glass-highlight);
+      transition: transform var(--duration-fast) var(--ease-pop), background var(--duration-normal) var(--ease-smooth);
+    }
+
+    .profile-chip:hover {
+      transform: translateY(-1px);
+      background: var(--glass-bg-light);
+    }
+
+    .profile-chip strong,
+    .profile-chip span {
+      display: block;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .profile-chip span {
+      color: var(--muted);
+      font-size: 12px;
     }
 
     .user-name {
@@ -339,8 +447,7 @@
       display: grid;
       grid-template-rows: auto minmax(0, 1fr) auto auto;
       overflow: hidden;
-      background: rgba(255, 255, 255, 0.52);
-      animation: slideInUp var(--duration-slow) var(--ease-smooth) 80ms both;
+      background: var(--glass-bg-soft);
     }
 
     .chat-header {
@@ -351,7 +458,7 @@
       gap: 16px;
       padding: 18px 22px;
       border-bottom: 1px solid var(--line);
-      background: rgba(255, 255, 255, 0.62);
+      background: var(--glass-bg);
       backdrop-filter: blur(var(--glass-blur-sm)) saturate(1.14);
     }
 
@@ -412,46 +519,81 @@
       display: none;
     }
 
-    .switch-user-btn {
+    .switch-user-btn,
+    .theme-toggle-btn {
       min-height: 36px;
       padding: 0 12px;
       display: inline-flex;
       align-items: center;
       justify-content: center;
       gap: 7px;
-      border: 1px solid rgba(255, 255, 255, 0.44);
+      border: 1px solid var(--glass-border);
       border-radius: var(--radius-md);
       color: var(--ink);
-      background: rgba(255, 255, 255, 0.58);
-      box-shadow: 0 12px 28px rgba(31, 48, 86, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.62);
+      background: var(--glass-bg-soft);
+      box-shadow: 0 10px 24px rgba(31, 48, 86, 0.08), inset 0 1px 0 var(--glass-highlight);
       backdrop-filter: blur(var(--glass-blur-sm)) saturate(1.16);
       font-weight: 800;
       transition:
         transform var(--duration-fast) var(--ease-pop),
-        box-shadow var(--duration-normal) var(--ease-smooth),
         background var(--duration-normal) var(--ease-smooth),
+        color var(--duration-normal) var(--ease-smooth),
         border-color var(--duration-normal) var(--ease-smooth);
     }
 
-    .switch-user-btn:hover {
+    .switch-user-btn:hover,
+    .theme-toggle-btn:hover {
       transform: translateY(-1px) scale(1.02);
       border-color: rgba(0, 122, 255, 0.24);
-      background: rgba(255, 255, 255, 0.72);
-      box-shadow: 0 16px 38px rgba(0, 122, 255, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.72);
+      background: var(--glass-bg-light);
     }
 
-    .switch-user-btn:active {
+    .switch-user-btn:active,
+    .theme-toggle-btn:active {
       transform: translateY(0) scale(0.97);
     }
 
-    .switch-user-btn .icon {
+    .switch-user-btn .icon,
+    .theme-toggle-btn .icon {
       width: 17px;
       height: 17px;
+    }
+
+    .theme-toggle-btn {
+      position: relative;
+      width: 42px;
+      padding: 0;
+    }
+
+    .theme-toggle-btn .theme-icon {
+      position: absolute;
+      transition: transform var(--duration-normal) var(--ease-smooth), opacity var(--duration-normal) var(--ease-smooth);
+    }
+
+    .theme-toggle-btn .moon-icon {
+      opacity: 1;
+      transform: rotate(0deg) scale(1);
+    }
+
+    .theme-toggle-btn .sun-icon {
+      opacity: 0;
+      transform: rotate(-40deg) scale(0.74);
+    }
+
+    html[data-theme="dark"] .theme-toggle-btn .moon-icon {
+      opacity: 0;
+      transform: rotate(40deg) scale(0.74);
+    }
+
+    html[data-theme="dark"] .theme-toggle-btn .sun-icon {
+      opacity: 1;
+      transform: rotate(0deg) scale(1);
     }
 
     .login-topbar {
       display: flex;
       justify-content: flex-end;
+      gap: 8px;
       margin-bottom: 14px;
     }
 
@@ -463,9 +605,10 @@
       padding: 8px 10px;
       border: 1px solid var(--line);
       border-radius: var(--radius-md);
-      background: var(--panel);
+      background: var(--glass-bg-soft);
       color: var(--muted);
       font-size: 13px;
+      box-shadow: inset 0 1px 0 var(--glass-highlight);
     }
 
     .dot {
@@ -487,9 +630,7 @@
       overscroll-behavior: contain;
       overflow: auto;
       scroll-behavior: auto;
-      background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.58), rgba(245, 247, 250, 0.38)),
-        repeating-linear-gradient(0deg, rgba(60, 60, 67, 0.018), rgba(60, 60, 67, 0.018) 1px, transparent 1px, transparent 28px);
+      background: var(--message-surface);
     }
 
     .new-message-btn {
@@ -559,7 +700,6 @@
     .message-row.is-recalling .bubble {
       opacity: 0;
       transform: translateY(4px) scale(0.94);
-      filter: blur(4px);
     }
 
     .bubble {
@@ -569,26 +709,23 @@
       border: 1px solid rgba(29, 36, 40, 0.08);
       border-radius: var(--radius-lg) var(--radius-lg) var(--radius-lg) var(--radius-sm);
       background: var(--received);
-      box-shadow: 0 10px 32px rgba(31, 44, 43, 0.08);
+      box-shadow: 0 8px 22px rgba(31, 44, 43, 0.08), inset 0 1px 0 var(--glass-highlight);
       overflow-wrap: anywhere;
       cursor: context-menu;
       transition:
         transform var(--duration-fast) var(--ease-smooth),
         opacity var(--duration-normal) var(--ease-smooth),
-        filter var(--duration-normal) var(--ease-smooth),
-        box-shadow var(--duration-normal) var(--ease-smooth),
         border-color var(--duration-normal) var(--ease-smooth);
     }
 
     .is-me .bubble {
       border-radius: var(--radius-lg) var(--radius-lg) var(--radius-sm) var(--radius-lg);
-      background: linear-gradient(180deg, #eaf4ff, var(--sent));
-      box-shadow: 0 12px 34px rgba(0, 122, 255, 0.12);
+      background: linear-gradient(180deg, var(--sent-top), var(--sent));
+      box-shadow: 0 9px 24px rgba(0, 122, 255, 0.12), inset 0 1px 0 var(--glass-highlight);
     }
 
     .bubble:hover {
       transform: translateY(-1px);
-      box-shadow: 0 15px 42px rgba(31, 44, 43, 0.12);
     }
 
     .meta {
@@ -618,7 +755,7 @@
       border-left: 3px solid var(--brand);
       border-radius: var(--radius-sm);
       color: var(--muted);
-      background: rgba(0, 122, 255, 0.07);
+      background: color-mix(in srgb, var(--brand) 10%, transparent);
       font-size: 12px;
       line-height: 1.45;
     }
@@ -630,7 +767,7 @@
       object-fit: contain;
       border-radius: var(--radius-md);
       border: 1px solid rgba(29, 36, 40, 0.12);
-      background: #fff;
+      background: var(--glass-bg-soft);
     }
 
     .voice-message {
@@ -664,7 +801,7 @@
       display: inline-grid;
       place-items: center;
       border-radius: var(--radius-md);
-      transition: transform 0.22s var(--ease), background 0.22s var(--ease), color 0.22s var(--ease), box-shadow 0.22s var(--ease);
+      transition: transform var(--duration-fast) var(--ease-pop), background var(--duration-fast) var(--ease-smooth), color var(--duration-fast) var(--ease-smooth);
     }
 
     .icon {
@@ -690,7 +827,7 @@
 
     .icon-btn {
       border: 1px solid var(--line);
-      background: rgba(255, 255, 255, 0.68);
+      background: var(--glass-bg-soft);
       color: var(--ink);
     }
 
@@ -699,7 +836,7 @@
     .send-btn:hover,
     .join-btn:hover {
       transform: translateY(-1px) scale(1.01);
-      box-shadow: 0 12px 28px rgba(0, 122, 255, 0.12);
+      background: var(--glass-bg-light);
     }
 
     .icon-btn:disabled,
@@ -725,7 +862,7 @@
       border: 1px solid var(--line);
       border-radius: 8px;
       color: var(--muted);
-      background: rgba(255, 255, 255, 0.75);
+      background: var(--glass-bg-soft);
       font-size: 13px;
       text-align: center;
     }
@@ -748,14 +885,13 @@
       gap: 10px;
       padding: 14px;
       border-top: 1px solid var(--line);
-      background: linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(250, 250, 252, 0.68));
-      box-shadow: 0 -16px 42px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.68);
-      backdrop-filter: blur(8px) saturate(1.08);
-      animation: slideInUp var(--duration-slow) var(--ease-smooth) 140ms both;
+      background: linear-gradient(180deg, var(--glass-bg-light), var(--glass-bg));
+      box-shadow: 0 -12px 28px rgba(15, 23, 42, 0.06), inset 0 1px 0 var(--glass-highlight);
+      backdrop-filter: blur(var(--glass-blur-sm)) saturate(1.08);
     }
 
     .composer.has-preview {
-      box-shadow: 0 -18px 48px rgba(0, 122, 255, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.72);
+      box-shadow: 0 -12px 30px rgba(0, 122, 255, 0.08), inset 0 1px 0 var(--glass-highlight);
     }
 
     .tool-row {
@@ -779,7 +915,7 @@
       border: 1px solid var(--line);
       border-radius: var(--radius-lg);
       color: var(--ink);
-      background: rgba(255, 255, 255, 0.9);
+      background: var(--field-bg);
       outline: 0;
       transition: border-color var(--duration-normal) var(--ease-smooth), box-shadow var(--duration-normal) var(--ease-smooth), background var(--duration-normal) var(--ease-smooth);
     }
@@ -787,8 +923,8 @@
     textarea:focus,
     input:focus {
       border-color: rgba(0, 122, 255, 0.72);
-      background: rgba(255, 255, 255, 0.96);
-      box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.12), 0 14px 34px rgba(0, 122, 255, 0.08);
+      background: var(--field-focus-bg);
+      box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.12);
     }
 
     .quote-preview {
@@ -802,8 +938,8 @@
       border: 1px solid rgba(0, 122, 255, 0.18);
       border-left: 4px solid var(--brand);
       border-radius: var(--radius-md);
-      background: rgba(232, 242, 255, 0.82);
-      box-shadow: 0 12px 28px rgba(0, 122, 255, 0.08);
+      background: color-mix(in srgb, var(--brand) 12%, var(--glass-bg-light));
+      box-shadow: 0 10px 24px rgba(0, 122, 255, 0.08);
       overflow: hidden;
       animation: quoteOpen var(--duration-normal) var(--ease-smooth);
     }
@@ -832,13 +968,13 @@
       height: 30px;
       border-radius: 999px;
       color: var(--muted);
-      background: rgba(255, 255, 255, 0.72);
+      background: var(--glass-bg-soft);
       transition: transform var(--duration-fast) var(--ease-pop), background var(--duration-fast) var(--ease-smooth);
     }
 
     .quote-preview button:hover {
       transform: scale(1.06);
-      background: #fff;
+      background: var(--glass-bg-light);
     }
 
     .image-preview {
@@ -850,7 +986,7 @@
       padding: 10px;
       border: 1px solid rgba(0, 122, 255, 0.16);
       border-radius: var(--radius-lg);
-      background: rgba(255, 255, 255, 0.78);
+      background: var(--glass-bg-light);
       box-shadow: 0 16px 38px rgba(0, 122, 255, 0.1);
       animation: previewIn var(--duration-normal) var(--ease-smooth);
     }
@@ -865,7 +1001,7 @@
       object-fit: cover;
       border-radius: var(--radius-md);
       border: 1px solid rgba(60, 60, 67, 0.12);
-      background: #fff;
+      background: var(--glass-bg-soft);
     }
 
     .image-preview strong {
@@ -888,13 +1024,13 @@
       height: 32px;
       border-radius: 999px;
       color: var(--muted);
-      background: rgba(242, 242, 247, 0.9);
+      background: var(--panel-soft);
       transition: transform var(--duration-fast) var(--ease-pop), background var(--duration-fast) var(--ease-smooth);
     }
 
     .image-preview button:hover {
       transform: scale(1.06);
-      background: #fff;
+      background: var(--glass-bg-light);
     }
 
     .mention-menu {
@@ -906,8 +1042,9 @@
       overflow: auto;
       border: 1px solid var(--line);
       border-radius: var(--radius-md);
-      background: rgba(255, 255, 255, 0.92);
-      box-shadow: 0 18px 60px rgba(31, 44, 43, 0.16);
+      background: var(--glass-bg-light);
+      box-shadow: 0 14px 42px rgba(31, 44, 43, 0.14);
+      backdrop-filter: blur(var(--glass-blur-sm)) saturate(1.08);
       padding: 6px;
       z-index: 5;
     }
@@ -939,9 +1076,9 @@
       padding: 6px;
       border: 1px solid rgba(60, 60, 67, 0.14);
       border-radius: var(--radius-md);
-      background: rgba(255, 255, 255, 0.82);
-      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.68);
-      backdrop-filter: blur(10px) saturate(1.1);
+      background: var(--glass-bg-light);
+      box-shadow: 0 16px 42px rgba(0, 0, 0, 0.14), inset 0 1px 0 var(--glass-highlight);
+      backdrop-filter: blur(var(--glass-blur-sm)) saturate(1.1);
       transform-origin: top left;
       z-index: 40;
       animation: menuIn var(--duration-fast) var(--ease-pop);
@@ -957,11 +1094,11 @@
       display: grid;
       place-items: center;
       padding: 22px;
-      background: rgba(8, 12, 24, 0.18);
-      backdrop-filter: blur(8px) saturate(1.08);
+      background: rgba(8, 12, 24, 0.2);
+      backdrop-filter: blur(var(--glass-blur-sm)) saturate(1.08);
       z-index: 60;
       opacity: 1;
-      transition: opacity var(--duration-normal) var(--ease-smooth), backdrop-filter var(--duration-normal) var(--ease-smooth);
+      transition: opacity var(--duration-normal) var(--ease-smooth);
     }
 
     .confirm-modal[hidden] {
@@ -970,7 +1107,6 @@
 
     .confirm-modal.is-closing {
       opacity: 0;
-      backdrop-filter: blur(2px) saturate(1);
     }
 
     .confirm-card {
@@ -978,11 +1114,93 @@
       padding: 20px;
       border: 1px solid var(--glass-border);
       border-radius: var(--radius-xl);
-      background: linear-gradient(180deg, rgba(255, 255, 255, 0.84), rgba(255, 255, 255, 0.66));
-      box-shadow: 0 28px 90px rgba(15, 23, 42, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.72);
+      background: linear-gradient(180deg, var(--glass-bg-light), var(--glass-bg));
+      box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-highlight);
       backdrop-filter: blur(var(--glass-blur-md)) saturate(1.18);
       transform-origin: center;
       animation: modalIn var(--duration-normal) var(--ease-pop);
+    }
+
+    .settings-card {
+      width: min(520px, 100%);
+      max-height: min(720px, calc(100dvh - 44px));
+      display: grid;
+      gap: 16px;
+      overflow: auto;
+    }
+
+    .settings-section {
+      display: grid;
+      gap: 10px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      background: var(--glass-bg-soft);
+      box-shadow: inset 0 1px 0 var(--glass-highlight);
+    }
+
+    .settings-section h4 {
+      margin: 0;
+      font-size: 14px;
+    }
+
+    .profile-settings {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      gap: 14px;
+      align-items: center;
+    }
+
+    .profile-settings-actions,
+    .settings-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .segmented {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 6px;
+      padding: 5px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      background: var(--glass-bg-soft);
+    }
+
+    .segment-btn,
+    .sound-toggle {
+      min-height: 40px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      border-radius: var(--radius-md);
+      color: var(--muted);
+      background: transparent;
+      font-weight: 800;
+      transition: transform var(--duration-fast) var(--ease-pop), background var(--duration-normal) var(--ease-smooth), color var(--duration-normal) var(--ease-smooth);
+    }
+
+    .segment-btn:hover,
+    .sound-toggle:hover {
+      transform: translateY(-1px);
+      background: var(--glass-bg-soft);
+      color: var(--ink);
+    }
+
+    .segment-btn.is-active,
+    .sound-toggle.is-on {
+      color: var(--ink);
+      background: var(--glass-bg-light);
+      box-shadow: inset 0 1px 0 var(--glass-highlight);
+    }
+
+    .settings-status {
+      min-height: 18px;
+      color: var(--muted);
+      font-size: 12px;
     }
 
     .confirm-modal.is-closing .confirm-card {
@@ -1055,10 +1273,9 @@
       place-items: center;
       padding: 20px;
       background:
-        radial-gradient(circle at 50% 38%, rgba(255, 255, 255, 0.32), transparent 32%),
-        linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(245, 245, 247, 0.28)),
+        radial-gradient(circle at 50% 38%, var(--glass-bg-soft), transparent 34%),
+        linear-gradient(180deg, var(--glass-bg-soft), transparent),
         linear-gradient(135deg, rgba(0, 122, 255, 0.08), transparent 48%);
-      backdrop-filter: blur(1px);
       z-index: 20;
     }
 
@@ -1071,10 +1288,9 @@
       padding: 24px;
       border: 1px solid var(--glass-border);
       border-radius: var(--radius-xl);
-      background: linear-gradient(180deg, rgba(255, 255, 255, 0.82), var(--glass-bg-light));
+      background: linear-gradient(180deg, var(--glass-bg-light), var(--glass-bg));
       backdrop-filter: blur(var(--glass-blur-sm)) saturate(1.16);
-      box-shadow: 0 28px 90px rgba(15, 23, 42, 0.2), 0 1px 0 rgba(255, 255, 255, 0.7) inset;
-      animation: panelIn 0.32s var(--ease);
+      box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-highlight);
       position: relative;
     }
 
@@ -1098,7 +1314,7 @@
     .admin-shell > .copyright-footer {
       padding: 9px 14px 10px;
       border-top: 1px solid var(--line);
-      background: rgba(250, 250, 252, 0.72);
+      background: var(--glass-bg-soft);
     }
 
     .login-panel h2 {
@@ -1129,7 +1345,7 @@
       min-height: 38px;
       border: 1px solid var(--line);
       border-radius: var(--radius-md);
-      background: #fff;
+      background: var(--glass-bg-soft);
       color: var(--muted);
       font-weight: 800;
     }
@@ -1157,6 +1373,8 @@
       border: 1px solid var(--line);
       border-radius: var(--radius-md);
       outline: 0;
+      color: var(--ink);
+      background: var(--field-bg);
     }
 
     .lobby {
@@ -1166,9 +1384,8 @@
       place-items: center;
       padding: 22px;
       background:
-        radial-gradient(circle at 54% 30%, rgba(255, 255, 255, 0.3), transparent 34%),
-        rgba(245, 245, 247, 0.28);
-      backdrop-filter: blur(1px);
+        radial-gradient(circle at 54% 30%, var(--glass-bg-soft), transparent 34%),
+        transparent;
       z-index: 16;
     }
 
@@ -1184,10 +1401,9 @@
       overflow: hidden;
       border: 1px solid var(--glass-border);
       border-radius: var(--radius-xl);
-      background: linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.58));
+      background: linear-gradient(180deg, var(--glass-bg-light), var(--glass-bg));
       backdrop-filter: blur(var(--glass-blur-sm)) saturate(1.16);
-      box-shadow: var(--glass-shadow), 0 1px 0 rgba(255, 255, 255, 0.68) inset;
-      animation: panelIn 0.32s var(--ease);
+      box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-highlight);
     }
 
     .lobby-header {
@@ -1220,7 +1436,7 @@
 
     .lobby-section + .lobby-section {
       border-left: 1px solid var(--line);
-      background: rgba(250, 250, 252, 0.92);
+      background: var(--glass-bg-soft);
     }
 
     .lobby-section h3 {
@@ -1242,12 +1458,11 @@
       padding: 12px;
       border: 1px solid var(--line);
       border-radius: var(--radius-lg);
-      background: rgba(255, 255, 255, 0.78);
+      background: var(--glass-bg-soft);
       color: var(--ink);
       text-align: left;
       box-shadow: 0 8px 24px rgba(31, 44, 43, 0.04);
-      animation: listItemIn var(--duration-normal) var(--ease-smooth);
-      transition: transform var(--duration-normal) var(--ease-pop), background var(--duration-normal) var(--ease-smooth), border-color var(--duration-normal) var(--ease-smooth), box-shadow var(--duration-normal) var(--ease-smooth);
+      transition: transform var(--duration-fast) var(--ease-pop), background var(--duration-normal) var(--ease-smooth), border-color var(--duration-normal) var(--ease-smooth);
     }
 
     .room-card:hover,
@@ -1255,18 +1470,17 @@
       background: var(--panel-soft);
       transform: translateY(-1px);
       border-color: rgba(0, 122, 255, 0.32);
-      box-shadow: 0 14px 32px rgba(0, 122, 255, 0.09);
     }
 
     .room-card.is-active {
       border-color: rgba(0, 122, 255, 0.5);
-      background: #f2f8ff;
-      box-shadow: inset 0 0 0 1px rgba(0, 122, 255, 0.08), 0 14px 34px rgba(0, 122, 255, 0.1);
+      background: color-mix(in srgb, var(--brand) 12%, var(--glass-bg-light));
+      box-shadow: inset 0 0 0 1px rgba(0, 122, 255, 0.08);
     }
 
     .private-card.has-unread {
       border-color: rgba(0, 122, 255, 0.45);
-      background: #f3f8ff;
+      background: color-mix(in srgb, var(--brand) 10%, var(--glass-bg-light));
     }
 
     .card-title-row,
@@ -1317,6 +1531,8 @@
       border: 1px solid var(--line);
       border-radius: var(--radius-md);
       outline: 0;
+      color: var(--ink);
+      background: var(--field-bg);
     }
 
     .lobby-error {
@@ -1338,9 +1554,8 @@
       inset: 0;
       padding: 22px;
       background:
-        radial-gradient(circle at 50% 20%, rgba(255, 255, 255, 0.3), transparent 34%),
-        rgba(245, 245, 247, 0.28);
-      backdrop-filter: blur(1px);
+        radial-gradient(circle at 50% 20%, var(--glass-bg-soft), transparent 34%),
+        transparent;
       z-index: 18;
     }
 
@@ -1357,10 +1572,9 @@
       overflow: hidden;
       border: 1px solid var(--glass-border);
       border-radius: var(--radius-xl);
-      background: linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.58));
+      background: linear-gradient(180deg, var(--glass-bg-light), var(--glass-bg));
       backdrop-filter: blur(var(--glass-blur-sm)) saturate(1.16);
-      box-shadow: var(--glass-shadow), 0 1px 0 rgba(255, 255, 255, 0.68) inset;
-      animation: panelIn 0.32s var(--ease);
+      box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-highlight);
     }
 
     .admin-header,
@@ -1391,15 +1605,15 @@
       padding: 0 12px;
       border-radius: var(--radius-md);
       border: 1px solid var(--line);
-      background: #fff;
+      background: var(--glass-bg-soft);
       color: var(--ink);
       font-weight: 800;
-      transition: transform var(--duration-fast) var(--ease-pop), box-shadow var(--duration-normal) var(--ease-smooth), background var(--duration-normal) var(--ease-smooth), border-color var(--duration-normal) var(--ease-smooth);
+      transition: transform var(--duration-fast) var(--ease-pop), background var(--duration-normal) var(--ease-smooth), border-color var(--duration-normal) var(--ease-smooth);
     }
 
     .admin-btn:hover {
       transform: translateY(-1px) scale(1.01);
-      box-shadow: 0 12px 28px rgba(0, 122, 255, 0.1);
+      background: var(--glass-bg-light);
     }
 
     .admin-btn.primary {
@@ -1435,7 +1649,7 @@
 
     .admin-users {
       border-right: 1px solid var(--line);
-      background: rgba(250, 250, 252, 0.74);
+      background: var(--glass-bg-soft);
     }
 
     .admin-user-btn {
@@ -1475,7 +1689,7 @@
       border-radius: var(--radius-lg);
       padding: 14px;
       margin-bottom: 12px;
-      background: #fff;
+      background: var(--glass-bg-soft);
       box-shadow: 0 10px 28px rgba(31, 44, 43, 0.04);
     }
 
@@ -1495,13 +1709,13 @@
       padding: 10px;
       border: 1px solid var(--line);
       border-radius: var(--radius-md);
-      background: rgba(255, 255, 255, 0.78);
-      transition: transform var(--duration-normal) var(--ease-smooth), box-shadow var(--duration-normal) var(--ease-smooth);
+      background: var(--glass-bg-soft);
+      transition: transform var(--duration-fast) var(--ease-smooth), background var(--duration-normal) var(--ease-smooth);
     }
 
     .admin-room-item:hover {
       transform: translateY(-1px);
-      box-shadow: 0 12px 26px rgba(0, 122, 255, 0.08);
+      background: var(--glass-bg-light);
     }
 
     .admin-form {
@@ -1517,6 +1731,8 @@
       padding: 0 10px;
       border: 1px solid var(--line);
       border-radius: var(--radius-md);
+      color: var(--ink);
+      background: var(--field-bg);
     }
 
     .admin-message {
@@ -1544,9 +1760,9 @@
       border: 1px solid rgba(0, 122, 255, 0.2);
       border-radius: var(--radius-lg);
       color: var(--ink);
-      background: rgba(255, 255, 255, 0.86);
-      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.66);
-      backdrop-filter: blur(10px) saturate(1.08);
+      background: var(--glass-bg-light);
+      box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-highlight);
+      backdrop-filter: blur(var(--glass-blur-sm)) saturate(1.08);
       z-index: 30;
       animation: toastIn 0.28s var(--ease);
     }
@@ -1642,17 +1858,14 @@
       from {
         opacity: 0;
         transform: translate3d(-28px, 10px, -30px) scale(0.965);
-        filter: blur(5px);
       }
       72% {
         opacity: 1;
         transform: translate3d(2px, -1px, 0) scale(1.006);
-        filter: blur(0);
       }
       to {
         opacity: 1;
         transform: translate3d(0, 0, 0) scale(1);
-        filter: blur(0);
       }
     }
 
@@ -1660,17 +1873,14 @@
       from {
         opacity: 0;
         transform: translate3d(34px, 10px, -28px) scale(0.955);
-        filter: blur(5px);
       }
       68% {
         opacity: 1;
         transform: translate3d(-2px, -1px, 0) scale(1.012);
-        filter: blur(0);
       }
       to {
         opacity: 1;
         transform: translate3d(0, 0, 0) scale(1);
-        filter: blur(0);
       }
     }
 
@@ -1701,12 +1911,10 @@
       from {
         opacity: 0;
         transform: translateY(4px) scale(0.94);
-        filter: blur(2px);
       }
       to {
         opacity: 1;
         transform: translateY(0) scale(1);
-        filter: blur(0);
       }
     }
 
@@ -1714,12 +1922,10 @@
       from {
         opacity: 0;
         transform: translateY(18px) scale(0.94);
-        filter: blur(8px);
       }
       to {
         opacity: 1;
         transform: translateY(0) scale(1);
-        filter: blur(0);
       }
     }
 
@@ -1825,7 +2031,6 @@
       body.view-admin .app {
         opacity: 0.54;
         transform: translate3d(0, 14px, -60px) scale(0.96);
-        filter: blur(10px) saturate(1.04);
       }
 
       .shell {
@@ -1863,6 +2068,16 @@
       .switch-user-btn {
         min-width: 42px;
         padding: 0 11px;
+      }
+
+      .profile-chip {
+        width: calc(100% - 24px);
+        margin: 0 12px 12px;
+      }
+
+      .segmented,
+      .profile-settings {
+        grid-template-columns: 1fr;
       }
 
       .messages {
@@ -1947,6 +2162,13 @@
             </div>
           </div>
         </header>
+        <button id="profileChip" class="profile-chip" data-settings-open type="button" hidden>
+          <span id="profileChipAvatar"></span>
+          <span>
+            <strong id="profileChipName">未登录</strong>
+            <span>个人设置</span>
+          </span>
+        </button>
 
         <div class="online-summary" aria-label="房间状态">
           <div class="metric">
@@ -1969,6 +2191,10 @@
             <span id="subtitle">选择频道开始</span>
           </div>
           <div class="header-actions">
+            <button class="theme-toggle-btn" data-theme-toggle data-settings-open type="button" aria-label="外观与设置" title="外观与设置">
+              <svg class="icon theme-icon moon-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 14.6A7.6 7.6 0 0 1 9.4 3 8.8 8.8 0 1 0 21 14.6z"/></svg>
+              <svg class="icon theme-icon sun-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="M4.93 4.93l1.41 1.41"/><path d="M17.66 17.66l1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="M4.93 19.07l1.41-1.41"/><path d="M17.66 6.34l1.41-1.41"/></svg>
+            </button>
             <button class="switch-user-btn" data-switch-user type="button" aria-label="切换用户">
               <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7h9l-3-3"/><path d="M17 7l-3 3"/><path d="M16 17H7l3 3"/><path d="M7 17l3-3"/><circle cx="12" cy="12" r="3"/></svg>
               <span>切换用户</span>
@@ -2038,6 +2264,10 @@
   <section id="login" class="login page-layer" data-view="auth" aria-label="加入聊天">
     <div class="login-panel">
       <div class="login-topbar">
+        <button class="theme-toggle-btn" data-theme-toggle data-settings-open type="button" aria-label="外观与设置" title="外观与设置">
+          <svg class="icon theme-icon moon-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 14.6A7.6 7.6 0 0 1 9.4 3 8.8 8.8 0 1 0 21 14.6z"/></svg>
+          <svg class="icon theme-icon sun-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="M4.93 4.93l1.41 1.41"/><path d="M17.66 17.66l1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="M4.93 19.07l1.41-1.41"/><path d="M17.66 6.34l1.41-1.41"/></svg>
+        </button>
         <button class="switch-user-btn" data-switch-user type="button" aria-label="切换用户">
           <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7h9l-3-3"/><path d="M17 7l-3 3"/><path d="M16 17H7l3 3"/><path d="M7 17l3-3"/><circle cx="12" cy="12" r="3"/></svg>
           <span>切换用户</span>
@@ -2078,6 +2308,10 @@
           <div id="lobbyStatus" class="status">选择频道或在线用户。</div>
         </div>
         <div class="admin-actions">
+          <button class="theme-toggle-btn" data-theme-toggle data-settings-open type="button" aria-label="外观与设置" title="外观与设置">
+            <svg class="icon theme-icon moon-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 14.6A7.6 7.6 0 0 1 9.4 3 8.8 8.8 0 1 0 21 14.6z"/></svg>
+            <svg class="icon theme-icon sun-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="M4.93 4.93l1.41 1.41"/><path d="M17.66 17.66l1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="M4.93 19.07l1.41-1.41"/><path d="M17.66 6.34l1.41-1.41"/></svg>
+          </button>
           <button class="switch-user-btn" data-switch-user type="button" aria-label="切换用户">
             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7h9l-3-3"/><path d="M17 7l-3 3"/><path d="M16 17H7l3 3"/><path d="M7 17l3-3"/><circle cx="12" cy="12" r="3"/></svg>
             <span>切换用户</span>
@@ -2118,6 +2352,10 @@
       <header class="admin-header">
         <h2>管理后台</h2>
         <div class="admin-actions">
+          <button class="theme-toggle-btn" data-theme-toggle data-settings-open type="button" aria-label="外观与设置" title="外观与设置">
+            <svg class="icon theme-icon moon-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 14.6A7.6 7.6 0 0 1 9.4 3 8.8 8.8 0 1 0 21 14.6z"/></svg>
+            <svg class="icon theme-icon sun-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="M4.93 4.93l1.41 1.41"/><path d="M17.66 17.66l1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="M4.93 19.07l1.41-1.41"/><path d="M17.66 6.34l1.41-1.41"/></svg>
+          </button>
           <button class="switch-user-btn" data-switch-user type="button" aria-label="切换用户">
             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7h9l-3-3"/><path d="M17 7l-3 3"/><path d="M16 17H7l3 3"/><path d="M7 17l3-3"/><circle cx="12" cy="12" r="3"/></svg>
             <span>切换用户</span>
@@ -2183,6 +2421,59 @@
       </div>
     </div>
   </div>
+  <div id="settingsModal" class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle" hidden>
+    <div class="confirm-card settings-card">
+      <div>
+        <h3 id="settingsTitle">设置</h3>
+        <p>管理头像、外观与消息提醒。</p>
+      </div>
+      <section class="settings-section">
+        <h4>个人头像</h4>
+        <div class="profile-settings">
+          <span id="settingsAvatarPreview"></span>
+          <div>
+            <div class="settings-actions">
+              <button id="avatarChoose" class="admin-btn" type="button">更换头像</button>
+              <button id="avatarUpload" class="admin-btn primary" type="button" disabled>确认上传</button>
+              <button id="avatarClear" class="admin-btn" type="button" disabled>取消</button>
+              <button id="avatarReset" class="admin-btn danger" type="button">恢复默认</button>
+            </div>
+            <div id="avatarStatus" class="settings-status">支持 JPG、PNG、WebP，最大 2MB。</div>
+            <input id="avatarInput" class="sr-only" type="file" accept="image/png,image/jpeg,image/webp">
+          </div>
+        </div>
+      </section>
+      <section class="settings-section">
+        <h4>外观</h4>
+        <div class="segmented" role="group" aria-label="外观模式">
+          <button class="segment-btn" data-theme-mode="light" type="button">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="M4.93 4.93l1.41 1.41"/><path d="M17.66 17.66l1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="M4.93 19.07l1.41-1.41"/><path d="M17.66 6.34l1.41-1.41"/></svg>
+            浅色
+          </button>
+          <button class="segment-btn" data-theme-mode="dark" type="button">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 14.6A7.6 7.6 0 0 1 9.4 3 8.8 8.8 0 1 0 21 14.6z"/></svg>
+            深色
+          </button>
+          <button class="segment-btn" data-theme-mode="system" type="button">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="3"/><path d="M8 21h8"/><path d="M12 17v4"/></svg>
+            跟随系统
+          </button>
+        </div>
+        <div id="themeStatus" class="settings-status"></div>
+      </section>
+      <section class="settings-section">
+        <h4>消息提示音</h4>
+        <button id="soundToggle" class="sound-toggle" type="button">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></svg>
+          <span id="soundToggleText">提示音关闭</span>
+        </button>
+        <div class="settings-status">浏览器可能需要一次点击后才能播放提示音。</div>
+      </section>
+      <div class="confirm-actions">
+        <button id="settingsClose" class="admin-btn primary" type="button">完成</button>
+      </div>
+    </div>
+  </div>
 
   <script>
     const socket = io();
@@ -2207,9 +2498,13 @@
       typingUsers: new Set(),
       messageCount: 0,
       imageCooldown: 0,
+      pendingAvatar: null,
       isRecording: false,
       recorder: null,
       recordStartedAt: 0,
+      soundEnabled: false,
+      lastSoundAt: 0,
+      audioContext: null,
       canReadAt: 0,
       isConnected: false,
       typingTimer: null,
@@ -2286,6 +2581,24 @@
     const quotePreviewClose = document.getElementById('quotePreviewClose');
     const messageMenu = document.getElementById('messageMenu');
     const switchUserButtons = Array.from(document.querySelectorAll('[data-switch-user]'));
+    const themeToggleButtons = Array.from(document.querySelectorAll('button[data-theme-toggle]'));
+    const settingsOpenButtons = Array.from(document.querySelectorAll('[data-settings-open]'));
+    const themeModeButtons = Array.from(document.querySelectorAll('button[data-theme-mode]'));
+    const profileChip = document.getElementById('profileChip');
+    const profileChipAvatar = document.getElementById('profileChipAvatar');
+    const profileChipName = document.getElementById('profileChipName');
+    const settingsModal = document.getElementById('settingsModal');
+    const settingsClose = document.getElementById('settingsClose');
+    const settingsAvatarPreview = document.getElementById('settingsAvatarPreview');
+    const avatarChoose = document.getElementById('avatarChoose');
+    const avatarUpload = document.getElementById('avatarUpload');
+    const avatarClear = document.getElementById('avatarClear');
+    const avatarReset = document.getElementById('avatarReset');
+    const avatarInput = document.getElementById('avatarInput');
+    const avatarStatus = document.getElementById('avatarStatus');
+    const themeStatus = document.getElementById('themeStatus');
+    const soundToggle = document.getElementById('soundToggle');
+    const soundToggleText = document.getElementById('soundToggleText');
     const switchUserModal = document.getElementById('switchUserModal');
     const switchUserCancel = document.getElementById('switchUserCancel');
     const switchUserConfirm = document.getElementById('switchUserConfirm');
@@ -2295,6 +2608,164 @@
       chat: document.querySelector('.app'),
       admin: adminPage
     };
+    const THEME_KEY = 'uni5-theme';
+    const THEME_MODE_KEY = 'uni5-theme-mode';
+    const SOUND_KEY = 'uni5-message-sound';
+    const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
+
+    function systemTheme() {
+      return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+
+    function readThemeMode() {
+      try {
+        const saved = localStorage.getItem(THEME_MODE_KEY);
+        if (['light', 'dark', 'system'].includes(saved)) return saved;
+        const legacy = localStorage.getItem(THEME_KEY);
+        if (legacy === 'light' || legacy === 'dark') return legacy;
+      } catch (error) {
+        return 'system';
+      }
+      return 'system';
+    }
+
+    function resolveTheme(mode) {
+      return mode === 'system' ? systemTheme() : mode === 'dark' ? 'dark' : 'light';
+    }
+
+    function updateThemeButtons(mode = readThemeMode(), theme = document.documentElement.dataset.theme || 'light') {
+      const label = `外观与设置：${mode === 'system' ? '跟随系统' : theme === 'dark' ? '深色' : '浅色'}`;
+      themeToggleButtons.forEach((button) => {
+        button.setAttribute('aria-label', label);
+        button.title = label;
+      });
+      themeModeButtons.forEach((button) => {
+        button.classList.toggle('is-active', button.dataset.themeMode === mode);
+      });
+      if (themeStatus) {
+        themeStatus.textContent = mode === 'system'
+          ? `当前跟随系统：${theme === 'dark' ? '深色' : '浅色'}`
+          : `当前固定为${theme === 'dark' ? '深色' : '浅色'}模式`;
+      }
+    }
+
+    function setThemeMode(mode, persist = true) {
+      const nextMode = ['light', 'dark', 'system'].includes(mode) ? mode : 'system';
+      const next = resolveTheme(nextMode);
+      document.documentElement.dataset.theme = next;
+      document.documentElement.dataset.themeMode = nextMode;
+      if (persist) {
+        try {
+          localStorage.setItem(THEME_MODE_KEY, nextMode);
+          localStorage.setItem(THEME_KEY, next);
+        } catch (error) {
+          // Theme persistence is optional; the UI can still switch without storage.
+        }
+      }
+      updateThemeButtons(nextMode, next);
+    }
+
+    function renderProfileChip() {
+      profileChip.hidden = !state.userId;
+      profileChipAvatar.textContent = '';
+      profileChipAvatar.append(createAvatar(state.avatar || state.username, state.username));
+      profileChipName.textContent = state.username || '未登录';
+      renderSettingsProfile();
+    }
+
+    function renderSettingsProfile() {
+      settingsAvatarPreview.textContent = '';
+      settingsAvatarPreview.append(createAvatar(state.pendingAvatar ? state.pendingAvatar.base64 : state.avatar || state.username, state.username, true));
+      avatarUpload.disabled = !state.pendingAvatar || !state.userId;
+      avatarClear.disabled = !state.pendingAvatar;
+      avatarReset.disabled = !state.userId;
+      avatarChoose.disabled = !state.userId;
+      if (!state.userId) avatarStatus.textContent = '登录后可以设置头像。';
+      else if (!state.pendingAvatar) avatarStatus.textContent = '支持 JPG、PNG、WebP，最大 2MB。';
+    }
+
+    function openSettingsModal() {
+      closeMessageMenu();
+      settingsModal.classList.remove('is-closing');
+      settingsModal.hidden = false;
+      renderSettingsProfile();
+      updateThemeButtons(readThemeMode(), document.documentElement.dataset.theme || 'light');
+      renderSoundToggle();
+      requestAnimationFrame(() => settingsClose.focus());
+    }
+
+    function closeSettingsModal() {
+      if (settingsModal.hidden) return;
+      settingsModal.classList.add('is-closing');
+      const delay = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 20 : 220;
+      window.setTimeout(() => {
+        settingsModal.hidden = true;
+        settingsModal.classList.remove('is-closing');
+      }, delay);
+    }
+
+    function readSoundPreference() {
+      try {
+        return localStorage.getItem(SOUND_KEY) === '1';
+      } catch (error) {
+        return false;
+      }
+    }
+
+    function setSoundEnabled(enabled, persist = true) {
+      state.soundEnabled = Boolean(enabled);
+      if (persist) {
+        try {
+          localStorage.setItem(SOUND_KEY, state.soundEnabled ? '1' : '0');
+        } catch (error) {
+          // Sound preference can fall back to the current session.
+        }
+      }
+      renderSoundToggle();
+    }
+
+    function renderSoundToggle() {
+      soundToggle.classList.toggle('is-on', state.soundEnabled);
+      soundToggleText.textContent = state.soundEnabled ? '提示音开启' : '提示音关闭';
+    }
+
+    function ensureAudioContext() {
+      if (!state.audioContext) {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextClass) return null;
+        state.audioContext = new AudioContextClass();
+      }
+      if (state.audioContext.state === 'suspended') {
+        state.audioContext.resume().catch(() => {});
+      }
+      return state.audioContext;
+    }
+
+    function playMessageSound() {
+      if (!state.soundEnabled) return;
+      const now = Date.now();
+      if (now - state.lastSoundAt < 900) return;
+      if (!document.hidden && document.hasFocus()) return;
+      const audio = ensureAudioContext();
+      if (!audio) return;
+      state.lastSoundAt = now;
+      try {
+        const gain = audio.createGain();
+        const osc = audio.createOscillator();
+        gain.gain.setValueAtTime(0.0001, audio.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.035, audio.currentTime + 0.015);
+        gain.gain.exponentialRampToValueAtTime(0.0001, audio.currentTime + 0.22);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(740, audio.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(980, audio.currentTime + 0.08);
+        osc.connect(gain);
+        gain.connect(audio.destination);
+        osc.start();
+        osc.stop(audio.currentTime + 0.24);
+      } catch (error) {
+        state.lastSoundAt = now;
+      }
+    }
 
     function setView(view) {
       if (!pageLayers[view]) return;
@@ -2316,7 +2787,7 @@
         document.body.classList.remove('view-auth', 'view-lobby', 'view-chat', 'view-admin');
         document.body.classList.add(`view-${view}`);
         state.view = view;
-        const delay = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 40 : 720;
+        const delay = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 40 : 560;
         state.viewTransitionTimer = window.setTimeout(() => {
           document.body.classList.remove('is-page-transitioning');
           cleanupViews(view);
@@ -2366,6 +2837,7 @@
       state.selectedAdminUserId = '';
       state.privateUnread = {};
       state.quotedMessage = null;
+      state.pendingAvatar = null;
       state.contextMessage = null;
       state.typingUsers.clear();
       messagesDiv.textContent = '';
@@ -2388,6 +2860,7 @@
       renderEmptyState();
       updateAdminEntries();
       updateCreateRoomMode();
+      renderProfileChip();
       setView('auth');
       window.setTimeout(() => accountInput.focus(), 240);
     }
@@ -2435,6 +2908,8 @@
       state.avatar = user.avatar || '';
       state.isAdmin = Boolean(user.isAdmin);
       state.privateUnread = {};
+      state.pendingAvatar = null;
+      renderProfileChip();
       updateAdminEntries();
       setView('lobby');
       loginError.textContent = '';
@@ -2445,6 +2920,26 @@
       updateCreateRoomMode();
       socket.emit('get lobby');
       if (state.isAdmin) socket.emit('admin get dashboard');
+    });
+
+    socket.on('profile updated', (data) => {
+      const user = data && data.user ? data.user : {};
+      state.username = user.username || state.username;
+      state.avatar = user.avatar || state.avatar;
+      state.isAdmin = Boolean(user.isAdmin);
+      state.pendingAvatar = null;
+      renderProfileChip();
+      updateAdminEntries();
+    });
+
+    socket.on('profileError', (msg) => {
+      avatarStatus.textContent = msg || '头像更新失败';
+      showToast(msg || '头像更新失败');
+    });
+
+    socket.on('profileNotice', (msg) => {
+      avatarStatus.textContent = msg || '头像已更新';
+      showToast(msg || '头像已更新');
     });
 
     socket.on('history', (messages) => {
@@ -2518,6 +3013,7 @@
       renderTyping();
       if (shouldScroll) settleAtBottom();
       else newMessageBtn.hidden = false;
+      if (data.userId !== state.userId && !data.recalled && data.type !== 'recalled') playMessageSound();
     });
 
     socket.on('private notification', (payload) => {
@@ -2529,6 +3025,7 @@
       state.privateUnread[senderId] = (state.privateUnread[senderId] || 0) + 1;
       renderLobby();
       showToast(`${payload.from.username || '有人'} 发来私聊消息`);
+      playMessageSound();
     });
 
     socket.on('message recalled', (data) => {
@@ -2648,6 +3145,31 @@
       button.addEventListener('click', openSwitchUserModal);
     });
 
+    settingsOpenButtons.forEach((button) => {
+      button.addEventListener('click', openSettingsModal);
+    });
+    themeModeButtons.forEach((button) => {
+      button.addEventListener('click', () => setThemeMode(button.dataset.themeMode));
+    });
+    setThemeMode(readThemeMode(), false);
+    setSoundEnabled(readSoundPreference(), false);
+    if (window.matchMedia) {
+      const themeMedia = window.matchMedia('(prefers-color-scheme: dark)');
+      const syncSystemTheme = (event) => {
+        try {
+          if (readThemeMode() !== 'system') return;
+        } catch (error) {
+          return;
+        }
+        setThemeMode('system', false);
+      };
+      if (themeMedia.addEventListener) {
+        themeMedia.addEventListener('change', syncSystemTheme);
+      } else if (themeMedia.addListener) {
+        themeMedia.addListener(syncSystemTheme);
+      }
+    }
+
     switchUserCancel.addEventListener('click', closeSwitchUserModal);
     switchUserConfirm.addEventListener('click', confirmSwitchUser);
     switchUserModal.addEventListener('click', (event) => {
@@ -2656,10 +3178,38 @@
 
     document.addEventListener('keydown', (event) => {
       if (event.key === 'Escape' && !switchUserModal.hidden) closeSwitchUserModal();
+      if (event.key === 'Escape' && !settingsModal.hidden) closeSettingsModal();
+    });
+
+    settingsClose.addEventListener('click', closeSettingsModal);
+    settingsModal.addEventListener('click', (event) => {
+      if (event.target === settingsModal) closeSettingsModal();
+    });
+    soundToggle.addEventListener('click', () => {
+      setSoundEnabled(!state.soundEnabled);
+      ensureAudioContext();
+      showToast(state.soundEnabled ? '消息提示音已开启' : '消息提示音已关闭');
     });
 
     quotePreviewClose.addEventListener('click', clearQuote);
     imagePreviewClear.addEventListener('click', clearPendingImage);
+    avatarChoose.addEventListener('click', () => avatarInput.click());
+    avatarInput.addEventListener('change', async (event) => {
+      const file = event.target.files && event.target.files[0];
+      await prepareAvatarFile(file);
+    });
+    avatarClear.addEventListener('click', clearPendingAvatar);
+    avatarUpload.addEventListener('click', () => {
+      if (!state.pendingAvatar) return;
+      avatarStatus.textContent = '正在上传头像...';
+      socket.emit('avatar upload', { base64: state.pendingAvatar.base64 });
+    });
+    avatarReset.addEventListener('click', () => {
+      if (!state.userId) return;
+      clearPendingAvatar();
+      avatarStatus.textContent = '正在恢复默认头像...';
+      socket.emit('avatar reset');
+    });
 
     adminRefresh.addEventListener('click', () => {
       if (state.isAdmin) socket.emit('admin get dashboard');
@@ -2795,7 +3345,7 @@
 
       const meta = document.createElement('div');
       meta.className = 'meta';
-      meta.append(createAvatar(message.avatar || message.username));
+      meta.append(createAvatar(message.avatar || message.username, message.username));
 
       const metaText = document.createElement('span');
       metaText.textContent = `${message.username} · ${formatTime(message.timestamp)}`;
@@ -2887,11 +3437,46 @@
       };
     }
 
-    function createAvatar(name) {
+    function createAvatar(value, label = '', large = false) {
+      const raw = typeof value === 'string' ? value.trim() : '';
+      const seed = label || raw || '?';
       const avatar = document.createElement('span');
-      avatar.className = 'avatar';
-      avatar.textContent = name.trim().slice(0, 1).toUpperCase() || '?';
+      avatar.className = `avatar${large ? ' is-large' : ''}`;
+      avatar.style.setProperty('--avatar-bg', avatarGradient(seed));
+      if (raw.startsWith('/uploads/avatars/')) {
+        const img = document.createElement('img');
+        img.src = raw;
+        img.alt = `${seed} 的头像`;
+        img.loading = 'lazy';
+        img.addEventListener('error', () => {
+          avatar.textContent = avatarInitial(seed);
+          img.remove();
+        }, { once: true });
+        avatar.append(img);
+      } else if (raw.startsWith('data:image/')) {
+        const img = document.createElement('img');
+        img.src = raw;
+        img.alt = '头像预览';
+        avatar.append(img);
+      } else {
+        avatar.textContent = avatarInitial(seed);
+      }
       return avatar;
+    }
+
+    function avatarInitial(value) {
+      const text = String(value || '?').trim();
+      return text.slice(0, 1).toUpperCase() || '?';
+    }
+
+    function avatarGradient(seed) {
+      let hash = 0;
+      String(seed || '?').split('').forEach((char) => {
+        hash = (hash * 31 + char.charCodeAt(0)) % 360;
+      });
+      const hueA = hash;
+      const hueB = (hash + 42) % 360;
+      return `linear-gradient(135deg, hsl(${hueA} 72% 56%), hsl(${hueB} 78% 48%))`;
     }
 
     function quoteMessage(message) {
@@ -3078,7 +3663,7 @@
         const button = document.createElement('button');
         button.type = 'button';
         button.className = 'user-chip';
-        button.append(createAvatar(avatarValue));
+        button.append(createAvatar(avatarValue, nameValue));
 
         const name = document.createElement('span');
         name.className = 'user-name';
@@ -3136,6 +3721,7 @@
         button.className = `private-card${unread > 0 ? ' has-unread' : ''}`;
         const titleRow = document.createElement('div');
         titleRow.className = 'card-title-row';
+        titleRow.append(createAvatar(user.avatar || user.username, user.username));
         const title = document.createElement('strong');
         title.textContent = user.username;
         titleRow.append(title);
@@ -3234,6 +3820,48 @@
       }
     }
 
+    async function prepareAvatarFile(file) {
+      if (!state.userId) {
+        showToast('请先登录后再设置头像');
+        return;
+      }
+      if (!file) return;
+      if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+        avatarStatus.textContent = '头像仅支持 JPG、PNG、WebP';
+        showToast('头像格式不支持');
+        return;
+      }
+      if (file.size > MAX_AVATAR_BYTES) {
+        avatarStatus.textContent = '头像最大 2MB';
+        showToast('头像最大 2MB');
+        return;
+      }
+      try {
+        const base64 = await readFileAsDataUrl(file);
+        state.pendingAvatar = { base64, name: file.name || '头像图片', size: file.size };
+        avatarStatus.textContent = `${state.pendingAvatar.name} · ${formatFileSize(file.size)}`;
+        renderSettingsProfile();
+      } catch (error) {
+        avatarStatus.textContent = '头像读取失败';
+        showToast('头像读取失败');
+      }
+    }
+
+    function readFileAsDataUrl(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ''));
+        reader.onerror = () => reject(reader.error || new Error('file read failed'));
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function clearPendingAvatar() {
+      state.pendingAvatar = null;
+      avatarInput.value = '';
+      renderSettingsProfile();
+    }
+
     function renderPendingImage() {
       const pending = state.pendingImage;
       composer.classList.toggle('has-preview', Boolean(pending));
@@ -3303,7 +3931,12 @@
         const online = document.createElement('span');
         online.className = 'admin-muted';
         online.textContent = user.online ? '在线' : '离线';
-        main.append(name, online);
+        const identity = document.createElement('span');
+        identity.style.display = 'inline-flex';
+        identity.style.alignItems = 'center';
+        identity.style.gap = '8px';
+        identity.append(createAvatar(user.avatar || user.username, user.username), name);
+        main.append(identity, online);
 
         const account = document.createElement('div');
         account.className = 'admin-muted';
@@ -3694,6 +4327,8 @@
     updateAdminEntries();
     updateCreateRoomMode();
     renderOnlineUsers();
+    renderProfileChip();
+    renderSoundToggle();
     renderMessageCount();
     cleanupViews('auth');
   </script>

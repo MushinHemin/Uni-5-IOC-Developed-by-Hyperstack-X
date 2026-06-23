@@ -1,8 +1,8 @@
 {
   "name": "beluga-chat",
-  "version": "1.0.0",
+  "version": "5.2.0",
   "private": true,
-  "description": "A small realtime web chat app.",
+  "description": "Uni 5 realtime chat app developed by Hyperstack X.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

@@ -15,12 +15,15 @@ const io = new Server(server, { cors: { origin: "*" } });
 const DATA_FILE = path.join(__dirname, 'chat-history.json');
 const USERS_FILE = path.join(__dirname, 'users.json');
 const DB_FILE = path.join(__dirname, 'beluga-chat.sqlite');
+const UPLOADS_DIR = path.join(__dirname, 'uploads');
+const AVATAR_UPLOAD_DIR = path.join(UPLOADS_DIR, 'avatars');
 const JSON_FILE_MODE = 0o600;
 const MAX_MESSAGE_LENGTH = 1000;
 const MAX_USERNAME_LENGTH = 20;
 const MAX_ACCOUNT_LENGTH = 24;
 const MIN_PASSWORD_LENGTH = 6;
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
 const MAX_VOICE_BYTES = 3 * 1024 * 1024;
 const MAX_HISTORY_MESSAGES = 300;
 const TYPING_TIMEOUT_MS = 3000;
@@ -34,7 +37,14 @@ const DEFAULT_ROOM_NAME = 'UniIOC World Channel';
 const RECALL_WINDOW_MS = 2 * 60 * 1000;
 const GROUP_CODE_WINDOW_MS = 10 * 60 * 1000;
 const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp']);
+const ALLOWED_AVATAR_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const ALLOWED_AUDIO_TYPES = new Set(['audio/webm', 'audio/mp4', 'audio/mpeg', 'audio/ogg', 'audio/wav']);
+const IMAGE_EXTENSIONS = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+  'image/gif': 'gif'
+};
 let db;
 
 function loadDotEnv() {
@@ -188,6 +198,23 @@ function makeAvatar(name) {
   return (cleanUsername(name) || '?').slice(0, 1).toUpperCase();
 }
 
+function cleanAvatar(value, fallbackName = '') {
+  if (typeof value !== 'string') return makeAvatar(fallbackName);
+  const avatar = value.trim();
+  if (/^\/uploads\/avatars\/[a-zA-Z0-9_.-]+\.(jpg|png|webp)$/.test(avatar)) return avatar;
+  return cleanText(avatar, 4) || makeAvatar(fallbackName);
+}
+
+function isUploadedAvatar(value) {
+  return typeof value === 'string' && value.startsWith('/uploads/avatars/');
+}
+
+function avatarFilePath(avatarUrl) {
+  if (!isUploadedAvatar(avatarUrl)) return '';
+  const fileName = path.basename(avatarUrl);
+  return path.join(AVATAR_UPLOAD_DIR, fileName);
+}
+
 function normalizeUser(user) {
   if (!user || typeof user !== 'object') return null;
   const account = cleanAccount(user.account);
@@ -198,7 +225,7 @@ function normalizeUser(user) {
     id: String(user.id),
     account,
     username,
-    avatar: cleanText(user.avatar, 4) || makeAvatar(username),
+    avatar: cleanAvatar(user.avatar, username),
     passwordHash,
     createdAt: Number.isNaN(Date.parse(user.createdAt)) ? new Date().toISOString() : user.createdAt,
     lastIp: typeof user.lastIp === 'string' ? user.lastIp : '',
@@ -591,6 +618,46 @@ function bindUser(socket, user) {
   onlineUsers.set(socket.id, user);
 }
 
+function syncUserAvatar(user, avatar) {
+  user.avatar = avatar || makeAvatar(user.username);
+  socketsForUser(user.id).forEach((connectedSocket) => {
+    connectedSocket.user = user;
+    onlineUsers.set(connectedSocket.id, user);
+    connectedSocket.emit('profile updated', { user: publicUser(user) });
+  });
+  messages = messages.map((message) => (
+    message.userId === user.id ? { ...message, avatar: user.avatar } : message
+  ));
+  saveUsers();
+  try {
+    db.prepare('UPDATE messages SET avatar = ? WHERE user_id = ?').run(user.avatar, user.id);
+  } catch (error) {
+    console.error('同步头像到历史消息失败:', error.message);
+  }
+  refreshOpenRooms();
+  broadcastOnlineUsers();
+  broadcastAdminDashboards();
+}
+
+function deleteAvatarFile(avatarUrl) {
+  if (!isUploadedAvatar(avatarUrl)) return;
+  const filePath = avatarFilePath(avatarUrl);
+  if (!filePath.startsWith(AVATAR_UPLOAD_DIR)) return;
+  fs.promises.unlink(filePath).catch(() => {});
+}
+
+function saveAvatarUpload(user, dataUrl) {
+  const parsed = parseAvatarData(dataUrl);
+  if (!parsed) return { error: '头像仅支持 JPG、PNG、WebP，最大 2MB' };
+
+  fs.mkdirSync(AVATAR_UPLOAD_DIR, { recursive: true });
+  const ext = IMAGE_EXTENSIONS[parsed.mime] || 'png';
+  const fileName = `avatar_${user.id}_${Date.now()}_${crypto.randomBytes(4).toString('hex')}.${ext}`;
+  const filePath = path.join(AVATAR_UPLOAD_DIR, fileName);
+  fs.writeFileSync(filePath, parsed.buffer, { mode: 0o600 });
+  return { avatar: `/uploads/avatars/${fileName}` };
+}
+
 function roomChannel(roomId) {
   return `room:${roomId}`;
 }
@@ -745,7 +812,7 @@ function ensureAdminUser() {
     let changed = false;
     if (existing.username !== ADMIN_USERNAME) {
       existing.username = ADMIN_USERNAME;
-      existing.avatar = makeAvatar(ADMIN_USERNAME);
+      if (!isUploadedAvatar(existing.avatar)) existing.avatar = makeAvatar(ADMIN_USERNAME);
       changed = true;
     }
     if (!verifyPassword(ADMIN_PASSWORD, existing.passwordHash)) {
@@ -849,19 +916,31 @@ function broadcastAdminDashboards() {
   });
 }
 
-function isValidImageData(value) {
+function parseDataUrl(value, allowedTypes, maxBytes) {
   if (typeof value !== 'string') return false;
   const match = value.match(/^data:(image\/[a-z0-9.+-]+);base64,([a-z0-9+/=\s]+)$/i);
-  if (!match || !ALLOWED_IMAGE_TYPES.has(match[1].toLowerCase())) return false;
+  if (!match) return false;
+  const mime = match[1].toLowerCase();
+  if (!allowedTypes.has(mime)) return false;
 
   const base64 = match[2].replace(/\s/g, '');
   if (!base64 || base64.length % 4 !== 0) return false;
 
   try {
-    return Buffer.byteLength(base64, 'base64') <= MAX_IMAGE_BYTES;
+    const buffer = Buffer.from(base64, 'base64');
+    if (buffer.length > maxBytes) return false;
+    return { mime, buffer };
   } catch (error) {
     return false;
   }
+}
+
+function isValidImageData(value) {
+  return Boolean(parseDataUrl(value, ALLOWED_IMAGE_TYPES, MAX_IMAGE_BYTES));
+}
+
+function parseAvatarData(value) {
+  return parseDataUrl(value, ALLOWED_AVATAR_TYPES, MAX_AVATAR_BYTES);
 }
 
 function isValidVoiceData(value) {
@@ -887,6 +966,8 @@ let rooms = loadRooms();
 const onlineUsers = new Map();
 const typingTimers = new Map();
 
+fs.mkdirSync(AVATAR_UPLOAD_DIR, { recursive: true });
+app.use('/uploads', express.static(UPLOADS_DIR));
 app.use(express.static(path.join(__dirname, 'public')));
 
 io.on('connection', (socket) => {
@@ -958,6 +1039,28 @@ io.on('connection', (socket) => {
   socket.on('get lobby', () => {
     if (!requireAuth(socket, '查看聊天列表')) return;
     emitLobby(socket);
+  });
+
+  socket.on('avatar upload', (payload) => {
+    if (!requireAuth(socket, '修改头像')) return;
+    const base64 = payload && typeof payload.base64 === 'string' ? payload.base64 : '';
+    const previousAvatar = socket.user.avatar;
+    const result = saveAvatarUpload(socket.user, base64);
+    if (result.error) {
+      socket.emit('profileError', result.error);
+      return;
+    }
+    syncUserAvatar(socket.user, result.avatar);
+    deleteAvatarFile(previousAvatar);
+    socket.emit('profileNotice', '头像已更新');
+  });
+
+  socket.on('avatar reset', () => {
+    if (!requireAuth(socket, '恢复默认头像')) return;
+    const previousAvatar = socket.user.avatar;
+    syncUserAvatar(socket.user, makeAvatar(socket.user.username));
+    deleteAvatarFile(previousAvatar);
+    socket.emit('profileNotice', '已恢复默认头像');
   });
 
   socket.on('join room', (roomIdValue) => {
@@ -1204,7 +1307,7 @@ io.on('connection', (socket) => {
 
     const previousUsername = user.username;
     user.username = username;
-    user.avatar = makeAvatar(username);
+    if (!isUploadedAvatar(user.avatar)) user.avatar = makeAvatar(username);
     messages = messages.map((message) => (
       message.userId === user.id
         ? { ...message, username: user.username, avatar: user.avatar }

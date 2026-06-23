@@ -2,6 +2,8 @@
 
 Uni 5 is a lightweight realtime chat app with account login, group chat, private chat, admin tools, message recall, image paste/upload, voice messages, and a glass-style responsive web UI.
 
+Current release: **Uni 5.2.0 Profile & Comfort Update**
+
 ## Features
 
 - Account registration and login
@@ -16,6 +18,24 @@ Uni 5 is a lightweight realtime chat app with account login, group chat, private
 - Admin dashboard for user, room, and message management
 - SQLite persistence with JSON compatibility helpers
 - macOS/iOS-inspired glass UI, rounded controls, and spatial page transitions
+- Uni 5.1.0: smoother GPU-friendly animations, systemized frosted glass styling, and persistent light/dark mode
+- Uni 5.2.0: user avatar uploads, light/dark/system theme strategy, and optional message notification sound
+
+## Release Notes
+
+### Uni 5.2.0 Profile & Comfort Update
+
+Added:
+
+- User avatar upload, preview, update, and reset-to-default support
+- Light / dark / follow-system appearance strategy
+- Optional message notification sound with local preference storage
+
+Improved:
+
+- User identity display across chat, online lists, settings, and admin users
+- Theme preference persistence and system theme syncing
+- Comfort settings inside a glass-style settings panel
 
 ## Tech Stack
 
