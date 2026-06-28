@@ -2,7 +2,7 @@
 
 Uni 5 is a lightweight realtime chat and community app with account login, group chat, private chat, forum posts, admin tools, message recall, image paste/upload, voice messages, and a glass-style responsive web UI.
 
-Current release: **Uni 5.4.0 Experience Architecture Update**
+Current release: **Uni 5.4.1 Stability & Forum Persistence Fix**
 
 ## Features
 
@@ -23,8 +23,19 @@ Current release: **Uni 5.4.0 Experience Architecture Update**
 - Uni 5.2.0: user avatar uploads, light/dark/system theme strategy, and optional message notification sound
 - Uni 5.3.0: forum posts, post list/detail views, and realtime comments
 - Uni 5.4.0: redesigned post-login home hub, clearer Chat / Forum module navigation, and refined module UI hierarchy
+- Uni 5.4.1: forum persistence hardening, CORS configuration, and stability cleanup
 
 ## Release Notes
+
+### Uni 5.4.1 Stability & Forum Persistence Fix
+
+Fixed:
+
+- Verified and repaired forum post/comment SQLite persistence
+- Added stricter forum input validation
+- Cleaned temporary `.gitignore` entries
+- Hardened Socket.IO CORS configuration
+- Improved module navigation edge cases
 
 ### Uni 5.4.0 Experience Architecture Update
 
@@ -88,7 +99,7 @@ Fixes:
 
 ## Requirements
 
-- Node.js with `node:sqlite` support
+- Node.js 22+ with `node:sqlite` support
 - npm
 
 ## Installation
@@ -109,6 +120,7 @@ Available environment variables:
 
 ```bash
 PORT=3200
+ALLOWED_ORIGINS=http://localhost:3200,http://127.0.0.1:3200
 ADMIN_ACCOUNT=admin
 ADMIN_PASSWORD=replace-with-a-strong-password
 ADMIN_USERNAME=Administrator
@@ -118,6 +130,8 @@ Notes:
 
 - `.env` is ignored by Git and must not be committed.
 - Change the admin password before sharing or deploying the app.
+- `ALLOWED_ORIGINS` is a comma-separated Socket.IO CORS allowlist.
+- When testing with ngrok, add the current ngrok URL to `ALLOWED_ORIGINS` locally, but do not commit real tunnel URLs.
 - Do not commit real ngrok URLs, API keys, passwords, user data, chat history, or SQLite database files.
 
 ## Running

@@ -1,6 +1,6 @@
 {
   "name": "beluga-chat",
-  "version": "5.4.0",
+  "version": "5.4.1",
   "private": true,
   "description": "Uni 5 realtime chat app developed by Hyperstack X.",
   "main": "server.js",
@@ -9,6 +9,9 @@
     "android:add": "npx cap add android",
     "android:sync": "npx cap sync android",
     "android:open": "npx cap open android"
+  },
+  "engines": {
+    "node": ">=22.0.0"
   },
   "dependencies": {
     "@capacitor/android": "^7.4.4",

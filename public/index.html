@@ -2199,6 +2199,10 @@
       padding: 14px;
     }
 
+    .forum-compose {
+      align-self: start;
+    }
+
     .forum-compose h3,
     .forum-list-section h3,
     .post-detail h3 {
@@ -2240,7 +2244,7 @@
 
     .forum-form textarea,
     .comment-form textarea {
-      min-height: 104px;
+      min-height: 92px;
       resize: vertical;
       padding: 11px 12px;
       line-height: 1.55;
@@ -2337,6 +2341,19 @@
       place-items: center;
       color: var(--muted);
       text-align: center;
+    }
+
+    .forum-empty {
+      min-height: 112px;
+      display: grid;
+      place-items: center;
+      padding: 18px;
+      border: 1px dashed var(--line);
+      border-radius: var(--radius-lg);
+      color: var(--muted);
+      background: var(--glass-bg-soft);
+      text-align: center;
+      line-height: 1.5;
     }
 
     .post-author,
@@ -3235,7 +3252,6 @@
             <span>切换用户</span>
           </button>
           <button id="forumRefresh" class="admin-btn" type="button">刷新</button>
-          <button id="forumClose" class="admin-btn" type="button">返回首页</button>
         </div>
       </header>
       <div class="forum-body">
@@ -3244,7 +3260,7 @@
             <h3>发布帖子</h3>
             <form id="forumPostForm" class="forum-form">
               <input id="forumPostTitle" maxlength="80" placeholder="帖子标题" autocomplete="off">
-              <textarea id="forumPostContent" maxlength="5000" placeholder="写下正文"></textarea>
+              <textarea id="forumPostContent" maxlength="3000" placeholder="写下正文"></textarea>
               <div class="forum-actions-row">
                 <button id="forumPostSubmit" class="admin-btn primary" type="submit">发布</button>
               </div>
@@ -3427,6 +3443,7 @@
   <script>
     const socket = io();
 
+    // State
     const state = {
       userId: '',
       username: '',
@@ -3467,6 +3484,7 @@
       viewTransitionTimer: null
     };
 
+    // DOM refs
     const messagesDiv = document.getElementById('messages');
     const emptyState = document.getElementById('emptyState');
     const input = document.getElementById('input');
@@ -3532,7 +3550,6 @@
     const forumPage = document.getElementById('forumPage');
     const forumStatus = document.getElementById('forumStatus');
     const forumHomeOpen = document.getElementById('forumHomeOpen');
-    const forumClose = document.getElementById('forumClose');
     const forumRefresh = document.getElementById('forumRefresh');
     const forumPostForm = document.getElementById('forumPostForm');
     const forumPostTitle = document.getElementById('forumPostTitle');
@@ -3607,6 +3624,7 @@
     const SOUND_KEY = 'uni5-message-sound';
     const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
 
+    // Theme and settings
     function systemTheme() {
       return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
     }
@@ -3777,6 +3795,7 @@
       }
     }
 
+    // Navigation
     function setView(view) {
       if (!pageLayers[view]) return;
       const previous = state.view || 'auth';
@@ -3895,6 +3914,7 @@
       resetClientSession();
     }
 
+    // Socket events
     socket.on('connect', () => {
       setConnection(true);
     });
@@ -4197,10 +4217,6 @@
 
     lobbyRefresh.addEventListener('click', () => {
       if (state.username) socket.emit('get lobby');
-    });
-
-    forumClose.addEventListener('click', () => {
-      returnHome();
     });
 
     forumRefresh.addEventListener('click', () => {
@@ -4748,6 +4764,7 @@
       return icons[name] || '';
     }
 
+    // Forum
     function openChatModule() {
       if (!state.username) {
         showToast('请先登录');
@@ -4833,10 +4850,11 @@
       if (!post || typeof post !== 'object') return null;
       const title = typeof post.title === 'string' ? post.title.trim() : '';
       const content = typeof post.content === 'string' ? post.content.trim() : '';
-      const postId = typeof post.postId === 'string' ? post.postId : '';
+      const postId = typeof post.id === 'string' ? post.id : typeof post.postId === 'string' ? post.postId : '';
       if (!postId || !title) return null;
       const username = typeof post.username === 'string' && post.username.trim() ? post.username.trim() : '匿名';
       return {
+        id: postId,
         postId,
         userId: typeof post.userId === 'string' ? post.userId : '',
         username,
@@ -4850,11 +4868,12 @@
 
     function normalizeForumComment(comment) {
       if (!comment || typeof comment !== 'object') return null;
-      const commentId = typeof comment.commentId === 'string' ? comment.commentId : '';
+      const commentId = typeof comment.id === 'string' ? comment.id : typeof comment.commentId === 'string' ? comment.commentId : '';
       const content = typeof comment.content === 'string' ? comment.content.trim() : '';
       if (!commentId || !content) return null;
       const username = typeof comment.username === 'string' && comment.username.trim() ? comment.username.trim() : '匿名';
       return {
+        id: commentId,
         commentId,
         postId: typeof comment.postId === 'string' ? comment.postId : '',
         userId: typeof comment.userId === 'string' ? comment.userId : '',
@@ -4872,8 +4891,8 @@
 
       if (posts.length === 0) {
         const empty = document.createElement('div');
-        empty.className = 'admin-muted';
-        empty.textContent = '还没有帖子，来发第一篇吧。';
+        empty.className = 'forum-empty';
+        empty.textContent = '还没有帖子。发布第一篇，把这个空间点亮。';
         forumPostList.append(empty);
         return;
       }
@@ -4965,8 +4984,8 @@
       if (title) title.textContent = `评论 ${comments.length}`;
       if (comments.length === 0) {
         const empty = document.createElement('div');
-        empty.className = 'admin-muted';
-        empty.textContent = '还没有评论。';
+        empty.className = 'forum-empty';
+        empty.textContent = '还没有评论。写下第一条回应。';
         list.append(empty);
         return;
       }

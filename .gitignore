@@ -33,7 +33,3 @@ android/local.properties
 android/.gradle/
 android/app/build/
 android/build/
-
-# Temporary scratch files
-200
-可连接

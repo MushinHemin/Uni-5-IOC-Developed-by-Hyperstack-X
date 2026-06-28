@@ -10,7 +10,19 @@ loadDotEnv();
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: "*" } });
+const DEFAULT_ALLOWED_ORIGINS = ['http://localhost:3200', 'http://127.0.0.1:3200'];
+const ALLOWED_ORIGINS = parseAllowedOrigins(process.env.ALLOWED_ORIGINS);
+const io = new Server(server, {
+  cors: {
+    origin(origin, callback) {
+      if (!origin || ALLOWED_ORIGINS.includes(origin)) {
+        callback(null, true);
+        return;
+      }
+      callback(new Error('Origin not allowed by Uni 5 CORS policy'));
+    }
+  }
+});
 
 const DATA_FILE = path.join(__dirname, 'chat-history.json');
 const USERS_FILE = path.join(__dirname, 'users.json');
@@ -20,7 +32,7 @@ const AVATAR_UPLOAD_DIR = path.join(UPLOADS_DIR, 'avatars');
 const JSON_FILE_MODE = 0o600;
 const MAX_MESSAGE_LENGTH = 1000;
 const MAX_POST_TITLE_LENGTH = 80;
-const MAX_POST_CONTENT_LENGTH = 5000;
+const MAX_POST_CONTENT_LENGTH = 3000;
 const MAX_COMMENT_LENGTH = 1000;
 const MAX_USERNAME_LENGTH = 20;
 const MAX_ACCOUNT_LENGTH = 24;
@@ -51,6 +63,8 @@ const IMAGE_EXTENSIONS = {
 };
 let db;
 
+warnIfDefaultAdminPassword();
+
 function loadDotEnv() {
   const envPath = path.join(__dirname, '.env');
   if (!fs.existsSync(envPath)) return;
@@ -73,6 +87,21 @@ function loadDotEnv() {
 
 function cleanEnv(value) {
   return typeof value === 'string' ? value.trim() : '';
+}
+
+function parseAllowedOrigins(value) {
+  const configured = cleanEnv(value)
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+  return configured.length > 0 ? configured : DEFAULT_ALLOWED_ORIGINS;
+}
+
+function warnIfDefaultAdminPassword() {
+  const configuredPassword = cleanEnv(process.env.ADMIN_PASSWORD);
+  if (!configuredPassword || configuredPassword === 'change-me-admin-password' || configuredPassword === 'mushin') {
+    console.warn('[Uni 5 security] ADMIN_PASSWORD is missing or weak. Set a strong ADMIN_PASSWORD in .env before sharing or deploying.');
+  }
 }
 
 function atomicWriteJsonSync(filePath, value) {
@@ -408,7 +437,7 @@ function initDatabase() {
     );
 
     CREATE TABLE IF NOT EXISTS posts (
-      post_id TEXT PRIMARY KEY,
+      id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL,
       username TEXT NOT NULL,
       avatar TEXT NOT NULL,
@@ -418,7 +447,7 @@ function initDatabase() {
     );
 
     CREATE TABLE IF NOT EXISTS comments (
-      comment_id TEXT PRIMARY KEY,
+      id TEXT PRIMARY KEY,
       post_id TEXT NOT NULL,
       user_id TEXT NOT NULL,
       username TEXT NOT NULL,
@@ -431,14 +460,85 @@ function initDatabase() {
     CREATE INDEX IF NOT EXISTS idx_messages_user_id ON messages(user_id);
     CREATE INDEX IF NOT EXISTS idx_room_members_user_id ON room_members(user_id);
     CREATE INDEX IF NOT EXISTS idx_posts_created_at ON posts(created_at);
+    CREATE INDEX IF NOT EXISTS idx_posts_user_id ON posts(user_id);
     CREATE INDEX IF NOT EXISTS idx_comments_post_id ON comments(post_id);
     CREATE INDEX IF NOT EXISTS idx_comments_created_at ON comments(created_at);
+    CREATE INDEX IF NOT EXISTS idx_comments_user_id ON comments(user_id);
   `);
+  migrateForumTables();
   ensureColumn('users', 'last_ip', "TEXT NOT NULL DEFAULT ''");
   ensureColumn('users', 'last_login_at', "TEXT NOT NULL DEFAULT ''");
   ensureColumn('messages', 'room_id', `TEXT NOT NULL DEFAULT '${DEFAULT_ROOM_ID}'`);
   db.exec('CREATE INDEX IF NOT EXISTS idx_messages_room_id ON messages(room_id)');
   ensureDefaultRoom();
+}
+
+function migrateForumTables() {
+  migrateForumTable({
+    tableName: 'posts',
+    legacyIdColumn: 'post_id',
+    columnsSql: `
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      username TEXT NOT NULL,
+      avatar TEXT NOT NULL,
+      title TEXT NOT NULL,
+      content TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    `,
+    copySql: (legacyTable) => `
+      INSERT OR IGNORE INTO posts (id, user_id, username, avatar, title, content, created_at)
+      SELECT post_id, user_id, username, avatar, title, content, created_at FROM ${legacyTable}
+      WHERE post_id IS NOT NULL AND TRIM(post_id) != ''
+    `
+  });
+
+  migrateForumTable({
+    tableName: 'comments',
+    legacyIdColumn: 'comment_id',
+    columnsSql: `
+      id TEXT PRIMARY KEY,
+      post_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      username TEXT NOT NULL,
+      avatar TEXT NOT NULL,
+      content TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    `,
+    copySql: (legacyTable) => `
+      INSERT OR IGNORE INTO comments (id, post_id, user_id, username, avatar, content, created_at)
+      SELECT comment_id, post_id, user_id, username, avatar, content, created_at FROM ${legacyTable}
+      WHERE comment_id IS NOT NULL AND TRIM(comment_id) != ''
+    `
+  });
+
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_posts_created_at ON posts(created_at);
+    CREATE INDEX IF NOT EXISTS idx_posts_user_id ON posts(user_id);
+    CREATE INDEX IF NOT EXISTS idx_comments_post_id ON comments(post_id);
+    CREATE INDEX IF NOT EXISTS idx_comments_created_at ON comments(created_at);
+    CREATE INDEX IF NOT EXISTS idx_comments_user_id ON comments(user_id);
+  `);
+}
+
+function migrateForumTable({ tableName, legacyIdColumn, columnsSql, copySql }) {
+  const columns = db.prepare(`PRAGMA table_info(${tableName})`).all();
+  const hasId = columns.some((column) => column.name === 'id');
+  const hasLegacyId = columns.some((column) => column.name === legacyIdColumn);
+  if (hasId || !hasLegacyId) return;
+
+  const legacyTable = `${tableName}_legacy_${Date.now()}`;
+  db.exec('BEGIN');
+  try {
+    db.exec(`ALTER TABLE ${tableName} RENAME TO ${legacyTable}`);
+    db.exec(`CREATE TABLE ${tableName} (${columnsSql})`);
+    db.exec(copySql(legacyTable));
+    db.exec(`DROP TABLE ${legacyTable}`);
+    db.exec('COMMIT');
+  } catch (error) {
+    db.exec('ROLLBACK');
+    throw error;
+  }
 }
 
 function ensureColumn(tableName, columnName, definition) {
@@ -494,11 +594,12 @@ function rowToMessage(row) {
 
 function rowToPost(row) {
   if (!row) return null;
-  const postId = cleanForumId(row.post_id);
+  const postId = cleanForumId(row.id || row.post_id);
   const title = cleanPostTitle(row.title);
   const content = cleanPostContent(row.content);
   if (!postId || !title || !content) return null;
   return {
+    id: postId,
     postId,
     userId: String(row.user_id || ''),
     username: cleanUsername(row.username) || '匿名',
@@ -512,11 +613,12 @@ function rowToPost(row) {
 
 function rowToComment(row) {
   if (!row) return null;
-  const commentId = cleanForumId(row.comment_id);
+  const commentId = cleanForumId(row.id || row.comment_id);
   const postId = cleanForumId(row.post_id);
   const content = cleanCommentContent(row.content);
   if (!commentId || !postId || !content) return null;
   return {
+    id: commentId,
     commentId,
     postId,
     userId: String(row.user_id || ''),
@@ -629,6 +731,7 @@ function publicMessage(message) {
 function publicForumPost(post) {
   if (!post) return null;
   return {
+    id: post.id || post.postId,
     postId: post.postId,
     userId: post.userId,
     username: post.username,
@@ -643,6 +746,7 @@ function publicForumPost(post) {
 function publicForumComment(comment) {
   if (!comment) return null;
   return {
+    id: comment.id || comment.commentId,
     commentId: comment.commentId,
     postId: comment.postId,
     userId: comment.userId,
@@ -655,10 +759,10 @@ function publicForumComment(comment) {
 
 function listForumPosts() {
   return db.prepare(`
-    SELECT posts.*, COUNT(comments.comment_id) AS comment_count
+    SELECT posts.*, COUNT(comments.id) AS comment_count
     FROM posts
-    LEFT JOIN comments ON comments.post_id = posts.post_id
-    GROUP BY posts.post_id
+    LEFT JOIN comments ON comments.post_id = posts.id
+    GROUP BY posts.id
     ORDER BY posts.created_at DESC
     LIMIT ?
   `).all(MAX_FORUM_POSTS).map(rowToPost).filter(Boolean).map(publicForumPost);
@@ -668,11 +772,11 @@ function getForumPost(postIdValue) {
   const postId = cleanForumId(postIdValue);
   if (!postId) return null;
   const row = db.prepare(`
-    SELECT posts.*, COUNT(comments.comment_id) AS comment_count
+    SELECT posts.*, COUNT(comments.id) AS comment_count
     FROM posts
-    LEFT JOIN comments ON comments.post_id = posts.post_id
-    WHERE posts.post_id = ?
-    GROUP BY posts.post_id
+    LEFT JOIN comments ON comments.post_id = posts.id
+    WHERE posts.id = ?
+    GROUP BY posts.id
   `).get(postId);
   return publicForumPost(rowToPost(row));
 }
@@ -689,14 +793,14 @@ function listForumComments(postIdValue) {
 
 function insertForumPost(post) {
   db.prepare(`
-    INSERT INTO posts (post_id, user_id, username, avatar, title, content, created_at)
+    INSERT INTO posts (id, user_id, username, avatar, title, content, created_at)
     VALUES (@postId, @userId, @username, @avatar, @title, @content, @createdAt)
   `).run(post);
 }
 
 function insertForumComment(comment) {
   db.prepare(`
-    INSERT INTO comments (comment_id, post_id, user_id, username, avatar, content, created_at)
+    INSERT INTO comments (id, post_id, user_id, username, avatar, content, created_at)
     VALUES (@commentId, @postId, @userId, @username, @avatar, @content, @createdAt)
   `).run(comment);
 }
