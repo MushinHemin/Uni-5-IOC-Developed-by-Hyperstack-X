@@ -197,6 +197,7 @@
     }
 
     body.view-auth .app,
+    body.view-home .app,
     body.view-lobby .app {
       opacity: 0.58;
       transform: translate3d(0, 38px, -130px) scale(0.9);
@@ -217,6 +218,7 @@
     }
 
     .login,
+    .home,
     .lobby,
     .admin-page,
     .forum-page {
@@ -230,6 +232,7 @@
     }
 
     body.view-auth .login,
+    body.view-home .home,
     body.view-lobby .lobby,
     body.view-admin .admin-page,
     body.view-forum .forum-page {
@@ -238,8 +241,12 @@
       pointer-events: auto;
     }
 
+    body.view-home .login,
     body.view-lobby .login,
+    body.view-lobby .home,
     body.view-chat .lobby,
+    body.view-chat .home,
+    body.view-forum .home,
     body.view-forum .lobby {
       opacity: 0;
       transform: translate3d(0, -72px, 160px) scale(1.08);
@@ -247,6 +254,10 @@
     }
 
     body.view-auth .lobby,
+    body.view-auth .home,
+    body.view-home .lobby,
+    body.view-home .admin-page,
+    body.view-home .forum-page,
     body.view-lobby .admin-page,
     body.view-chat .admin-page,
     body.view-auth .admin-page,
@@ -259,6 +270,7 @@
     }
 
     body.view-admin .login,
+    body.view-admin .home,
     body.view-admin .lobby,
     body.view-forum .login {
       opacity: 0.52;
@@ -1406,6 +1418,7 @@
       border-top: 1px solid var(--line);
     }
 
+    .home-shell > .copyright-footer,
     .lobby-shell > .copyright-footer,
     .admin-shell > .copyright-footer,
     .forum-shell > .copyright-footer {
@@ -1474,6 +1487,261 @@
       background: var(--field-bg);
     }
 
+    .home {
+      position: fixed;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: 22px;
+      background:
+        radial-gradient(circle at 48% 18%, var(--glass-bg-soft), transparent 36%),
+        transparent;
+      z-index: 15;
+    }
+
+    .home[hidden] {
+      display: none;
+    }
+
+    .home-shell {
+      width: min(1080px, 100%);
+      max-height: min(820px, calc(100dvh - 44px));
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+      overflow: hidden;
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-xl);
+      background:
+        linear-gradient(145deg, var(--glass-bg-light), var(--glass-bg)),
+        var(--glass-bg);
+      backdrop-filter: blur(var(--glass-blur-sm)) saturate(1.16);
+      box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-highlight);
+    }
+
+    .home-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 24px 26px 18px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .home-kicker {
+      margin: 0 0 8px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .home-header h2 {
+      margin: 0;
+      font-size: clamp(30px, 5vw, 52px);
+      line-height: 1.02;
+      letter-spacing: 0;
+    }
+
+    .home-subtitle {
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 15px;
+    }
+
+    .home-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .home-profile {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 44px;
+      padding: 6px 12px 6px 6px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      color: var(--ink);
+      background: var(--glass-bg-soft);
+      box-shadow: inset 0 1px 0 var(--glass-highlight);
+    }
+
+    .home-grid {
+      min-height: 0;
+      display: grid;
+      grid-template-columns: minmax(0, 1.08fr) minmax(280px, 0.72fr);
+      gap: 16px;
+      padding: 18px;
+      overflow: auto;
+    }
+
+    .home-primary,
+    .home-secondary {
+      display: grid;
+      gap: 14px;
+      min-width: 0;
+    }
+
+    .home-primary {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .home-card {
+      position: relative;
+      min-height: 220px;
+      display: grid;
+      align-content: space-between;
+      gap: 18px;
+      padding: 22px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-xl);
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 82% 8%, rgba(0, 122, 255, 0.14), transparent 32%),
+        var(--glass-bg-soft);
+      text-align: left;
+      box-shadow: 0 18px 54px rgba(31, 44, 43, 0.08), inset 0 1px 0 var(--glass-highlight);
+      transition:
+        transform var(--duration-normal) var(--ease-pop),
+        background var(--duration-normal) var(--ease-smooth),
+        border-color var(--duration-normal) var(--ease-smooth),
+        box-shadow var(--duration-normal) var(--ease-smooth);
+      animation: homeCardIn 420ms var(--ease-smooth) both;
+    }
+
+    .home-card:nth-child(2) {
+      animation-delay: 60ms;
+    }
+
+    .home-card:hover {
+      transform: translateY(-4px) scale(1.01);
+      border-color: rgba(0, 122, 255, 0.32);
+      background:
+        radial-gradient(circle at 82% 8%, rgba(0, 122, 255, 0.2), transparent 34%),
+        var(--glass-bg-light);
+      box-shadow: 0 24px 70px rgba(31, 44, 43, 0.12), inset 0 1px 0 var(--glass-highlight);
+    }
+
+    .home-card:active {
+      transform: translateY(-1px) scale(0.992);
+    }
+
+    .home-card-icon,
+    .mini-card-icon {
+      width: 54px;
+      height: 54px;
+      display: inline-grid;
+      place-items: center;
+      border-radius: var(--radius-lg);
+      color: #fff;
+      background: linear-gradient(145deg, var(--brand), #6aa9ff);
+      box-shadow: 0 14px 32px rgba(0, 122, 255, 0.24);
+    }
+
+    .home-card-icon .icon,
+    .mini-card-icon .icon {
+      width: 24px;
+      height: 24px;
+    }
+
+    .home-card h3,
+    .mini-card h3 {
+      margin: 0;
+      font-size: 24px;
+      letter-spacing: 0;
+    }
+
+    .home-card p,
+    .mini-card p {
+      margin: 8px 0 0;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    .home-card-meta {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .home-card-meta span,
+    .home-stat {
+      min-height: 28px;
+      display: inline-flex;
+      align-items: center;
+      padding: 0 10px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--glass-bg-soft);
+    }
+
+    .home-secondary {
+      grid-template-rows: auto auto minmax(0, 1fr);
+    }
+
+    .mini-card,
+    .home-insight {
+      width: 100%;
+      display: grid;
+      gap: 10px;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      color: var(--ink);
+      background: var(--glass-bg-soft);
+      text-align: left;
+      box-shadow: 0 10px 30px rgba(31, 44, 43, 0.06), inset 0 1px 0 var(--glass-highlight);
+      transition:
+        transform var(--duration-fast) var(--ease-pop),
+        background var(--duration-normal) var(--ease-smooth),
+        border-color var(--duration-normal) var(--ease-smooth);
+      animation: homeCardIn 420ms var(--ease-smooth) 120ms both;
+    }
+
+    .mini-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(0, 122, 255, 0.28);
+      background: var(--glass-bg-light);
+    }
+
+    .mini-card-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .mini-card-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: var(--radius-md);
+      box-shadow: 0 10px 24px rgba(0, 122, 255, 0.18);
+    }
+
+    .home-insight {
+      align-content: start;
+      min-height: 160px;
+      animation-delay: 180ms;
+    }
+
+    .home-insight h3 {
+      margin: 0;
+      font-size: 15px;
+    }
+
+    .home-stats {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
     .lobby {
       position: fixed;
       inset: 0;
@@ -1491,7 +1759,7 @@
     }
 
     .lobby-shell {
-      width: min(980px, 100%);
+      width: min(1040px, 100%);
       max-height: min(760px, calc(100dvh - 44px));
       display: grid;
       grid-template-rows: auto minmax(0, 1fr) auto;
@@ -1528,7 +1796,7 @@
     .lobby-section {
       min-height: 0;
       overflow: auto;
-      padding: 16px;
+      padding: 18px;
     }
 
     .lobby-section + .lobby-section {
@@ -1552,13 +1820,13 @@
       width: 100%;
       display: grid;
       gap: 5px;
-      padding: 12px;
+      padding: 14px;
       border: 1px solid var(--line);
       border-radius: var(--radius-lg);
       background: var(--glass-bg-soft);
       color: var(--ink);
       text-align: left;
-      box-shadow: 0 8px 24px rgba(31, 44, 43, 0.04);
+      box-shadow: 0 10px 28px rgba(31, 44, 43, 0.05), inset 0 1px 0 var(--glass-highlight);
       transition: transform var(--duration-fast) var(--ease-pop), background var(--duration-normal) var(--ease-smooth), border-color var(--duration-normal) var(--ease-smooth);
     }
 
@@ -1897,7 +2165,7 @@
     .forum-body {
       min-height: 0;
       display: grid;
-      grid-template-columns: 360px minmax(0, 1fr);
+      grid-template-columns: minmax(340px, 0.46fr) minmax(0, 1fr);
       overflow: hidden;
     }
 
@@ -1911,6 +2179,9 @@
     .forum-sidebar {
       border-right: 1px solid var(--line);
       background: var(--glass-bg-soft);
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      gap: 12px;
     }
 
     .forum-compose,
@@ -1936,7 +2207,8 @@
     }
 
     .forum-list-section {
-      margin-top: 12px;
+      min-height: 0;
+      overflow: auto;
     }
 
     .forum-form,
@@ -2003,7 +2275,7 @@
       display: grid;
       grid-template-columns: auto minmax(0, 1fr);
       gap: 10px;
-      padding: 12px;
+      padding: 14px;
       border: 1px solid var(--line);
       border-radius: var(--radius-lg);
       color: var(--ink);
@@ -2053,7 +2325,9 @@
 
     .post-detail {
       min-height: 100%;
-      padding: 18px;
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 22px;
       animation: forumDetailIn 320ms var(--ease-smooth) both;
     }
 
@@ -2365,6 +2639,17 @@
       }
     }
 
+    @keyframes homeCardIn {
+      from {
+        opacity: 0;
+        transform: translateY(18px) scale(0.975);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
     @keyframes forumItemIn {
       from {
         opacity: 0;
@@ -2429,6 +2714,7 @@
 
       .page-layer,
       .login,
+      .home,
       .lobby,
       .admin-page,
       .forum-page {
@@ -2443,6 +2729,7 @@
       }
 
       body.view-auth .app,
+      body.view-home .app,
       body.view-lobby .app,
       body.view-admin .app,
       body.view-forum .app {
@@ -2515,9 +2802,41 @@
         order: -1;
       }
 
+      .home,
       .admin-page,
       .forum-page {
         padding: 0;
+      }
+
+      .home-shell {
+        height: 100dvh;
+        max-height: none;
+        border: 0;
+        border-radius: 0;
+      }
+
+      .home-header {
+        align-items: flex-start;
+        flex-direction: column;
+        padding: 20px 16px 14px;
+      }
+
+      .home-toolbar {
+        width: 100%;
+        justify-content: space-between;
+      }
+
+      .home-grid {
+        grid-template-columns: 1fr;
+        padding: 14px;
+      }
+
+      .home-primary {
+        grid-template-columns: 1fr;
+      }
+
+      .home-card {
+        min-height: 180px;
       }
 
       .admin-shell,
@@ -2632,15 +2951,15 @@
             <button class="settings-toggle-btn" data-settings-open type="button" aria-label="系统设置" title="系统设置">
               <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.05.05a2 2 0 0 1-2.83 2.83l-.05-.05a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 0 1-4 0v-.07A1.7 1.7 0 0 0 9 19.37a1.7 1.7 0 0 0-1.88.34l-.05.05a2 2 0 1 1-2.83-2.83l.05-.05A1.7 1.7 0 0 0 4.63 15 1.7 1.7 0 0 0 3.07 14H3a2 2 0 0 1 0-4h.07A1.7 1.7 0 0 0 4.63 9a1.7 1.7 0 0 0-.34-1.88l-.05-.05a2 2 0 1 1 2.83-2.83l.05.05A1.7 1.7 0 0 0 9 4.63 1.7 1.7 0 0 0 10 3.07V3a2 2 0 0 1 4 0v.07A1.7 1.7 0 0 0 15 4.63a1.7 1.7 0 0 0 1.88-.34l.05-.05a2 2 0 0 1 2.83 2.83l-.05.05A1.7 1.7 0 0 0 19.37 9c.22.61.8 1 1.56 1H21a2 2 0 0 1 0 4h-.07A1.7 1.7 0 0 0 19.4 15z"/></svg>
             </button>
-            <button class="admin-btn" data-forum-entry type="button" aria-label="打开论坛">
-              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14v10H8l-3 3V5z"/><path d="M9 9h6"/><path d="M9 12h4"/></svg>
-              <span>论坛</span>
+            <button id="chatHomeOpen" class="admin-btn" type="button" aria-label="返回首页">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-7 8 7"/><path d="M6 10v9h12v-9"/><path d="M10 19v-5h4v5"/></svg>
+              <span>首页</span>
             </button>
             <button class="switch-user-btn" data-switch-user type="button" aria-label="切换用户">
               <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7h9l-3-3"/><path d="M17 7l-3 3"/><path d="M16 17H7l3 3"/><path d="M7 17l3-3"/><circle cx="12" cy="12" r="3"/></svg>
               <span>切换用户</span>
             </button>
-            <button id="backToLobby" class="admin-btn" type="button" hidden>返回</button>
+            <button id="backToLobby" class="admin-btn" type="button" hidden>会话</button>
             <button id="adminOpen" class="admin-open-btn" data-admin-entry type="button" hidden>
               <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6l7-3z"/><path d="M9 12l2 2 4-5"/></svg>
               <span>后台</span>
@@ -2744,11 +3063,105 @@
     </div>
   </section>
 
+  <section id="homePage" class="home page-layer" data-view="home" aria-label="Uni 5 首页" hidden>
+    <div class="home-shell">
+      <header class="home-header">
+        <div>
+          <p class="home-kicker">Uni 5</p>
+          <h2 id="homeWelcome">欢迎回来</h2>
+          <div id="homeSubtitle" class="home-subtitle">选择你想进入的空间。</div>
+        </div>
+        <div class="home-toolbar">
+          <button id="homeProfile" class="home-profile" data-settings-open type="button" aria-label="账户">
+            <span id="homeProfileAvatar"></span>
+            <span>
+              <strong id="homeProfileName">未登录</strong>
+              <span class="admin-muted">账户</span>
+            </span>
+          </button>
+          <button class="theme-toggle-btn" data-theme-toggle type="button" aria-label="切换外观" title="切换外观">
+            <svg class="icon theme-icon moon-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 14.6A7.6 7.6 0 0 1 9.4 3 8.8 8.8 0 1 0 21 14.6z"/></svg>
+            <svg class="icon theme-icon sun-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="M4.93 4.93l1.41 1.41"/><path d="M17.66 17.66l1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="M4.93 19.07l1.41-1.41"/><path d="M17.66 6.34l1.41-1.41"/></svg>
+          </button>
+          <button class="settings-toggle-btn" data-settings-open type="button" aria-label="系统设置" title="系统设置">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.05.05a2 2 0 0 1-2.83 2.83l-.05-.05a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 0 1-4 0v-.07A1.7 1.7 0 0 0 9 19.37a1.7 1.7 0 0 0-1.88.34l-.05.05a2 2 0 1 1-2.83-2.83l.05-.05A1.7 1.7 0 0 0 4.63 15 1.7 1.7 0 0 0 3.07 14H3a2 2 0 0 1 0-4h.07A1.7 1.7 0 0 0 4.63 9a1.7 1.7 0 0 0-.34-1.88l-.05-.05a2 2 0 1 1 2.83-2.83l.05.05A1.7 1.7 0 0 0 9 4.63 1.7 1.7 0 0 0 10 3.07V3a2 2 0 0 1 4 0v.07A1.7 1.7 0 0 0 15 4.63a1.7 1.7 0 0 0 1.88-.34l.05-.05a2 2 0 0 1 2.83 2.83l-.05.05A1.7 1.7 0 0 0 19.37 9c.22.61.8 1 1.56 1H21a2 2 0 0 1 0 4h-.07A1.7 1.7 0 0 0 19.4 15z"/></svg>
+          </button>
+          <button class="switch-user-btn" data-switch-user type="button" aria-label="切换用户">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7h9l-3-3"/><path d="M17 7l-3 3"/><path d="M16 17H7l3 3"/><path d="M7 17l3-3"/><circle cx="12" cy="12" r="3"/></svg>
+            <span>切换用户</span>
+          </button>
+          <button id="homeAdminOpen" class="admin-open-btn" data-admin-entry type="button" hidden>
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 13h7V4H4v9z"/><path d="M13 20h7V4h-7v16z"/><path d="M4 20h7v-5H4v5z"/></svg>
+            <span>后台</span>
+          </button>
+        </div>
+      </header>
+      <div class="home-grid">
+        <div class="home-primary">
+          <button id="homeChatOpen" class="home-card" type="button">
+            <span class="home-card-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14v10H8l-3 3V6z"/><path d="M9 10h6"/><path d="M9 13h4"/></svg></span>
+            <span>
+              <h3>聊天</h3>
+              <p>进入群组、私聊和实时会话。</p>
+            </span>
+            <span class="home-card-meta">
+              <span id="homeRoomStat">聊天组 0</span>
+              <span id="homeOnlineStat">在线 0</span>
+            </span>
+          </button>
+          <button id="homeForumOpen" class="home-card" type="button">
+            <span class="home-card-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v12H7l-3 3V5z"/><path d="M8 9h8"/><path d="M8 12h5"/></svg></span>
+            <span>
+              <h3>论坛</h3>
+              <p>浏览帖子、发布想法、参与评论。</p>
+            </span>
+            <span class="home-card-meta">
+              <span id="homeForumStat">社区空间</span>
+              <span>实时评论</span>
+            </span>
+          </button>
+        </div>
+        <div class="home-secondary">
+          <button id="homeAccountOpen" class="mini-card" type="button">
+            <span class="mini-card-row">
+              <span class="mini-card-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M5 20c1.5-4 12.5-4 14 0"/></svg></span>
+              <span>
+                <h3>账户</h3>
+                <p>头像、昵称和个人资料。</p>
+              </span>
+            </span>
+          </button>
+          <button id="homeSettingsOpen" class="mini-card" type="button">
+            <span class="mini-card-row">
+              <span class="mini-card-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.05.05a2 2 0 0 1-2.83 2.83l-.05-.05a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 0 1-4 0v-.07A1.7 1.7 0 0 0 9 19.37a1.7 1.7 0 0 0-1.88.34l-.05.05a2 2 0 1 1-2.83-2.83l.05-.05A1.7 1.7 0 0 0 4.63 15 1.7 1.7 0 0 0 3.07 14H3a2 2 0 0 1 0-4h.07A1.7 1.7 0 0 0 4.63 9a1.7 1.7 0 0 0-.34-1.88l-.05-.05a2 2 0 1 1 2.83-2.83l.05.05A1.7 1.7 0 0 0 9 4.63 1.7 1.7 0 0 0 10 3.07V3a2 2 0 0 1 4 0v.07A1.7 1.7 0 0 0 15 4.63a1.7 1.7 0 0 0 1.88-.34l.05-.05a2 2 0 0 1 2.83 2.83l-.05.05A1.7 1.7 0 0 0 19.37 9c.22.61.8 1 1.56 1H21a2 2 0 0 1 0 4h-.07A1.7 1.7 0 0 0 19.4 15z"/></svg></span>
+              <span>
+                <h3>设置</h3>
+                <p>外观、提示音和舒适度选项。</p>
+              </span>
+            </span>
+          </button>
+          <section class="home-insight">
+            <h3>当前状态</h3>
+            <div class="home-stats">
+              <span id="homeConnectionStat" class="home-stat">连接中</span>
+              <span id="homeAdminStat" class="home-stat">普通用户</span>
+            </div>
+            <p class="admin-muted">从这里进入核心功能，进入模块后工具会自动收纳到顶部栏。</p>
+          </section>
+        </div>
+      </div>
+      <footer class="copyright-footer">
+        <div>&copy;2026 Hyperstack X Copyright all rights reserved.</div>
+        <div>Developed by Hyperstack X</div>
+      </footer>
+    </div>
+  </section>
+
   <section id="lobby" class="lobby page-layer" data-view="lobby" aria-label="选择聊天" hidden>
     <div class="lobby-shell">
       <header class="lobby-header">
         <div>
-          <h2>开始</h2>
+          <h2>聊天</h2>
           <div id="lobbyStatus" class="status">选择频道或在线用户。</div>
         </div>
         <div class="admin-actions">
@@ -2759,9 +3172,9 @@
           <button class="settings-toggle-btn" data-settings-open type="button" aria-label="系统设置" title="系统设置">
             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.05.05a2 2 0 0 1-2.83 2.83l-.05-.05a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 0 1-4 0v-.07A1.7 1.7 0 0 0 9 19.37a1.7 1.7 0 0 0-1.88.34l-.05.05a2 2 0 1 1-2.83-2.83l.05-.05A1.7 1.7 0 0 0 4.63 15 1.7 1.7 0 0 0 3.07 14H3a2 2 0 0 1 0-4h.07A1.7 1.7 0 0 0 4.63 9a1.7 1.7 0 0 0-.34-1.88l-.05-.05a2 2 0 1 1 2.83-2.83l.05.05A1.7 1.7 0 0 0 9 4.63 1.7 1.7 0 0 0 10 3.07V3a2 2 0 0 1 4 0v.07A1.7 1.7 0 0 0 15 4.63a1.7 1.7 0 0 0 1.88-.34l.05-.05a2 2 0 0 1 2.83 2.83l-.05.05A1.7 1.7 0 0 0 19.37 9c.22.61.8 1 1.56 1H21a2 2 0 0 1 0 4h-.07A1.7 1.7 0 0 0 19.4 15z"/></svg>
           </button>
-          <button class="admin-btn" data-forum-entry type="button" aria-label="打开论坛">
-            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14v10H8l-3 3V5z"/><path d="M9 9h6"/><path d="M9 12h4"/></svg>
-            <span>论坛</span>
+          <button id="lobbyHomeOpen" class="admin-btn" type="button" aria-label="返回首页">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-7 8 7"/><path d="M6 10v9h12v-9"/><path d="M10 19v-5h4v5"/></svg>
+            <span>首页</span>
           </button>
           <button class="switch-user-btn" data-switch-user type="button" aria-label="切换用户">
             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7h9l-3-3"/><path d="M17 7l-3 3"/><path d="M16 17H7l3 3"/><path d="M7 17l3-3"/><circle cx="12" cy="12" r="3"/></svg>
@@ -2813,16 +3226,16 @@
           <button class="settings-toggle-btn" data-settings-open type="button" aria-label="系统设置" title="系统设置">
             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.05.05a2 2 0 0 1-2.83 2.83l-.05-.05a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 0 1-4 0v-.07A1.7 1.7 0 0 0 9 19.37a1.7 1.7 0 0 0-1.88.34l-.05.05a2 2 0 1 1-2.83-2.83l.05-.05A1.7 1.7 0 0 0 4.63 15 1.7 1.7 0 0 0 3.07 14H3a2 2 0 0 1 0-4h.07A1.7 1.7 0 0 0 4.63 9a1.7 1.7 0 0 0-.34-1.88l-.05-.05a2 2 0 1 1 2.83-2.83l.05.05A1.7 1.7 0 0 0 9 4.63 1.7 1.7 0 0 0 10 3.07V3a2 2 0 0 1 4 0v.07A1.7 1.7 0 0 0 15 4.63a1.7 1.7 0 0 0 1.88-.34l.05-.05a2 2 0 0 1 2.83 2.83l-.05.05A1.7 1.7 0 0 0 19.37 9c.22.61.8 1 1.56 1H21a2 2 0 0 1 0 4h-.07A1.7 1.7 0 0 0 19.4 15z"/></svg>
           </button>
-          <button class="admin-btn" data-forum-entry type="button" aria-label="打开论坛">
-            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14v10H8l-3 3V5z"/><path d="M9 9h6"/><path d="M9 12h4"/></svg>
-            <span>论坛</span>
+          <button id="forumHomeOpen" class="admin-btn" type="button" aria-label="返回首页">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-7 8 7"/><path d="M6 10v9h12v-9"/><path d="M10 19v-5h4v5"/></svg>
+            <span>首页</span>
           </button>
           <button class="switch-user-btn" data-switch-user type="button" aria-label="切换用户">
             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7h9l-3-3"/><path d="M17 7l-3 3"/><path d="M16 17H7l3 3"/><path d="M7 17l3-3"/><circle cx="12" cy="12" r="3"/></svg>
             <span>切换用户</span>
           </button>
           <button id="forumRefresh" class="admin-btn" type="button">刷新</button>
-          <button id="forumClose" class="admin-btn" type="button">返回</button>
+          <button id="forumClose" class="admin-btn" type="button">返回首页</button>
         </div>
       </header>
       <div class="forum-body">
@@ -3046,8 +3459,8 @@
       isConnected: false,
       typingTimer: null,
       view: 'auth',
-      adminReturnView: 'lobby',
-      forumReturnView: 'lobby',
+      adminReturnView: 'home',
+      forumReturnView: 'home',
       forumPosts: [],
       selectedForumPost: null,
       forumComments: [],
@@ -3088,6 +3501,20 @@
     const usernameInput = document.getElementById('usernameInput');
     const authSubmit = document.getElementById('authSubmit');
     const loginError = document.getElementById('loginError');
+    const homePage = document.getElementById('homePage');
+    const homeWelcome = document.getElementById('homeWelcome');
+    const homeSubtitle = document.getElementById('homeSubtitle');
+    const homeProfileAvatar = document.getElementById('homeProfileAvatar');
+    const homeProfileName = document.getElementById('homeProfileName');
+    const homeChatOpen = document.getElementById('homeChatOpen');
+    const homeForumOpen = document.getElementById('homeForumOpen');
+    const homeAccountOpen = document.getElementById('homeAccountOpen');
+    const homeSettingsOpen = document.getElementById('homeSettingsOpen');
+    const homeRoomStat = document.getElementById('homeRoomStat');
+    const homeOnlineStat = document.getElementById('homeOnlineStat');
+    const homeForumStat = document.getElementById('homeForumStat');
+    const homeConnectionStat = document.getElementById('homeConnectionStat');
+    const homeAdminStat = document.getElementById('homeAdminStat');
     const lobby = document.getElementById('lobby');
     const lobbyStatus = document.getElementById('lobbyStatus');
     const lobbyRefresh = document.getElementById('lobbyRefresh');
@@ -3098,11 +3525,13 @@
     const createRoomCode = document.getElementById('createRoomCode');
     const createRoomHint = document.getElementById('createRoomHint');
     const lobbyError = document.getElementById('lobbyError');
+    const chatHomeOpen = document.getElementById('chatHomeOpen');
+    const lobbyHomeOpen = document.getElementById('lobbyHomeOpen');
     const backToLobby = document.getElementById('backToLobby');
     const adminEntryButtons = Array.from(document.querySelectorAll('[data-admin-entry]'));
-    const forumEntryButtons = Array.from(document.querySelectorAll('[data-forum-entry]'));
     const forumPage = document.getElementById('forumPage');
     const forumStatus = document.getElementById('forumStatus');
+    const forumHomeOpen = document.getElementById('forumHomeOpen');
     const forumClose = document.getElementById('forumClose');
     const forumRefresh = document.getElementById('forumRefresh');
     const forumPostForm = document.getElementById('forumPostForm');
@@ -3167,6 +3596,7 @@
     const switchUserConfirm = document.getElementById('switchUserConfirm');
     const pageLayers = {
       auth: login,
+      home: homePage,
       lobby,
       chat: document.querySelector('.app'),
       forum: forumPage,
@@ -3234,7 +3664,23 @@
       profileChipAvatar.textContent = '';
       profileChipAvatar.append(createAvatar(state.avatar || state.username, state.username));
       profileChipName.textContent = state.username || '未登录';
+      renderHome();
       renderSettingsProfile();
+    }
+
+    function renderHome() {
+      if (!homePage) return;
+      const name = state.username || '朋友';
+      homeWelcome.textContent = state.username ? `欢迎回来，${name}` : '欢迎回来';
+      homeSubtitle.textContent = '选择你想进入的空间。';
+      homeProfileAvatar.textContent = '';
+      homeProfileAvatar.append(createAvatar(state.avatar || state.username || 'U', state.username || 'Uni 5'));
+      homeProfileName.textContent = state.username || '未登录';
+      homeRoomStat.textContent = `聊天组 ${state.lobbyRooms.length}`;
+      homeOnlineStat.textContent = `在线 ${state.lobbyUsers.length || state.onlineUsers.length || 0}`;
+      homeForumStat.textContent = state.forumPosts.length > 0 ? `帖子 ${state.forumPosts.length}` : '社区空间';
+      homeConnectionStat.textContent = state.isConnected ? '已连接' : '连接中';
+      homeAdminStat.textContent = state.isAdmin ? '管理员' : '普通用户';
     }
 
     function renderSettingsProfile() {
@@ -3343,7 +3789,8 @@
 
       const visible = new Set(['chat', previous, view]);
       if (view === 'admin') visible.add(state.adminReturnView || previous || 'chat');
-      if (view === 'forum') visible.add(state.forumReturnView || previous || 'lobby');
+      if (view === 'forum') visible.add(state.forumReturnView || previous || 'home');
+      if (view === 'lobby' || view === 'home') visible.add('home');
       visible.forEach((name) => {
         const layer = pageLayers[name];
         if (layer && name !== 'chat') layer.hidden = false;
@@ -3352,7 +3799,7 @@
       window.clearTimeout(state.viewTransitionTimer);
       document.body.classList.add('is-page-transitioning');
       requestAnimationFrame(() => {
-        document.body.classList.remove('view-auth', 'view-lobby', 'view-chat', 'view-admin', 'view-forum');
+        document.body.classList.remove('view-auth', 'view-home', 'view-lobby', 'view-chat', 'view-admin', 'view-forum');
         document.body.classList.add(`view-${view}`);
         state.view = view;
         const delay = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 40 : 560;
@@ -3366,16 +3813,17 @@
     function cleanupViews(view) {
       const keep = new Set(['chat']);
       if (view === 'auth') keep.add('auth');
+      if (view === 'home') keep.add('home');
       if (view === 'lobby') keep.add('lobby');
       if (view === 'forum') {
         keep.add('forum');
-        keep.add(state.forumReturnView || 'lobby');
+        keep.add(state.forumReturnView || 'home');
       }
       if (view === 'admin') {
         keep.add('admin');
         keep.add(state.adminReturnView || 'chat');
       }
-      ['auth', 'lobby', 'forum', 'admin'].forEach((name) => {
+      ['auth', 'home', 'lobby', 'forum', 'admin'].forEach((name) => {
         const layer = pageLayers[name];
         if (layer) layer.hidden = !keep.has(name);
       });
@@ -3487,14 +3935,16 @@
       state.pendingAvatar = null;
       renderProfileChip();
       updateAdminEntries();
-      setView('lobby');
+      renderHome();
+      setView('home');
       loginError.textContent = '';
       setChatEnabled(false);
       backToLobby.hidden = true;
       roomStatus.textContent = `${state.username} 已加入`;
-      subtitle.textContent = '请选择聊天组或私聊';
+      subtitle.textContent = '选择空间开始';
       updateCreateRoomMode();
       socket.emit('get lobby');
+      socket.emit('get forum posts');
       if (state.isAdmin) socket.emit('admin get dashboard');
     });
 
@@ -3532,11 +3982,13 @@
       state.lobbyRooms = payload && Array.isArray(payload.rooms) ? payload.rooms : [];
       state.lobbyUsers = payload && Array.isArray(payload.users) ? payload.users : [];
       renderLobby();
+      renderHome();
     });
 
     socket.on('forum posts', (payload) => {
       state.forumPosts = payload && Array.isArray(payload.posts) ? payload.posts : [];
       renderForumPosts();
+      renderHome();
       if (state.selectedForumPost) {
         const refreshed = state.forumPosts.find((post) => post.postId === state.selectedForumPost.postId);
         if (refreshed) state.selectedForumPost = { ...state.selectedForumPost, ...refreshed };
@@ -3672,6 +4124,7 @@
       ));
       renderOnlineUsers();
       renderMentionMenu();
+      renderHome();
     });
 
     socket.on('system', (data) => {
@@ -3714,7 +4167,7 @@
 
     socket.on('admin error', (msg) => {
       showAdminNotice(msg || '后台操作失败', true);
-      if (!state.isAdmin) setView(state.username ? (state.currentRoom ? 'chat' : 'lobby') : 'auth');
+      if (!state.isAdmin) setView(state.username ? (state.currentRoom ? 'chat' : 'home') : 'auth');
     });
 
     socket.on('admin notice', (msg) => {
@@ -3734,17 +4187,20 @@
       });
     });
 
+    homeChatOpen.addEventListener('click', openChatModule);
+    homeForumOpen.addEventListener('click', openForumPage);
+    homeAccountOpen.addEventListener('click', openSettingsModal);
+    homeSettingsOpen.addEventListener('click', openSettingsModal);
+    chatHomeOpen.addEventListener('click', returnHome);
+    lobbyHomeOpen.addEventListener('click', returnHome);
+    forumHomeOpen.addEventListener('click', returnHome);
+
     lobbyRefresh.addEventListener('click', () => {
       if (state.username) socket.emit('get lobby');
     });
 
-    forumEntryButtons.forEach((button) => {
-      button.addEventListener('click', openForumPage);
-    });
-
     forumClose.addEventListener('click', () => {
-      const target = state.forumReturnView || (state.currentRoom ? 'chat' : 'lobby');
-      setView(target === 'admin' ? 'lobby' : target);
+      returnHome();
     });
 
     forumRefresh.addEventListener('click', () => {
@@ -4292,6 +4748,37 @@
       return icons[name] || '';
     }
 
+    function openChatModule() {
+      if (!state.username) {
+        showToast('请先登录');
+        setView('auth');
+        return;
+      }
+      closeMessageMenu();
+      setView('lobby');
+      socket.emit('get lobby');
+    }
+
+    function returnHome() {
+      if (!state.username) {
+        setView('auth');
+        return;
+      }
+      stopTyping();
+      closeMessageMenu();
+      state.currentRoom = null;
+      messagesDiv.textContent = '';
+      renderEmptyState();
+      setChatEnabled(false);
+      backToLobby.hidden = true;
+      roomTitle.textContent = '选择聊天';
+      subtitle.textContent = '选择空间开始';
+      socket.emit('leave room');
+      socket.emit('get lobby');
+      socket.emit('get forum posts');
+      setView('home');
+    }
+
     function openForumPage() {
       if (!state.username) {
         showToast('请先登录');
@@ -4299,6 +4786,7 @@
         return;
       }
       closeMessageMenu();
+      state.forumReturnView = 'home';
       setView('forum');
       forumError.textContent = '';
       updateForumPostButton();
@@ -5121,6 +5609,7 @@
       } else if (state.username) {
         subtitle.textContent = '实时聊天已就绪';
       }
+      renderHome();
     }
 
     function setChatEnabled(enabled) {

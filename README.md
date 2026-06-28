@@ -2,7 +2,7 @@
 
 Uni 5 is a lightweight realtime chat and community app with account login, group chat, private chat, forum posts, admin tools, message recall, image paste/upload, voice messages, and a glass-style responsive web UI.
 
-Current release: **Uni 5.3.0 Forum Update**
+Current release: **Uni 5.4.0 Experience Architecture Update**
 
 ## Features
 
@@ -22,8 +22,24 @@ Current release: **Uni 5.3.0 Forum Update**
 - Uni 5.1.0: smoother GPU-friendly animations, systemized frosted glass styling, and persistent light/dark mode
 - Uni 5.2.0: user avatar uploads, light/dark/system theme strategy, and optional message notification sound
 - Uni 5.3.0: forum posts, post list/detail views, and realtime comments
+- Uni 5.4.0: redesigned post-login home hub, clearer Chat / Forum module navigation, and refined module UI hierarchy
 
 ## Release Notes
+
+### Uni 5.4.0 Experience Architecture Update
+
+Added:
+
+- Post-login home hub with primary Chat and Forum module cards
+- Secondary Account and Settings entry cards on the home hub
+- Clear return-to-home controls in Chat and Forum modules
+
+Improved:
+
+- Chat and Forum are now treated as first-level product modules instead of toolbar items
+- Module toolbars are cleaner and more focused
+- Forum layout, post list cards, and detail reading area have stronger visual hierarchy
+- Home, Chat, Forum, Settings, and Admin continue to share the same glass, rounded, dark-mode-ready design language
 
 ### Uni 5.3.0 Forum Update
 
