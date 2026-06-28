@@ -1,8 +1,8 @@
 # Uni 5
 
-Uni 5 is a lightweight realtime chat app with account login, group chat, private chat, admin tools, message recall, image paste/upload, voice messages, and a glass-style responsive web UI.
+Uni 5 is a lightweight realtime chat and community app with account login, group chat, private chat, forum posts, admin tools, message recall, image paste/upload, voice messages, and a glass-style responsive web UI.
 
-Current release: **Uni 5.2.0 Profile & Comfort Update**
+Current release: **Uni 5.3.0 Forum Update**
 
 ## Features
 
@@ -12,6 +12,7 @@ Current release: **Uni 5.2.0 Profile & Comfort Update**
 - Default public group: UniIOC World Channel
 - User-created groups with admin-controlled creation code
 - Private chat and private message notifications
+- Forum MVP with posts, post detail pages, and realtime comments
 - Message recall within the configured recall window
 - Text, image, pasted image, and voice messages
 - Quote, read-aloud, and recall actions from a message context menu
@@ -20,8 +21,24 @@ Current release: **Uni 5.2.0 Profile & Comfort Update**
 - macOS/iOS-inspired glass UI, rounded controls, and spatial page transitions
 - Uni 5.1.0: smoother GPU-friendly animations, systemized frosted glass styling, and persistent light/dark mode
 - Uni 5.2.0: user avatar uploads, light/dark/system theme strategy, and optional message notification sound
+- Uni 5.3.0: forum posts, post list/detail views, and realtime comments
 
 ## Release Notes
+
+### Uni 5.3.0 Forum Update
+
+Added:
+
+- Forum page entry for logged-in users
+- Post creation with title, content, author identity, avatar, and creation time
+- Reverse-chronological post list with glass-style cards
+- Post detail view with full content and author information
+- Realtime comment creation and live comment append
+
+Improved:
+
+- SQLite persistence now includes `posts` and `comments` tables
+- Forum UI reuses the existing avatar, theme, glass, and spatial page layer systems
 
 ### Uni 5.2.0 Profile & Comfort Update
 

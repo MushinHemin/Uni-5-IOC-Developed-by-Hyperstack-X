@@ -203,7 +203,8 @@
       pointer-events: none;
     }
 
-    body.view-admin .app {
+    body.view-admin .app,
+    body.view-forum .app {
       opacity: 0.52;
       transform: translate3d(0, 36px, -120px) scale(0.91);
       pointer-events: none;
@@ -217,7 +218,8 @@
 
     .login,
     .lobby,
-    .admin-page {
+    .admin-page,
+    .forum-page {
       opacity: 0;
       pointer-events: none;
       transform: translate3d(0, 42px, -130px) scale(0.9);
@@ -229,14 +231,16 @@
 
     body.view-auth .login,
     body.view-lobby .lobby,
-    body.view-admin .admin-page {
+    body.view-admin .admin-page,
+    body.view-forum .forum-page {
       opacity: 1;
       transform: translate3d(0, 0, 0) scale(1);
       pointer-events: auto;
     }
 
     body.view-lobby .login,
-    body.view-chat .lobby {
+    body.view-chat .lobby,
+    body.view-forum .lobby {
       opacity: 0;
       transform: translate3d(0, -72px, 160px) scale(1.08);
       pointer-events: none;
@@ -245,14 +249,18 @@
     body.view-auth .lobby,
     body.view-lobby .admin-page,
     body.view-chat .admin-page,
-    body.view-auth .admin-page {
+    body.view-auth .admin-page,
+    body.view-lobby .forum-page,
+    body.view-chat .forum-page,
+    body.view-auth .forum-page {
       opacity: 0;
       transform: translate3d(0, 42px, -130px) scale(0.9);
       pointer-events: none;
     }
 
     body.view-admin .login,
-    body.view-admin .lobby {
+    body.view-admin .lobby,
+    body.view-forum .login {
       opacity: 0.52;
       transform: translate3d(0, 38px, -130px) scale(0.91);
       pointer-events: none;
@@ -1399,7 +1407,8 @@
     }
 
     .lobby-shell > .copyright-footer,
-    .admin-shell > .copyright-footer {
+    .admin-shell > .copyright-footer,
+    .forum-shell > .copyright-footer {
       padding: 9px 14px 10px;
       border-top: 1px solid var(--line);
       background: var(--glass-bg-soft);
@@ -1691,6 +1700,10 @@
     .admin-btn {
       min-height: 36px;
       padding: 0 12px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
       border-radius: var(--radius-md);
       border: 1px solid var(--line);
       background: var(--glass-bg-soft);
@@ -1837,6 +1850,283 @@
       padding: 0 18px;
       color: var(--muted);
       font-size: 13px;
+    }
+
+    .forum-page {
+      position: fixed;
+      inset: 0;
+      padding: 22px;
+      background:
+        radial-gradient(circle at 52% 18%, var(--glass-bg-soft), transparent 34%),
+        transparent;
+      z-index: 17;
+    }
+
+    .forum-page[hidden] {
+      display: none;
+    }
+
+    .forum-shell {
+      width: min(1120px, 100%);
+      height: min(820px, calc(100dvh - 44px));
+      margin: 0 auto;
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+      overflow: hidden;
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-xl);
+      background: linear-gradient(180deg, var(--glass-bg-light), var(--glass-bg));
+      backdrop-filter: blur(var(--glass-blur-sm)) saturate(1.16);
+      box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-highlight);
+    }
+
+    .forum-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 16px 18px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .forum-header h2 {
+      margin: 0;
+      font-size: 20px;
+    }
+
+    .forum-body {
+      min-height: 0;
+      display: grid;
+      grid-template-columns: 360px minmax(0, 1fr);
+      overflow: hidden;
+    }
+
+    .forum-sidebar,
+    .forum-detail-section {
+      min-height: 0;
+      overflow: auto;
+      padding: 16px;
+    }
+
+    .forum-sidebar {
+      border-right: 1px solid var(--line);
+      background: var(--glass-bg-soft);
+    }
+
+    .forum-compose,
+    .forum-list-section,
+    .post-detail,
+    .comment-form {
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      background: var(--glass-bg-soft);
+      box-shadow: 0 10px 30px rgba(31, 44, 43, 0.05);
+    }
+
+    .forum-compose,
+    .forum-list-section {
+      padding: 14px;
+    }
+
+    .forum-compose h3,
+    .forum-list-section h3,
+    .post-detail h3 {
+      margin: 0 0 12px;
+      font-size: 15px;
+    }
+
+    .forum-list-section {
+      margin-top: 12px;
+    }
+
+    .forum-form,
+    .comment-form {
+      display: grid;
+      gap: 8px;
+    }
+
+    .forum-form input,
+    .forum-form textarea,
+    .comment-form textarea {
+      width: 100%;
+      min-width: 0;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+      color: var(--ink);
+      background: var(--field-bg);
+      outline: 0;
+      transition:
+        border-color var(--duration-normal) var(--ease-smooth),
+        box-shadow var(--duration-normal) var(--ease-smooth),
+        background var(--duration-normal) var(--ease-smooth);
+    }
+
+    .forum-form input {
+      min-height: 40px;
+      padding: 0 12px;
+    }
+
+    .forum-form textarea,
+    .comment-form textarea {
+      min-height: 104px;
+      resize: vertical;
+      padding: 11px 12px;
+      line-height: 1.55;
+    }
+
+    .comment-form textarea {
+      min-height: 72px;
+      resize: none;
+    }
+
+    .forum-form input:focus,
+    .forum-form textarea:focus,
+    .comment-form textarea:focus {
+      border-color: rgba(0, 122, 255, 0.48);
+      box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.1);
+      background: var(--glass-bg-light);
+    }
+
+    .forum-error {
+      min-height: 18px;
+      color: var(--danger);
+      font-size: 12px;
+    }
+
+    .post-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .post-card {
+      width: 100%;
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      gap: 10px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      color: var(--ink);
+      background: var(--glass-bg-soft);
+      text-align: left;
+      transition:
+        transform var(--duration-fast) var(--ease-pop),
+        background var(--duration-normal) var(--ease-smooth),
+        border-color var(--duration-normal) var(--ease-smooth);
+      animation: forumItemIn 260ms var(--ease-smooth) both;
+    }
+
+    .post-card:hover,
+    .post-card.is-active {
+      transform: translateY(-1px);
+      border-color: rgba(0, 122, 255, 0.34);
+      background: color-mix(in srgb, var(--brand) 10%, var(--glass-bg-light));
+    }
+
+    .post-card-main {
+      min-width: 0;
+      display: grid;
+      gap: 4px;
+    }
+
+    .post-card-title {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-weight: 900;
+    }
+
+    .post-card-meta,
+    .post-summary,
+    .comment-meta {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .post-summary {
+      display: -webkit-box;
+      overflow: hidden;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      line-height: 1.45;
+    }
+
+    .post-detail {
+      min-height: 100%;
+      padding: 18px;
+      animation: forumDetailIn 320ms var(--ease-smooth) both;
+    }
+
+    .post-detail.is-empty {
+      min-height: 220px;
+      display: grid;
+      place-items: center;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    .post-author,
+    .comment-author {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .post-title-full {
+      margin: 16px 0 8px;
+      font-size: clamp(22px, 3vw, 32px);
+      letter-spacing: 0;
+      line-height: 1.16;
+    }
+
+    .post-content-full {
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      line-height: 1.72;
+      color: var(--ink);
+    }
+
+    .comments-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin: 20px 0 10px;
+      padding-top: 14px;
+      border-top: 1px solid var(--line);
+    }
+
+    .comment-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .comment-card {
+      display: grid;
+      gap: 8px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      background: var(--glass-bg-soft);
+      animation: commentIn 300ms var(--ease-pop) both;
+    }
+
+    .comment-content {
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      line-height: 1.58;
+    }
+
+    .comment-form {
+      margin-top: 12px;
+      padding: 12px;
+    }
+
+    .forum-actions-row {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
     }
 
     .toast {
@@ -2075,6 +2365,43 @@
       }
     }
 
+    @keyframes forumItemIn {
+      from {
+        opacity: 0;
+        transform: translateY(12px) scale(0.985);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    @keyframes forumDetailIn {
+      from {
+        opacity: 0;
+        transform: translateY(14px) scale(0.985);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    @keyframes commentIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px) scale(0.98);
+      }
+      72% {
+        opacity: 1;
+        transform: translateY(-1px) scale(1.006);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
     @keyframes toastIn {
       from {
         opacity: 0;
@@ -2103,7 +2430,8 @@
       .page-layer,
       .login,
       .lobby,
-      .admin-page {
+      .admin-page,
+      .forum-page {
         transform: none !important;
         filter: none !important;
       }
@@ -2116,7 +2444,8 @@
 
       body.view-auth .app,
       body.view-lobby .app,
-      body.view-admin .app {
+      body.view-admin .app,
+      body.view-forum .app {
         opacity: 0.54;
         transform: translate3d(0, 14px, -60px) scale(0.96);
       }
@@ -2186,11 +2515,13 @@
         order: -1;
       }
 
-      .admin-page {
+      .admin-page,
+      .forum-page {
         padding: 0;
       }
 
-      .admin-shell {
+      .admin-shell,
+      .forum-shell {
         height: 100dvh;
         border: 0;
         border-radius: 0;
@@ -2207,7 +2538,8 @@
       }
 
       .admin-toolbar,
-      .admin-header {
+      .admin-header,
+      .forum-header {
         align-items: stretch;
       }
 
@@ -2233,6 +2565,20 @@
 
       .create-room {
         grid-template-columns: 1fr;
+      }
+
+      .forum-body {
+        grid-template-columns: 1fr;
+        grid-template-rows: minmax(220px, 45%) minmax(0, 1fr);
+      }
+
+      .forum-sidebar {
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .post-title-full {
+        font-size: 22px;
       }
     }
   </style>
@@ -2285,6 +2631,10 @@
             </button>
             <button class="settings-toggle-btn" data-settings-open type="button" aria-label="系统设置" title="系统设置">
               <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.05.05a2 2 0 0 1-2.83 2.83l-.05-.05a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 0 1-4 0v-.07A1.7 1.7 0 0 0 9 19.37a1.7 1.7 0 0 0-1.88.34l-.05.05a2 2 0 1 1-2.83-2.83l.05-.05A1.7 1.7 0 0 0 4.63 15 1.7 1.7 0 0 0 3.07 14H3a2 2 0 0 1 0-4h.07A1.7 1.7 0 0 0 4.63 9a1.7 1.7 0 0 0-.34-1.88l-.05-.05a2 2 0 1 1 2.83-2.83l.05.05A1.7 1.7 0 0 0 9 4.63 1.7 1.7 0 0 0 10 3.07V3a2 2 0 0 1 4 0v.07A1.7 1.7 0 0 0 15 4.63a1.7 1.7 0 0 0 1.88-.34l.05-.05a2 2 0 0 1 2.83 2.83l-.05.05A1.7 1.7 0 0 0 19.37 9c.22.61.8 1 1.56 1H21a2 2 0 0 1 0 4h-.07A1.7 1.7 0 0 0 19.4 15z"/></svg>
+            </button>
+            <button class="admin-btn" data-forum-entry type="button" aria-label="打开论坛">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14v10H8l-3 3V5z"/><path d="M9 9h6"/><path d="M9 12h4"/></svg>
+              <span>论坛</span>
             </button>
             <button class="switch-user-btn" data-switch-user type="button" aria-label="切换用户">
               <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7h9l-3-3"/><path d="M17 7l-3 3"/><path d="M16 17H7l3 3"/><path d="M7 17l3-3"/><circle cx="12" cy="12" r="3"/></svg>
@@ -2409,6 +2759,10 @@
           <button class="settings-toggle-btn" data-settings-open type="button" aria-label="系统设置" title="系统设置">
             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.05.05a2 2 0 0 1-2.83 2.83l-.05-.05a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 0 1-4 0v-.07A1.7 1.7 0 0 0 9 19.37a1.7 1.7 0 0 0-1.88.34l-.05.05a2 2 0 1 1-2.83-2.83l.05-.05A1.7 1.7 0 0 0 4.63 15 1.7 1.7 0 0 0 3.07 14H3a2 2 0 0 1 0-4h.07A1.7 1.7 0 0 0 4.63 9a1.7 1.7 0 0 0-.34-1.88l-.05-.05a2 2 0 1 1 2.83-2.83l.05.05A1.7 1.7 0 0 0 9 4.63 1.7 1.7 0 0 0 10 3.07V3a2 2 0 0 1 4 0v.07A1.7 1.7 0 0 0 15 4.63a1.7 1.7 0 0 0 1.88-.34l.05-.05a2 2 0 0 1 2.83 2.83l-.05.05A1.7 1.7 0 0 0 19.37 9c.22.61.8 1 1.56 1H21a2 2 0 0 1 0 4h-.07A1.7 1.7 0 0 0 19.4 15z"/></svg>
           </button>
+          <button class="admin-btn" data-forum-entry type="button" aria-label="打开论坛">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14v10H8l-3 3V5z"/><path d="M9 9h6"/><path d="M9 12h4"/></svg>
+            <span>论坛</span>
+          </button>
           <button class="switch-user-btn" data-switch-user type="button" aria-label="切换用户">
             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7h9l-3-3"/><path d="M17 7l-3 3"/><path d="M16 17H7l3 3"/><path d="M7 17l3-3"/><circle cx="12" cy="12" r="3"/></svg>
             <span>切换用户</span>
@@ -2435,6 +2789,68 @@
         <section class="lobby-section">
           <h3>在线用户</h3>
           <div id="privateList" class="private-list"></div>
+        </section>
+      </div>
+      <footer class="copyright-footer">
+        <div>&copy;2026 Hyperstack X Copyright all rights reserved.</div>
+        <div>Developed by Hyperstack X</div>
+      </footer>
+    </div>
+  </section>
+
+  <section id="forumPage" class="forum-page page-layer" data-view="forum" aria-label="论坛" hidden>
+    <div class="forum-shell">
+      <header class="forum-header">
+        <div>
+          <h2>论坛</h2>
+          <div id="forumStatus" class="status">发帖、阅读和评论。</div>
+        </div>
+        <div class="admin-actions">
+          <button class="theme-toggle-btn" data-theme-toggle type="button" aria-label="切换外观" title="切换外观">
+            <svg class="icon theme-icon moon-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 14.6A7.6 7.6 0 0 1 9.4 3 8.8 8.8 0 1 0 21 14.6z"/></svg>
+            <svg class="icon theme-icon sun-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="M4.93 4.93l1.41 1.41"/><path d="M17.66 17.66l1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="M4.93 19.07l1.41-1.41"/><path d="M17.66 6.34l1.41-1.41"/></svg>
+          </button>
+          <button class="settings-toggle-btn" data-settings-open type="button" aria-label="系统设置" title="系统设置">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.05.05a2 2 0 0 1-2.83 2.83l-.05-.05a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 0 1-4 0v-.07A1.7 1.7 0 0 0 9 19.37a1.7 1.7 0 0 0-1.88.34l-.05.05a2 2 0 1 1-2.83-2.83l.05-.05A1.7 1.7 0 0 0 4.63 15 1.7 1.7 0 0 0 3.07 14H3a2 2 0 0 1 0-4h.07A1.7 1.7 0 0 0 4.63 9a1.7 1.7 0 0 0-.34-1.88l-.05-.05a2 2 0 1 1 2.83-2.83l.05.05A1.7 1.7 0 0 0 9 4.63 1.7 1.7 0 0 0 10 3.07V3a2 2 0 0 1 4 0v.07A1.7 1.7 0 0 0 15 4.63a1.7 1.7 0 0 0 1.88-.34l.05-.05a2 2 0 0 1 2.83 2.83l-.05.05A1.7 1.7 0 0 0 19.37 9c.22.61.8 1 1.56 1H21a2 2 0 0 1 0 4h-.07A1.7 1.7 0 0 0 19.4 15z"/></svg>
+          </button>
+          <button class="admin-btn" data-forum-entry type="button" aria-label="打开论坛">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14v10H8l-3 3V5z"/><path d="M9 9h6"/><path d="M9 12h4"/></svg>
+            <span>论坛</span>
+          </button>
+          <button class="switch-user-btn" data-switch-user type="button" aria-label="切换用户">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7h9l-3-3"/><path d="M17 7l-3 3"/><path d="M16 17H7l3 3"/><path d="M7 17l3-3"/><circle cx="12" cy="12" r="3"/></svg>
+            <span>切换用户</span>
+          </button>
+          <button id="forumRefresh" class="admin-btn" type="button">刷新</button>
+          <button id="forumClose" class="admin-btn" type="button">返回</button>
+        </div>
+      </header>
+      <div class="forum-body">
+        <aside class="forum-sidebar">
+          <section class="forum-compose">
+            <h3>发布帖子</h3>
+            <form id="forumPostForm" class="forum-form">
+              <input id="forumPostTitle" maxlength="80" placeholder="帖子标题" autocomplete="off">
+              <textarea id="forumPostContent" maxlength="5000" placeholder="写下正文"></textarea>
+              <div class="forum-actions-row">
+                <button id="forumPostSubmit" class="admin-btn primary" type="submit">发布</button>
+              </div>
+            </form>
+            <div id="forumError" class="forum-error" role="alert"></div>
+          </section>
+          <section class="forum-list-section">
+            <h3>帖子</h3>
+            <div id="forumPostList" class="post-list"></div>
+          </section>
+        </aside>
+        <section class="forum-detail-section" aria-label="帖子详情">
+          <article id="forumPostDetail" class="post-detail is-empty">选择一个帖子查看详情。</article>
+          <form id="forumCommentForm" class="comment-form" hidden>
+            <textarea id="forumCommentInput" maxlength="1000" placeholder="写评论"></textarea>
+            <div class="forum-actions-row">
+              <button id="forumCommentSubmit" class="admin-btn primary" type="submit">评论</button>
+            </div>
+          </form>
         </section>
       </div>
       <footer class="copyright-footer">
@@ -2631,6 +3047,10 @@
       typingTimer: null,
       view: 'auth',
       adminReturnView: 'lobby',
+      forumReturnView: 'lobby',
+      forumPosts: [],
+      selectedForumPost: null,
+      forumComments: [],
       viewTransitionTimer: null
     };
 
@@ -2680,6 +3100,21 @@
     const lobbyError = document.getElementById('lobbyError');
     const backToLobby = document.getElementById('backToLobby');
     const adminEntryButtons = Array.from(document.querySelectorAll('[data-admin-entry]'));
+    const forumEntryButtons = Array.from(document.querySelectorAll('[data-forum-entry]'));
+    const forumPage = document.getElementById('forumPage');
+    const forumStatus = document.getElementById('forumStatus');
+    const forumClose = document.getElementById('forumClose');
+    const forumRefresh = document.getElementById('forumRefresh');
+    const forumPostForm = document.getElementById('forumPostForm');
+    const forumPostTitle = document.getElementById('forumPostTitle');
+    const forumPostContent = document.getElementById('forumPostContent');
+    const forumPostSubmit = document.getElementById('forumPostSubmit');
+    const forumError = document.getElementById('forumError');
+    const forumPostList = document.getElementById('forumPostList');
+    const forumPostDetail = document.getElementById('forumPostDetail');
+    const forumCommentForm = document.getElementById('forumCommentForm');
+    const forumCommentInput = document.getElementById('forumCommentInput');
+    const forumCommentSubmit = document.getElementById('forumCommentSubmit');
     const adminPage = document.getElementById('adminPage');
     const adminClose = document.getElementById('adminClose');
     const adminRefresh = document.getElementById('adminRefresh');
@@ -2734,6 +3169,7 @@
       auth: login,
       lobby,
       chat: document.querySelector('.app'),
+      forum: forumPage,
       admin: adminPage
     };
     const THEME_KEY = 'uni5-theme';
@@ -2901,9 +3337,13 @@
       if (view === 'admin' && previous !== 'admin') {
         state.adminReturnView = previous;
       }
+      if (view === 'forum' && previous !== 'forum') {
+        state.forumReturnView = previous;
+      }
 
       const visible = new Set(['chat', previous, view]);
       if (view === 'admin') visible.add(state.adminReturnView || previous || 'chat');
+      if (view === 'forum') visible.add(state.forumReturnView || previous || 'lobby');
       visible.forEach((name) => {
         const layer = pageLayers[name];
         if (layer && name !== 'chat') layer.hidden = false;
@@ -2912,7 +3352,7 @@
       window.clearTimeout(state.viewTransitionTimer);
       document.body.classList.add('is-page-transitioning');
       requestAnimationFrame(() => {
-        document.body.classList.remove('view-auth', 'view-lobby', 'view-chat', 'view-admin');
+        document.body.classList.remove('view-auth', 'view-lobby', 'view-chat', 'view-admin', 'view-forum');
         document.body.classList.add(`view-${view}`);
         state.view = view;
         const delay = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 40 : 560;
@@ -2927,11 +3367,15 @@
       const keep = new Set(['chat']);
       if (view === 'auth') keep.add('auth');
       if (view === 'lobby') keep.add('lobby');
+      if (view === 'forum') {
+        keep.add('forum');
+        keep.add(state.forumReturnView || 'lobby');
+      }
       if (view === 'admin') {
         keep.add('admin');
         keep.add(state.adminReturnView || 'chat');
       }
-      ['auth', 'lobby', 'admin'].forEach((name) => {
+      ['auth', 'lobby', 'forum', 'admin'].forEach((name) => {
         const layer = pageLayers[name];
         if (layer) layer.hidden = !keep.has(name);
       });
@@ -2963,6 +3407,9 @@
       state.currentRoom = null;
       state.adminData = null;
       state.selectedAdminUserId = '';
+      state.forumPosts = [];
+      state.selectedForumPost = null;
+      state.forumComments = [];
       state.privateUnread = {};
       state.quotedMessage = null;
       state.pendingAvatar = null;
@@ -2975,6 +3422,7 @@
       usernameInput.value = '';
       loginError.textContent = '';
       lobbyError.textContent = '';
+      forumError.textContent = '';
       clearQuote();
       clearPendingImage();
       closeMessageMenu();
@@ -3084,6 +3532,59 @@
       state.lobbyRooms = payload && Array.isArray(payload.rooms) ? payload.rooms : [];
       state.lobbyUsers = payload && Array.isArray(payload.users) ? payload.users : [];
       renderLobby();
+    });
+
+    socket.on('forum posts', (payload) => {
+      state.forumPosts = payload && Array.isArray(payload.posts) ? payload.posts : [];
+      renderForumPosts();
+      if (state.selectedForumPost) {
+        const refreshed = state.forumPosts.find((post) => post.postId === state.selectedForumPost.postId);
+        if (refreshed) state.selectedForumPost = { ...state.selectedForumPost, ...refreshed };
+      }
+      renderForumDetail();
+    });
+
+    socket.on('forum post created', (payload) => {
+      const post = payload && payload.post ? payload.post : null;
+      if (!post) return;
+      forumPostTitle.value = '';
+      forumPostContent.value = '';
+      state.selectedForumPost = post;
+      state.forumComments = [];
+      forumError.textContent = '';
+      renderForumPosts();
+      renderForumDetail();
+      socket.emit('get forum post', post.postId);
+      showToast('帖子已发布');
+    });
+
+    socket.on('forum post detail', (payload) => {
+      state.selectedForumPost = payload && payload.post ? payload.post : null;
+      state.forumComments = payload && Array.isArray(payload.comments) ? payload.comments : [];
+      forumError.textContent = '';
+      renderForumPosts();
+      renderForumDetail();
+    });
+
+    socket.on('forum comment created', (payload) => {
+      const comment = payload && payload.comment ? payload.comment : null;
+      if (!comment || !state.selectedForumPost || comment.postId !== state.selectedForumPost.postId) return;
+      if (!state.forumComments.some((item) => item.commentId === comment.commentId)) {
+        state.forumComments = [...state.forumComments, comment];
+      }
+      state.selectedForumPost.commentCount = Math.max(Number(state.selectedForumPost.commentCount) || 0, state.forumComments.length);
+      renderForumComments();
+      if (comment.userId === state.userId) {
+        forumCommentInput.value = '';
+      }
+      updateForumCommentButton();
+    });
+
+    socket.on('forum error', (msg) => {
+      forumError.textContent = msg || '论坛操作失败';
+      updateForumPostButton();
+      updateForumCommentButton();
+      showToast(msg || '论坛操作失败');
     });
 
     socket.on('room joined', (payload) => {
@@ -3236,6 +3737,33 @@
     lobbyRefresh.addEventListener('click', () => {
       if (state.username) socket.emit('get lobby');
     });
+
+    forumEntryButtons.forEach((button) => {
+      button.addEventListener('click', openForumPage);
+    });
+
+    forumClose.addEventListener('click', () => {
+      const target = state.forumReturnView || (state.currentRoom ? 'chat' : 'lobby');
+      setView(target === 'admin' ? 'lobby' : target);
+    });
+
+    forumRefresh.addEventListener('click', () => {
+      if (state.username) socket.emit('get forum posts');
+    });
+
+    forumPostForm.addEventListener('submit', (event) => {
+      event.preventDefault();
+      createForumPost();
+    });
+
+    forumCommentForm.addEventListener('submit', (event) => {
+      event.preventDefault();
+      createForumComment();
+    });
+
+    forumPostTitle.addEventListener('input', updateForumPostButton);
+    forumPostContent.addEventListener('input', updateForumPostButton);
+    forumCommentInput.addEventListener('input', updateForumCommentButton);
 
     backToLobby.addEventListener('click', () => {
       if (!state.username) return;
@@ -3762,6 +4290,219 @@
         undo: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14l-4-4 4-4"/><path d="M5 10h9a5 5 0 1 1 0 10h-2"/></svg>'
       };
       return icons[name] || '';
+    }
+
+    function openForumPage() {
+      if (!state.username) {
+        showToast('请先登录');
+        setView('auth');
+        return;
+      }
+      closeMessageMenu();
+      setView('forum');
+      forumError.textContent = '';
+      updateForumPostButton();
+      updateForumCommentButton();
+      socket.emit('get forum posts');
+      if (state.selectedForumPost) socket.emit('get forum post', state.selectedForumPost.postId);
+    }
+
+    function createForumPost() {
+      const title = forumPostTitle.value.trim();
+      const content = forumPostContent.value.trim();
+      forumError.textContent = '';
+      if (!state.username) {
+        forumError.textContent = '请先登录';
+        return;
+      }
+      if (!title || !content) {
+        forumError.textContent = '标题和正文都需要填写';
+        return;
+      }
+      forumPostSubmit.disabled = true;
+      socket.emit('create forum post', { title, content });
+    }
+
+    function createForumComment() {
+      const content = forumCommentInput.value.trim();
+      if (!state.selectedForumPost || !content) return;
+      forumCommentSubmit.disabled = true;
+      socket.emit('create forum comment', {
+        postId: state.selectedForumPost.postId,
+        content
+      });
+    }
+
+    function updateForumPostButton() {
+      forumPostSubmit.disabled = !state.username || !forumPostTitle.value.trim() || !forumPostContent.value.trim();
+    }
+
+    function updateForumCommentButton() {
+      forumCommentSubmit.disabled = !state.username || !state.selectedForumPost || !forumCommentInput.value.trim();
+    }
+
+    function normalizeForumPost(post) {
+      if (!post || typeof post !== 'object') return null;
+      const title = typeof post.title === 'string' ? post.title.trim() : '';
+      const content = typeof post.content === 'string' ? post.content.trim() : '';
+      const postId = typeof post.postId === 'string' ? post.postId : '';
+      if (!postId || !title) return null;
+      const username = typeof post.username === 'string' && post.username.trim() ? post.username.trim() : '匿名';
+      return {
+        postId,
+        userId: typeof post.userId === 'string' ? post.userId : '',
+        username,
+        avatar: typeof post.avatar === 'string' ? post.avatar : '',
+        title,
+        content,
+        createdAt: post.createdAt || new Date().toISOString(),
+        commentCount: Number(post.commentCount || 0)
+      };
+    }
+
+    function normalizeForumComment(comment) {
+      if (!comment || typeof comment !== 'object') return null;
+      const commentId = typeof comment.commentId === 'string' ? comment.commentId : '';
+      const content = typeof comment.content === 'string' ? comment.content.trim() : '';
+      if (!commentId || !content) return null;
+      const username = typeof comment.username === 'string' && comment.username.trim() ? comment.username.trim() : '匿名';
+      return {
+        commentId,
+        postId: typeof comment.postId === 'string' ? comment.postId : '',
+        userId: typeof comment.userId === 'string' ? comment.userId : '',
+        username,
+        avatar: typeof comment.avatar === 'string' ? comment.avatar : '',
+        content,
+        createdAt: comment.createdAt || new Date().toISOString()
+      };
+    }
+
+    function renderForumPosts() {
+      forumPostList.textContent = '';
+      const posts = state.forumPosts.map(normalizeForumPost).filter(Boolean);
+      forumStatus.textContent = posts.length > 0 ? `共有 ${posts.length} 个帖子` : '发帖、阅读和评论。';
+
+      if (posts.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'admin-muted';
+        empty.textContent = '还没有帖子，来发第一篇吧。';
+        forumPostList.append(empty);
+        return;
+      }
+
+      posts.forEach((post) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = `post-card${state.selectedForumPost && state.selectedForumPost.postId === post.postId ? ' is-active' : ''}`;
+        button.append(createAvatar(post.avatar || post.username, post.username));
+
+        const main = document.createElement('div');
+        main.className = 'post-card-main';
+        const title = document.createElement('div');
+        title.className = 'post-card-title';
+        title.textContent = post.title;
+        const meta = document.createElement('div');
+        meta.className = 'post-card-meta';
+        meta.textContent = `${post.username} · ${formatFullTime(post.createdAt)} · 评论 ${post.commentCount || 0}`;
+        const summary = document.createElement('div');
+        summary.className = 'post-summary';
+        summary.textContent = compactText(post.content, 130);
+        main.append(title, meta, summary);
+        button.append(main);
+        button.addEventListener('click', () => {
+          state.selectedForumPost = post;
+          renderForumPosts();
+          renderForumDetail(true);
+          socket.emit('get forum post', post.postId);
+        });
+        forumPostList.append(button);
+      });
+    }
+
+    function renderForumDetail(isLoading = false) {
+      const post = normalizeForumPost(state.selectedForumPost);
+      forumPostDetail.textContent = '';
+      if (!post) {
+        forumPostDetail.className = 'post-detail is-empty';
+        forumPostDetail.textContent = '选择一个帖子查看详情。';
+        forumCommentForm.hidden = true;
+        return;
+      }
+
+      forumPostDetail.className = 'post-detail';
+      const author = document.createElement('div');
+      author.className = 'post-author';
+      author.append(createAvatar(post.avatar || post.username, post.username));
+      const authorText = document.createElement('div');
+      const authorName = document.createElement('strong');
+      authorName.textContent = post.username;
+      const meta = document.createElement('div');
+      meta.className = 'post-card-meta';
+      meta.textContent = formatFullTime(post.createdAt);
+      authorText.append(authorName, meta);
+      author.append(authorText);
+
+      const title = document.createElement('h1');
+      title.className = 'post-title-full';
+      title.textContent = post.title;
+      const content = document.createElement('div');
+      content.className = 'post-content-full';
+      content.textContent = post.content;
+
+      const commentsHeader = document.createElement('div');
+      commentsHeader.className = 'comments-header';
+      const commentsTitle = document.createElement('h3');
+      commentsTitle.textContent = `评论 ${post.commentCount || state.forumComments.length || 0}`;
+      const hint = document.createElement('span');
+      hint.className = 'admin-muted';
+      hint.textContent = isLoading ? '正在同步...' : '实时追加';
+      commentsHeader.append(commentsTitle, hint);
+
+      const commentList = document.createElement('div');
+      commentList.id = 'forumCommentList';
+      commentList.className = 'comment-list';
+
+      forumPostDetail.append(author, title, content, commentsHeader, commentList);
+      forumCommentForm.hidden = false;
+      updateForumCommentButton();
+      renderForumComments();
+    }
+
+    function renderForumComments() {
+      const list = document.getElementById('forumCommentList');
+      if (!list) return;
+      list.textContent = '';
+      const comments = state.forumComments.map(normalizeForumComment).filter(Boolean);
+      const title = forumPostDetail.querySelector('.comments-header h3');
+      if (title) title.textContent = `评论 ${comments.length}`;
+      if (comments.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'admin-muted';
+        empty.textContent = '还没有评论。';
+        list.append(empty);
+        return;
+      }
+
+      comments.forEach((comment) => {
+        const item = document.createElement('article');
+        item.className = 'comment-card';
+        const author = document.createElement('div');
+        author.className = 'comment-author';
+        author.append(createAvatar(comment.avatar || comment.username, comment.username));
+        const text = document.createElement('div');
+        const name = document.createElement('strong');
+        name.textContent = comment.username;
+        const meta = document.createElement('div');
+        meta.className = 'comment-meta';
+        meta.textContent = formatFullTime(comment.createdAt);
+        text.append(name, meta);
+        author.append(text);
+        const content = document.createElement('div');
+        content.className = 'comment-content';
+        content.textContent = comment.content;
+        item.append(author, content);
+        list.append(item);
+      });
     }
 
     function openAdminPage() {

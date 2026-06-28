@@ -19,6 +19,9 @@ const UPLOADS_DIR = path.join(__dirname, 'uploads');
 const AVATAR_UPLOAD_DIR = path.join(UPLOADS_DIR, 'avatars');
 const JSON_FILE_MODE = 0o600;
 const MAX_MESSAGE_LENGTH = 1000;
+const MAX_POST_TITLE_LENGTH = 80;
+const MAX_POST_CONTENT_LENGTH = 5000;
+const MAX_COMMENT_LENGTH = 1000;
 const MAX_USERNAME_LENGTH = 20;
 const MAX_ACCOUNT_LENGTH = 24;
 const MIN_PASSWORD_LENGTH = 6;
@@ -26,6 +29,7 @@ const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
 const MAX_VOICE_BYTES = 3 * 1024 * 1024;
 const MAX_HISTORY_MESSAGES = 300;
+const MAX_FORUM_POSTS = 120;
 const TYPING_TIMEOUT_MS = 3000;
 const AUTH_WINDOW_MS = 60 * 1000;
 const AUTH_MAX_ATTEMPTS = 8;
@@ -192,6 +196,23 @@ function cleanRoomName(value) {
 function cleanRoomId(value) {
   if (typeof value !== 'string') return '';
   return value.trim().replace(/[^a-zA-Z0-9:_-]/g, '').slice(0, 80);
+}
+
+function cleanForumId(value) {
+  if (typeof value !== 'string') return '';
+  return value.trim().replace(/[^a-zA-Z0-9:_-]/g, '').slice(0, 80);
+}
+
+function cleanPostTitle(value) {
+  return cleanText(value, MAX_POST_TITLE_LENGTH).replace(/\s+/g, ' ');
+}
+
+function cleanPostContent(value) {
+  return cleanText(value, MAX_POST_CONTENT_LENGTH);
+}
+
+function cleanCommentContent(value) {
+  return cleanText(value, MAX_COMMENT_LENGTH);
 }
 
 function makeAvatar(name) {
@@ -386,9 +407,32 @@ function initDatabase() {
       PRIMARY KEY (room_id, user_id)
     );
 
+    CREATE TABLE IF NOT EXISTS posts (
+      post_id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      username TEXT NOT NULL,
+      avatar TEXT NOT NULL,
+      title TEXT NOT NULL,
+      content TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS comments (
+      comment_id TEXT PRIMARY KEY,
+      post_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      username TEXT NOT NULL,
+      avatar TEXT NOT NULL,
+      content TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+
     CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at);
     CREATE INDEX IF NOT EXISTS idx_messages_user_id ON messages(user_id);
     CREATE INDEX IF NOT EXISTS idx_room_members_user_id ON room_members(user_id);
+    CREATE INDEX IF NOT EXISTS idx_posts_created_at ON posts(created_at);
+    CREATE INDEX IF NOT EXISTS idx_comments_post_id ON comments(post_id);
+    CREATE INDEX IF NOT EXISTS idx_comments_created_at ON comments(created_at);
   `);
   ensureColumn('users', 'last_ip', "TEXT NOT NULL DEFAULT ''");
   ensureColumn('users', 'last_login_at', "TEXT NOT NULL DEFAULT ''");
@@ -446,6 +490,41 @@ function rowToMessage(row) {
     timestamp: row.created_at,
     recalled: Boolean(row.recalled)
   });
+}
+
+function rowToPost(row) {
+  if (!row) return null;
+  const postId = cleanForumId(row.post_id);
+  const title = cleanPostTitle(row.title);
+  const content = cleanPostContent(row.content);
+  if (!postId || !title || !content) return null;
+  return {
+    postId,
+    userId: String(row.user_id || ''),
+    username: cleanUsername(row.username) || '匿名',
+    avatar: cleanAvatar(row.avatar, row.username),
+    title,
+    content,
+    createdAt: Number.isNaN(Date.parse(row.created_at)) ? new Date().toISOString() : row.created_at,
+    commentCount: Number(row.comment_count || 0)
+  };
+}
+
+function rowToComment(row) {
+  if (!row) return null;
+  const commentId = cleanForumId(row.comment_id);
+  const postId = cleanForumId(row.post_id);
+  const content = cleanCommentContent(row.content);
+  if (!commentId || !postId || !content) return null;
+  return {
+    commentId,
+    postId,
+    userId: String(row.user_id || ''),
+    username: cleanUsername(row.username) || '匿名',
+    avatar: cleanAvatar(row.avatar, row.username),
+    content,
+    createdAt: Number.isNaN(Date.parse(row.created_at)) ? new Date().toISOString() : row.created_at
+  };
 }
 
 function upsertUser(user) {
@@ -547,6 +626,93 @@ function publicMessage(message) {
   };
 }
 
+function publicForumPost(post) {
+  if (!post) return null;
+  return {
+    postId: post.postId,
+    userId: post.userId,
+    username: post.username,
+    avatar: post.avatar || makeAvatar(post.username),
+    title: post.title,
+    content: post.content,
+    createdAt: post.createdAt,
+    commentCount: Number(post.commentCount || 0)
+  };
+}
+
+function publicForumComment(comment) {
+  if (!comment) return null;
+  return {
+    commentId: comment.commentId,
+    postId: comment.postId,
+    userId: comment.userId,
+    username: comment.username,
+    avatar: comment.avatar || makeAvatar(comment.username),
+    content: comment.content,
+    createdAt: comment.createdAt
+  };
+}
+
+function listForumPosts() {
+  return db.prepare(`
+    SELECT posts.*, COUNT(comments.comment_id) AS comment_count
+    FROM posts
+    LEFT JOIN comments ON comments.post_id = posts.post_id
+    GROUP BY posts.post_id
+    ORDER BY posts.created_at DESC
+    LIMIT ?
+  `).all(MAX_FORUM_POSTS).map(rowToPost).filter(Boolean).map(publicForumPost);
+}
+
+function getForumPost(postIdValue) {
+  const postId = cleanForumId(postIdValue);
+  if (!postId) return null;
+  const row = db.prepare(`
+    SELECT posts.*, COUNT(comments.comment_id) AS comment_count
+    FROM posts
+    LEFT JOIN comments ON comments.post_id = posts.post_id
+    WHERE posts.post_id = ?
+    GROUP BY posts.post_id
+  `).get(postId);
+  return publicForumPost(rowToPost(row));
+}
+
+function listForumComments(postIdValue) {
+  const postId = cleanForumId(postIdValue);
+  if (!postId) return [];
+  return db.prepare(`
+    SELECT * FROM comments
+    WHERE post_id = ?
+    ORDER BY created_at ASC
+  `).all(postId).map(rowToComment).filter(Boolean).map(publicForumComment);
+}
+
+function insertForumPost(post) {
+  db.prepare(`
+    INSERT INTO posts (post_id, user_id, username, avatar, title, content, created_at)
+    VALUES (@postId, @userId, @username, @avatar, @title, @content, @createdAt)
+  `).run(post);
+}
+
+function insertForumComment(comment) {
+  db.prepare(`
+    INSERT INTO comments (comment_id, post_id, user_id, username, avatar, content, created_at)
+    VALUES (@commentId, @postId, @userId, @username, @avatar, @content, @createdAt)
+  `).run(comment);
+}
+
+function forumPostChannel(postId) {
+  return `forum:${postId}`;
+}
+
+function emitForumPosts(socket) {
+  socket.emit('forum posts', { posts: listForumPosts() });
+}
+
+function broadcastForumPosts() {
+  io.emit('forum posts', { posts: listForumPosts() });
+}
+
 function hashPassword(password, salt = crypto.randomBytes(16).toString('hex')) {
   const hash = crypto.scryptSync(password, salt, 64).toString('hex');
   return `${salt}:${hash}`;
@@ -631,11 +797,14 @@ function syncUserAvatar(user, avatar) {
   saveUsers();
   try {
     db.prepare('UPDATE messages SET avatar = ? WHERE user_id = ?').run(user.avatar, user.id);
+    db.prepare('UPDATE posts SET avatar = ? WHERE user_id = ?').run(user.avatar, user.id);
+    db.prepare('UPDATE comments SET avatar = ? WHERE user_id = ?').run(user.avatar, user.id);
   } catch (error) {
-    console.error('同步头像到历史消息失败:', error.message);
+    console.error('同步头像到历史内容失败:', error.message);
   }
   refreshOpenRooms();
   broadcastOnlineUsers();
+  broadcastForumPosts();
   broadcastAdminDashboards();
 }
 
@@ -1041,6 +1210,92 @@ io.on('connection', (socket) => {
     emitLobby(socket);
   });
 
+  socket.on('get forum posts', () => {
+    if (!requireAuth(socket, '查看论坛')) return;
+    emitForumPosts(socket);
+  });
+
+  socket.on('create forum post', (payload) => {
+    if (!requireAuth(socket, '发帖')) return;
+    const title = cleanPostTitle(payload && payload.title);
+    const content = cleanPostContent(payload && payload.content);
+    if (!title) {
+      socket.emit('forum error', '请输入帖子标题');
+      return;
+    }
+    if (!content) {
+      socket.emit('forum error', '请输入帖子正文');
+      return;
+    }
+
+    const post = {
+      postId: `post:${crypto.randomUUID()}`,
+      userId: socket.user.id,
+      username: socket.user.username,
+      avatar: socket.user.avatar,
+      title,
+      content,
+      createdAt: new Date().toISOString()
+    };
+    try {
+      insertForumPost(post);
+    } catch (error) {
+      socket.emit('forum error', '发帖失败，请稍后再试');
+      return;
+    }
+    const publicPost = publicForumPost({ ...post, commentCount: 0 });
+    socket.emit('forum post created', { post: publicPost, comments: [] });
+    broadcastForumPosts();
+  });
+
+  socket.on('get forum post', (postIdValue) => {
+    if (!requireAuth(socket, '查看帖子')) return;
+    const postId = cleanForumId(postIdValue);
+    const post = getForumPost(postId);
+    if (!post) {
+      socket.emit('forum error', '帖子不存在');
+      return;
+    }
+    if (socket.currentForumPostId && socket.currentForumPostId !== postId) {
+      socket.leave(forumPostChannel(socket.currentForumPostId));
+    }
+    socket.currentForumPostId = postId;
+    socket.join(forumPostChannel(postId));
+    socket.emit('forum post detail', { post, comments: listForumComments(postId) });
+  });
+
+  socket.on('create forum comment', (payload) => {
+    if (!requireAuth(socket, '评论')) return;
+    const postId = cleanForumId(payload && payload.postId);
+    const content = cleanCommentContent(payload && payload.content);
+    if (!postId || !getForumPost(postId)) {
+      socket.emit('forum error', '帖子不存在');
+      return;
+    }
+    if (!content) {
+      socket.emit('forum error', '请输入评论内容');
+      return;
+    }
+
+    const comment = {
+      commentId: `comment:${crypto.randomUUID()}`,
+      postId,
+      userId: socket.user.id,
+      username: socket.user.username,
+      avatar: socket.user.avatar,
+      content,
+      createdAt: new Date().toISOString()
+    };
+    try {
+      insertForumComment(comment);
+    } catch (error) {
+      socket.emit('forum error', '评论失败，请稍后再试');
+      return;
+    }
+    io.to(forumPostChannel(postId)).emit('forum comment created', { comment: publicForumComment(comment) });
+    broadcastForumPosts();
+  });
+
   socket.on('avatar upload', (payload) => {
     if (!requireAuth(socket, '修改头像')) return;
     const base64 = payload && typeof payload.base64 === 'string' ? payload.base64 : '';
@@ -1317,6 +1572,8 @@ io.on('connection', (socket) => {
     try {
       saveUsers();
       db.prepare('UPDATE messages SET username = ?, avatar = ? WHERE user_id = ?').run(user.username, user.avatar, user.id);
+      db.prepare('UPDATE posts SET username = ?, avatar = ? WHERE user_id = ?').run(user.username, user.avatar, user.id);
+      db.prepare('UPDATE comments SET username = ?, avatar = ? WHERE user_id = ?').run(user.username, user.avatar, user.id);
     } catch (error) {
       socket.emit('admin error', '修改昵称失败');
       return;
@@ -1324,6 +1581,7 @@ io.on('connection', (socket) => {
 
     broadcastOnlineUsers();
     refreshOpenRooms();
+    broadcastForumPosts();
     io.emit('system', { type: 'rename', previousUsername, username: user.username });
     broadcastAdminDashboards();
   });
