@@ -1247,6 +1247,10 @@ io.on('connection', (socket) => {
   socket.emit('onlineUsers', { count: onlineUsers.size, users: Array.from(onlineUsers.values()).map(publicUser) });
   emitLobby(socket);
 
+  socket.on('latency:ping', (sentAt) => {
+    socket.emit('latency:pong', sentAt);
+  });
+
   socket.on('register', (payload) => {
     if (!checkAuthLimit(socket)) {
       socket.emit('authError', '尝试次数太多了，请稍后再试');

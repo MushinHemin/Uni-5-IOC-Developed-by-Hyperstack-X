@@ -594,8 +594,13 @@
     }
 
     .settings-toggle-btn {
-      width: 42px;
-      padding: 0;
+      width: auto;
+      min-width: 42px;
+      padding: 0 12px;
+    }
+
+    .settings-toggle-btn[data-settings-open]::after {
+      content: attr(title);
     }
 
     .theme-toggle-btn .theme-icon {
@@ -654,6 +659,37 @@
     .dot.is-online {
       background: #118c58;
       box-shadow: 0 0 0 4px rgba(17, 140, 88, 0.12);
+    }
+
+    .presence-dot {
+      width: 9px;
+      height: 9px;
+      display: inline-block;
+      flex: 0 0 auto;
+      border-radius: 999px;
+      background: #8e8e93;
+      box-shadow: 0 0 0 4px rgba(142, 142, 147, 0.1);
+    }
+
+    .presence-dot.is-good {
+      background: #34c759;
+      box-shadow: 0 0 0 4px rgba(52, 199, 89, 0.14);
+      animation: statusPulse 2.6s var(--ease-smooth) infinite;
+    }
+
+    .presence-dot.is-warn {
+      background: #ff9f0a;
+      box-shadow: 0 0 0 4px rgba(255, 159, 10, 0.14);
+    }
+
+    .presence-dot.is-bad {
+      background: #ff453a;
+      box-shadow: 0 0 0 4px rgba(255, 69, 58, 0.14);
+    }
+
+    .presence-dot.is-off {
+      background: #8e8e93;
+      box-shadow: 0 0 0 4px rgba(142, 142, 147, 0.1);
     }
 
     .messages {
@@ -1244,6 +1280,83 @@
       font-size: 12px;
     }
 
+    .glass-control {
+      display: grid;
+      gap: 9px;
+    }
+
+    .glass-control-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .glass-range {
+      width: 100%;
+      height: 36px;
+      appearance: none;
+      border-radius: 999px;
+      background:
+        linear-gradient(90deg, var(--brand) var(--glass-slider-value, 50%), var(--glass-bg-soft) 0);
+      border: 1px solid var(--line);
+      box-shadow: inset 0 1px 0 var(--glass-highlight), 0 10px 24px rgba(31, 44, 43, 0.06);
+      outline: 0;
+      transition: box-shadow var(--duration-normal) var(--ease-smooth), border-color var(--duration-normal) var(--ease-smooth);
+    }
+
+    .glass-range:focus-visible {
+      border-color: rgba(0, 122, 255, 0.56);
+      box-shadow: inset 0 1px 0 var(--glass-highlight), 0 0 0 4px rgba(0, 122, 255, 0.12);
+    }
+
+    .glass-range::-webkit-slider-thumb {
+      appearance: none;
+      width: 28px;
+      height: 28px;
+      border: 1px solid rgba(255, 255, 255, 0.76);
+      border-radius: 999px;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(242, 247, 255, 0.82));
+      box-shadow: 0 8px 18px rgba(31, 44, 43, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+      transition: transform var(--duration-fast) var(--ease-pop);
+    }
+
+    .glass-range:hover::-webkit-slider-thumb,
+    .glass-range:active::-webkit-slider-thumb {
+      transform: scale(1.08);
+    }
+
+    .glass-range::-moz-range-thumb {
+      width: 28px;
+      height: 28px;
+      border: 1px solid rgba(255, 255, 255, 0.76);
+      border-radius: 999px;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(242, 247, 255, 0.82));
+      box-shadow: 0 8px 18px rgba(31, 44, 43, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+    }
+
+    .network-status-panel {
+      display: grid;
+      gap: 8px;
+      padding: 11px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      background: var(--glass-bg-soft);
+      box-shadow: inset 0 1px 0 var(--glass-highlight);
+    }
+
+    .network-status-line {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      color: var(--ink);
+      font-weight: 800;
+    }
+
     .crop-card {
       width: min(520px, 100%);
       display: grid;
@@ -1573,21 +1686,17 @@
     .home-grid {
       min-height: 0;
       display: grid;
-      grid-template-columns: minmax(0, 1.08fr) minmax(280px, 0.72fr);
-      gap: 16px;
+      grid-template-rows: minmax(0, 1fr) auto;
+      gap: 14px;
       padding: 18px;
       overflow: auto;
     }
 
-    .home-primary,
-    .home-secondary {
+    .home-primary {
       display: grid;
       gap: 14px;
       min-width: 0;
-    }
-
-    .home-primary {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 
     .home-card {
@@ -1618,6 +1727,10 @@
       animation-delay: 60ms;
     }
 
+    .home-card:nth-child(3) {
+      animation-delay: 120ms;
+    }
+
     .home-card:hover {
       transform: translateY(-4px) scale(1.01);
       border-color: rgba(0, 122, 255, 0.32);
@@ -1631,8 +1744,7 @@
       transform: translateY(-1px) scale(0.992);
     }
 
-    .home-card-icon,
-    .mini-card-icon {
+    .home-card-icon {
       width: 54px;
       height: 54px;
       display: inline-grid;
@@ -1643,21 +1755,18 @@
       box-shadow: 0 14px 32px rgba(0, 122, 255, 0.24);
     }
 
-    .home-card-icon .icon,
-    .mini-card-icon .icon {
+    .home-card-icon .icon {
       width: 24px;
       height: 24px;
     }
 
-    .home-card h3,
-    .mini-card h3 {
+    .home-card h3 {
       margin: 0;
       font-size: 24px;
       letter-spacing: 0;
     }
 
-    .home-card p,
-    .mini-card p {
+    .home-card p {
       margin: 8px 0 0;
       color: var(--muted);
       line-height: 1.55;
@@ -1672,8 +1781,7 @@
       font-weight: 800;
     }
 
-    .home-card-meta span,
-    .home-stat {
+    .home-card-meta span {
       min-height: 28px;
       display: inline-flex;
       align-items: center;
@@ -1683,63 +1791,29 @@
       background: var(--glass-bg-soft);
     }
 
-    .home-secondary {
-      grid-template-rows: auto auto minmax(0, 1fr);
-    }
-
-    .mini-card,
-    .home-insight {
-      width: 100%;
-      display: grid;
-      gap: 10px;
-      padding: 16px;
-      border: 1px solid var(--line);
-      border-radius: var(--radius-lg);
-      color: var(--ink);
-      background: var(--glass-bg-soft);
-      text-align: left;
-      box-shadow: 0 10px 30px rgba(31, 44, 43, 0.06), inset 0 1px 0 var(--glass-highlight);
-      transition:
-        transform var(--duration-fast) var(--ease-pop),
-        background var(--duration-normal) var(--ease-smooth),
-        border-color var(--duration-normal) var(--ease-smooth);
-      animation: homeCardIn 420ms var(--ease-smooth) 120ms both;
-    }
-
-    .mini-card:hover {
-      transform: translateY(-2px);
-      border-color: rgba(0, 122, 255, 0.28);
-      background: var(--glass-bg-light);
-    }
-
-    .mini-card-row {
-      display: flex;
+    .home-status-card {
+      width: fit-content;
+      max-width: 100%;
+      min-height: 38px;
+      display: inline-flex;
       align-items: center;
-      gap: 12px;
-    }
-
-    .mini-card-icon {
-      width: 42px;
-      height: 42px;
-      border-radius: var(--radius-md);
-      box-shadow: 0 10px 24px rgba(0, 122, 255, 0.18);
-    }
-
-    .home-insight {
-      align-content: start;
-      min-height: 160px;
-      animation-delay: 180ms;
-    }
-
-    .home-insight h3 {
-      margin: 0;
-      font-size: 15px;
-    }
-
-    .home-stats {
-      display: flex;
-      flex-wrap: wrap;
+      justify-self: center;
       gap: 8px;
+      padding: 8px 13px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--muted);
+      background: linear-gradient(180deg, var(--glass-bg-light), var(--glass-bg-soft));
+      box-shadow: 0 12px 32px rgba(31, 44, 43, 0.07), inset 0 1px 0 var(--glass-highlight);
+      backdrop-filter: blur(var(--glass-blur-sm)) saturate(1.12);
+      font-size: 13px;
+      font-weight: 800;
+      animation: homeCardIn 420ms var(--ease-smooth) 180ms both;
+    }
+
+    .home-status-card .separator {
+      color: color-mix(in srgb, var(--muted) 52%, transparent);
+      font-weight: 700;
     }
 
     .lobby {
@@ -2715,6 +2789,16 @@
       }
     }
 
+    @keyframes statusPulse {
+      0%,
+      100% {
+        box-shadow: 0 0 0 4px rgba(52, 199, 89, 0.14);
+      }
+      50% {
+        box-shadow: 0 0 0 7px rgba(52, 199, 89, 0.04);
+      }
+    }
+
     @media (prefers-reduced-motion: reduce) {
       *,
       *::before,
@@ -2789,6 +2873,15 @@
       .switch-user-btn {
         min-width: 42px;
         padding: 0 11px;
+      }
+
+      .settings-toggle-btn[data-settings-open] {
+        width: 42px;
+        padding: 0;
+      }
+
+      .settings-toggle-btn[data-settings-open]::after {
+        display: none;
       }
 
       .profile-chip {
@@ -2932,11 +3025,11 @@
             </div>
           </div>
         </header>
-        <button id="profileChip" class="profile-chip" data-settings-open type="button" hidden>
+        <button id="profileChip" class="profile-chip" data-settings-open type="button" aria-label="账户与设置" hidden>
           <span id="profileChipAvatar"></span>
           <span>
             <strong id="profileChipName">未登录</strong>
-            <span>个人设置</span>
+            <span>账户与设置</span>
           </span>
         </button>
 
@@ -2965,7 +3058,7 @@
               <svg class="icon theme-icon moon-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 14.6A7.6 7.6 0 0 1 9.4 3 8.8 8.8 0 1 0 21 14.6z"/></svg>
               <svg class="icon theme-icon sun-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="M4.93 4.93l1.41 1.41"/><path d="M17.66 17.66l1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="M4.93 19.07l1.41-1.41"/><path d="M17.66 6.34l1.41-1.41"/></svg>
             </button>
-            <button class="settings-toggle-btn" data-settings-open type="button" aria-label="系统设置" title="系统设置">
+            <button class="settings-toggle-btn" data-settings-open type="button" aria-label="账户与设置" title="账户与设置">
               <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.05.05a2 2 0 0 1-2.83 2.83l-.05-.05a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 0 1-4 0v-.07A1.7 1.7 0 0 0 9 19.37a1.7 1.7 0 0 0-1.88.34l-.05.05a2 2 0 1 1-2.83-2.83l.05-.05A1.7 1.7 0 0 0 4.63 15 1.7 1.7 0 0 0 3.07 14H3a2 2 0 0 1 0-4h.07A1.7 1.7 0 0 0 4.63 9a1.7 1.7 0 0 0-.34-1.88l-.05-.05a2 2 0 1 1 2.83-2.83l.05.05A1.7 1.7 0 0 0 9 4.63 1.7 1.7 0 0 0 10 3.07V3a2 2 0 0 1 4 0v.07A1.7 1.7 0 0 0 15 4.63a1.7 1.7 0 0 0 1.88-.34l.05-.05a2 2 0 0 1 2.83 2.83l-.05.05A1.7 1.7 0 0 0 19.37 9c.22.61.8 1 1.56 1H21a2 2 0 0 1 0 4h-.07A1.7 1.7 0 0 0 19.4 15z"/></svg>
             </button>
             <button id="chatHomeOpen" class="admin-btn" type="button" aria-label="返回首页">
@@ -3045,7 +3138,7 @@
           <svg class="icon theme-icon moon-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 14.6A7.6 7.6 0 0 1 9.4 3 8.8 8.8 0 1 0 21 14.6z"/></svg>
           <svg class="icon theme-icon sun-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="M4.93 4.93l1.41 1.41"/><path d="M17.66 17.66l1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="M4.93 19.07l1.41-1.41"/><path d="M17.66 6.34l1.41-1.41"/></svg>
         </button>
-        <button class="settings-toggle-btn" data-settings-open type="button" aria-label="系统设置" title="系统设置">
+        <button class="settings-toggle-btn" data-settings-open type="button" aria-label="账户与设置" title="账户与设置">
           <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.05.05a2 2 0 0 1-2.83 2.83l-.05-.05a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 0 1-4 0v-.07A1.7 1.7 0 0 0 9 19.37a1.7 1.7 0 0 0-1.88.34l-.05.05a2 2 0 1 1-2.83-2.83l.05-.05A1.7 1.7 0 0 0 4.63 15 1.7 1.7 0 0 0 3.07 14H3a2 2 0 0 1 0-4h.07A1.7 1.7 0 0 0 4.63 9a1.7 1.7 0 0 0-.34-1.88l-.05-.05a2 2 0 1 1 2.83-2.83l.05.05A1.7 1.7 0 0 0 9 4.63 1.7 1.7 0 0 0 10 3.07V3a2 2 0 0 1 4 0v.07A1.7 1.7 0 0 0 15 4.63a1.7 1.7 0 0 0 1.88-.34l.05-.05a2 2 0 0 1 2.83 2.83l-.05.05A1.7 1.7 0 0 0 19.37 9c.22.61.8 1 1.56 1H21a2 2 0 0 1 0 4h-.07A1.7 1.7 0 0 0 19.4 15z"/></svg>
         </button>
         <button class="switch-user-btn" data-switch-user type="button" aria-label="切换用户">
@@ -3089,18 +3182,18 @@
           <div id="homeSubtitle" class="home-subtitle">选择你想进入的空间。</div>
         </div>
         <div class="home-toolbar">
-          <button id="homeProfile" class="home-profile" data-settings-open type="button" aria-label="账户">
+          <button id="homeProfile" class="home-profile" data-settings-open type="button" aria-label="账户与设置">
             <span id="homeProfileAvatar"></span>
             <span>
               <strong id="homeProfileName">未登录</strong>
-              <span class="admin-muted">账户</span>
+              <span class="admin-muted">账户与设置</span>
             </span>
           </button>
           <button class="theme-toggle-btn" data-theme-toggle type="button" aria-label="切换外观" title="切换外观">
             <svg class="icon theme-icon moon-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 14.6A7.6 7.6 0 0 1 9.4 3 8.8 8.8 0 1 0 21 14.6z"/></svg>
             <svg class="icon theme-icon sun-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="M4.93 4.93l1.41 1.41"/><path d="M17.66 17.66l1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="M4.93 19.07l1.41-1.41"/><path d="M17.66 6.34l1.41-1.41"/></svg>
           </button>
-          <button class="settings-toggle-btn" data-settings-open type="button" aria-label="系统设置" title="系统设置">
+          <button class="settings-toggle-btn" data-settings-open type="button" aria-label="账户与设置" title="账户与设置">
             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.05.05a2 2 0 0 1-2.83 2.83l-.05-.05a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 0 1-4 0v-.07A1.7 1.7 0 0 0 9 19.37a1.7 1.7 0 0 0-1.88.34l-.05.05a2 2 0 1 1-2.83-2.83l.05-.05A1.7 1.7 0 0 0 4.63 15 1.7 1.7 0 0 0 3.07 14H3a2 2 0 0 1 0-4h.07A1.7 1.7 0 0 0 4.63 9a1.7 1.7 0 0 0-.34-1.88l-.05-.05a2 2 0 1 1 2.83-2.83l.05.05A1.7 1.7 0 0 0 9 4.63 1.7 1.7 0 0 0 10 3.07V3a2 2 0 0 1 4 0v.07A1.7 1.7 0 0 0 15 4.63a1.7 1.7 0 0 0 1.88-.34l.05-.05a2 2 0 0 1 2.83 2.83l-.05.05A1.7 1.7 0 0 0 19.37 9c.22.61.8 1 1.56 1H21a2 2 0 0 1 0 4h-.07A1.7 1.7 0 0 0 19.4 15z"/></svg>
           </button>
           <button class="switch-user-btn" data-switch-user type="button" aria-label="切换用户">
@@ -3137,35 +3230,26 @@
               <span>实时评论</span>
             </span>
           </button>
-        </div>
-        <div class="home-secondary">
-          <button id="homeAccountOpen" class="mini-card" type="button">
-            <span class="mini-card-row">
-              <span class="mini-card-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M5 20c1.5-4 12.5-4 14 0"/></svg></span>
-              <span>
-                <h3>账户</h3>
-                <p>头像、昵称和个人资料。</p>
-              </span>
+          <button id="homeSettingsOpen" class="home-card" type="button">
+            <span class="home-card-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="8" r="3.5"/><path d="M4.5 19c1.3-3.8 9.7-3.8 11 0"/><path d="M18.2 11.4a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z"/><path d="M18.2 9.8v1"/><path d="M18.2 16.4v1"/><path d="M14.9 11.8l.8.5"/><path d="M20.7 15.5l.8.5"/><path d="M14.9 16l.8-.5"/><path d="M20.7 12.3l.8-.5"/></svg></span>
+            <span>
+              <h3>账户与设置</h3>
+              <p>管理头像、外观、提示音与个人偏好。</p>
+            </span>
+            <span class="home-card-meta">
+              <span>头像裁剪</span>
+              <span>液态玻璃</span>
             </span>
           </button>
-          <button id="homeSettingsOpen" class="mini-card" type="button">
-            <span class="mini-card-row">
-              <span class="mini-card-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.05.05a2 2 0 0 1-2.83 2.83l-.05-.05a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 0 1-4 0v-.07A1.7 1.7 0 0 0 9 19.37a1.7 1.7 0 0 0-1.88.34l-.05.05a2 2 0 1 1-2.83-2.83l.05-.05A1.7 1.7 0 0 0 4.63 15 1.7 1.7 0 0 0 3.07 14H3a2 2 0 0 1 0-4h.07A1.7 1.7 0 0 0 4.63 9a1.7 1.7 0 0 0-.34-1.88l-.05-.05a2 2 0 1 1 2.83-2.83l.05.05A1.7 1.7 0 0 0 9 4.63 1.7 1.7 0 0 0 10 3.07V3a2 2 0 0 1 4 0v.07A1.7 1.7 0 0 0 15 4.63a1.7 1.7 0 0 0 1.88-.34l.05-.05a2 2 0 0 1 2.83 2.83l-.05.05A1.7 1.7 0 0 0 19.37 9c.22.61.8 1 1.56 1H21a2 2 0 0 1 0 4h-.07A1.7 1.7 0 0 0 19.4 15z"/></svg></span>
-              <span>
-                <h3>设置</h3>
-                <p>外观、提示音和舒适度选项。</p>
-              </span>
-            </span>
-          </button>
-          <section class="home-insight">
-            <h3>当前状态</h3>
-            <div class="home-stats">
-              <span id="homeConnectionStat" class="home-stat">连接中</span>
-              <span id="homeAdminStat" class="home-stat">普通用户</span>
-            </div>
-            <p class="admin-muted">从这里进入核心功能，进入模块后工具会自动收纳到顶部栏。</p>
-          </section>
         </div>
+        <section class="home-status-card" aria-label="当前状态">
+          <span id="homePresenceDot" class="presence-dot is-off" aria-hidden="true"></span>
+          <span id="homeNetworkStat">检测中</span>
+          <span class="separator">·</span>
+          <span id="homeConnectionStat">连接中</span>
+          <span class="separator">·</span>
+          <span id="homeAdminStat">普通用户</span>
+        </section>
       </div>
       <footer class="copyright-footer">
         <div>&copy;2026 Hyperstack X Copyright all rights reserved.</div>
@@ -3186,7 +3270,7 @@
             <svg class="icon theme-icon moon-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 14.6A7.6 7.6 0 0 1 9.4 3 8.8 8.8 0 1 0 21 14.6z"/></svg>
             <svg class="icon theme-icon sun-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="M4.93 4.93l1.41 1.41"/><path d="M17.66 17.66l1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="M4.93 19.07l1.41-1.41"/><path d="M17.66 6.34l1.41-1.41"/></svg>
           </button>
-          <button class="settings-toggle-btn" data-settings-open type="button" aria-label="系统设置" title="系统设置">
+          <button class="settings-toggle-btn" data-settings-open type="button" aria-label="账户与设置" title="账户与设置">
             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.05.05a2 2 0 0 1-2.83 2.83l-.05-.05a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 0 1-4 0v-.07A1.7 1.7 0 0 0 9 19.37a1.7 1.7 0 0 0-1.88.34l-.05.05a2 2 0 1 1-2.83-2.83l.05-.05A1.7 1.7 0 0 0 4.63 15 1.7 1.7 0 0 0 3.07 14H3a2 2 0 0 1 0-4h.07A1.7 1.7 0 0 0 4.63 9a1.7 1.7 0 0 0-.34-1.88l-.05-.05a2 2 0 1 1 2.83-2.83l.05.05A1.7 1.7 0 0 0 9 4.63 1.7 1.7 0 0 0 10 3.07V3a2 2 0 0 1 4 0v.07A1.7 1.7 0 0 0 15 4.63a1.7 1.7 0 0 0 1.88-.34l.05-.05a2 2 0 0 1 2.83 2.83l-.05.05A1.7 1.7 0 0 0 19.37 9c.22.61.8 1 1.56 1H21a2 2 0 0 1 0 4h-.07A1.7 1.7 0 0 0 19.4 15z"/></svg>
           </button>
           <button id="lobbyHomeOpen" class="admin-btn" type="button" aria-label="返回首页">
@@ -3240,7 +3324,7 @@
             <svg class="icon theme-icon moon-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 14.6A7.6 7.6 0 0 1 9.4 3 8.8 8.8 0 1 0 21 14.6z"/></svg>
             <svg class="icon theme-icon sun-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="M4.93 4.93l1.41 1.41"/><path d="M17.66 17.66l1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="M4.93 19.07l1.41-1.41"/><path d="M17.66 6.34l1.41-1.41"/></svg>
           </button>
-          <button class="settings-toggle-btn" data-settings-open type="button" aria-label="系统设置" title="系统设置">
+          <button class="settings-toggle-btn" data-settings-open type="button" aria-label="账户与设置" title="账户与设置">
             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.05.05a2 2 0 0 1-2.83 2.83l-.05-.05a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 0 1-4 0v-.07A1.7 1.7 0 0 0 9 19.37a1.7 1.7 0 0 0-1.88.34l-.05.05a2 2 0 1 1-2.83-2.83l.05-.05A1.7 1.7 0 0 0 4.63 15 1.7 1.7 0 0 0 3.07 14H3a2 2 0 0 1 0-4h.07A1.7 1.7 0 0 0 4.63 9a1.7 1.7 0 0 0-.34-1.88l-.05-.05a2 2 0 1 1 2.83-2.83l.05.05A1.7 1.7 0 0 0 9 4.63 1.7 1.7 0 0 0 10 3.07V3a2 2 0 0 1 4 0v.07A1.7 1.7 0 0 0 15 4.63a1.7 1.7 0 0 0 1.88-.34l.05-.05a2 2 0 0 1 2.83 2.83l-.05.05A1.7 1.7 0 0 0 19.37 9c.22.61.8 1 1.56 1H21a2 2 0 0 1 0 4h-.07A1.7 1.7 0 0 0 19.4 15z"/></svg>
           </button>
           <button id="forumHomeOpen" class="admin-btn" type="button" aria-label="返回首页">
@@ -3298,7 +3382,7 @@
             <svg class="icon theme-icon moon-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 14.6A7.6 7.6 0 0 1 9.4 3 8.8 8.8 0 1 0 21 14.6z"/></svg>
             <svg class="icon theme-icon sun-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="M4.93 4.93l1.41 1.41"/><path d="M17.66 17.66l1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="M4.93 19.07l1.41-1.41"/><path d="M17.66 6.34l1.41-1.41"/></svg>
           </button>
-          <button class="settings-toggle-btn" data-settings-open type="button" aria-label="系统设置" title="系统设置">
+          <button class="settings-toggle-btn" data-settings-open type="button" aria-label="账户与设置" title="账户与设置">
             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.05.05a2 2 0 0 1-2.83 2.83l-.05-.05a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 0 1-4 0v-.07A1.7 1.7 0 0 0 9 19.37a1.7 1.7 0 0 0-1.88.34l-.05.05a2 2 0 1 1-2.83-2.83l.05-.05A1.7 1.7 0 0 0 4.63 15 1.7 1.7 0 0 0 3.07 14H3a2 2 0 0 1 0-4h.07A1.7 1.7 0 0 0 4.63 9a1.7 1.7 0 0 0-.34-1.88l-.05-.05a2 2 0 1 1 2.83-2.83l.05.05A1.7 1.7 0 0 0 9 4.63 1.7 1.7 0 0 0 10 3.07V3a2 2 0 0 1 4 0v.07A1.7 1.7 0 0 0 15 4.63a1.7 1.7 0 0 0 1.88-.34l.05-.05a2 2 0 0 1 2.83 2.83l-.05.05A1.7 1.7 0 0 0 19.37 9c.22.61.8 1 1.56 1H21a2 2 0 0 1 0 4h-.07A1.7 1.7 0 0 0 19.4 15z"/></svg>
           </button>
           <button class="switch-user-btn" data-switch-user type="button" aria-label="切换用户">
@@ -3369,8 +3453,8 @@
   <div id="settingsModal" class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle" hidden>
     <div class="confirm-card settings-card">
       <div>
-        <h3 id="settingsTitle">系统设置</h3>
-        <p>管理头像、外观与消息提醒。</p>
+        <h3 id="settingsTitle">账户与设置</h3>
+        <p>管理头像、外观、提示音与当前状态。</p>
       </div>
       <section class="settings-section">
         <h4>个人资料</h4>
@@ -3404,6 +3488,18 @@
             跟随系统
           </button>
         </div>
+        <div class="glass-control">
+          <div class="glass-control-row">
+            <span>液态玻璃效果</span>
+            <span id="glassValueLabel">50%</span>
+          </div>
+          <input id="glassRange" class="glass-range" type="range" min="0" max="100" step="1" aria-label="液态玻璃效果强度">
+          <div class="glass-control-row" aria-hidden="true">
+            <span>更透明</span>
+            <span>更柔和</span>
+          </div>
+          <div class="settings-status">拖动后立即预览，并会保存在当前浏览器。</div>
+        </div>
         <div id="themeStatus" class="settings-status"></div>
       </section>
       <section class="settings-section">
@@ -3413,6 +3509,20 @@
           <span id="soundToggleText">提示音关闭</span>
         </button>
         <div class="settings-status">浏览器可能需要一次点击后才能播放提示音。</div>
+      </section>
+      <section class="settings-section">
+        <h4>网络与状态</h4>
+        <div class="network-status-panel">
+          <div class="network-status-line">
+            <span id="settingsPresenceDot" class="presence-dot is-off" aria-hidden="true"></span>
+            <span id="settingsLatencyText">正在检测网络延迟</span>
+          </div>
+          <div class="settings-status">
+            <span id="settingsConnectionText">连接中</span>
+            <span> · </span>
+            <span id="settingsRoleText">普通用户</span>
+          </div>
+        </div>
       </section>
       <div class="confirm-actions">
         <button id="settingsClose" class="admin-btn primary" type="button">完成</button>
@@ -3481,7 +3591,9 @@
       forumPosts: [],
       selectedForumPost: null,
       forumComments: [],
-      viewTransitionTimer: null
+      viewTransitionTimer: null,
+      latencyMs: null,
+      latencyTimer: null
     };
 
     // DOM refs
@@ -3526,11 +3638,12 @@
     const homeProfileName = document.getElementById('homeProfileName');
     const homeChatOpen = document.getElementById('homeChatOpen');
     const homeForumOpen = document.getElementById('homeForumOpen');
-    const homeAccountOpen = document.getElementById('homeAccountOpen');
     const homeSettingsOpen = document.getElementById('homeSettingsOpen');
     const homeRoomStat = document.getElementById('homeRoomStat');
     const homeOnlineStat = document.getElementById('homeOnlineStat');
     const homeForumStat = document.getElementById('homeForumStat');
+    const homePresenceDot = document.getElementById('homePresenceDot');
+    const homeNetworkStat = document.getElementById('homeNetworkStat');
     const homeConnectionStat = document.getElementById('homeConnectionStat');
     const homeAdminStat = document.getElementById('homeAdminStat');
     const lobby = document.getElementById('lobby');
@@ -3606,8 +3719,14 @@
     const avatarCropCancel = document.getElementById('avatarCropCancel');
     const avatarCropConfirm = document.getElementById('avatarCropConfirm');
     const themeStatus = document.getElementById('themeStatus');
+    const glassRange = document.getElementById('glassRange');
+    const glassValueLabel = document.getElementById('glassValueLabel');
     const soundToggle = document.getElementById('soundToggle');
     const soundToggleText = document.getElementById('soundToggleText');
+    const settingsPresenceDot = document.getElementById('settingsPresenceDot');
+    const settingsLatencyText = document.getElementById('settingsLatencyText');
+    const settingsConnectionText = document.getElementById('settingsConnectionText');
+    const settingsRoleText = document.getElementById('settingsRoleText');
     const switchUserModal = document.getElementById('switchUserModal');
     const switchUserCancel = document.getElementById('switchUserCancel');
     const switchUserConfirm = document.getElementById('switchUserConfirm');
@@ -3622,9 +3741,10 @@
     const THEME_KEY = 'uni5-theme';
     const THEME_MODE_KEY = 'uni5-theme-mode';
     const SOUND_KEY = 'uni5-message-sound';
+    const GLASS_KEY = 'uni5-glass-intensity';
     const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
 
-    // Theme and settings
+    // Theme / glass / latency
     function systemTheme() {
       return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
     }
@@ -3675,6 +3795,111 @@
         }
       }
       updateThemeButtons(nextMode, next);
+      applyGlassIntensity(readGlassIntensity(), false);
+    }
+
+    function readGlassIntensity() {
+      try {
+        const saved = Number(localStorage.getItem(GLASS_KEY));
+        if (Number.isFinite(saved)) return Math.min(100, Math.max(0, saved));
+      } catch (error) {
+        return 50;
+      }
+      return 50;
+    }
+
+    function alphaColor(rgb, alpha) {
+      return `rgba(${rgb}, ${alpha.toFixed(3)})`;
+    }
+
+    function applyGlassIntensity(value, persist = true) {
+      const next = Math.min(100, Math.max(0, Number(value) || 0));
+      const level = next / 100;
+      const isDark = (document.documentElement.dataset.theme || 'light') === 'dark';
+      const glassRgb = isDark ? '20, 27, 44' : '255, 255, 255';
+      const borderRgb = '255, 255, 255';
+      const shadowRgb = isDark ? '0, 0, 0' : '40, 60, 120';
+      const lightAlpha = (isDark ? 0.46 : 0.38) + level * (isDark ? 0.24 : 0.28);
+      const baseAlpha = (isDark ? 0.38 : 0.30) + level * (isDark ? 0.20 : 0.24);
+      const softAlpha = (isDark ? 0.26 : 0.20) + level * (isDark ? 0.18 : 0.20);
+      const borderAlpha = (isDark ? 0.12 : 0.34) + level * (isDark ? 0.1 : 0.18);
+      const highlightAlpha = (isDark ? 0.08 : 0.42) + level * (isDark ? 0.08 : 0.28);
+      const shadowAlpha = (isDark ? 0.22 : 0.08) + level * (isDark ? 0.14 : 0.1);
+      const blurSm = 6 + level * 8;
+      const blurMd = 10 + level * 12;
+      const blurLg = 14 + level * 16;
+
+      document.documentElement.style.setProperty('--glass-bg-light', alphaColor(glassRgb, lightAlpha));
+      document.documentElement.style.setProperty('--glass-bg', alphaColor(glassRgb, baseAlpha));
+      document.documentElement.style.setProperty('--glass-bg-soft', alphaColor(glassRgb, softAlpha));
+      document.documentElement.style.setProperty('--glass-border', alphaColor(borderRgb, borderAlpha));
+      document.documentElement.style.setProperty('--glass-highlight', alphaColor(borderRgb, highlightAlpha));
+      document.documentElement.style.setProperty('--glass-shadow', `0 18px 52px rgba(${shadowRgb}, ${shadowAlpha.toFixed(3)})`);
+      document.documentElement.style.setProperty('--glass-blur-sm', `${blurSm.toFixed(1)}px`);
+      document.documentElement.style.setProperty('--glass-blur-md', `${blurMd.toFixed(1)}px`);
+      document.documentElement.style.setProperty('--glass-blur-lg', `${blurLg.toFixed(1)}px`);
+      document.documentElement.style.setProperty('--glass-slider-value', `${next}%`);
+      if (glassRange) glassRange.value = String(next);
+      if (glassValueLabel) glassValueLabel.textContent = `${Math.round(next)}%`;
+      if (persist) {
+        try {
+          localStorage.setItem(GLASS_KEY, String(Math.round(next)));
+        } catch (error) {
+          // The visual preference can remain session-only if storage is unavailable.
+        }
+      }
+    }
+
+    function getPresenceInfo() {
+      if (!state.isConnected) {
+        return { level: 'off', label: '未连接', latencyText: '未连接', connectionText: '未连接' };
+      }
+      if (!Number.isFinite(state.latencyMs)) {
+        return { level: 'off', label: '检测中', latencyText: '检测中', connectionText: '已连接' };
+      }
+      const rounded = Math.max(0, Math.round(state.latencyMs));
+      if (rounded <= 120) return { level: 'good', label: '网络良好', latencyText: `网络良好 ${rounded}ms`, connectionText: '已连接' };
+      if (rounded <= 250) return { level: 'warn', label: '延迟稍高', latencyText: `延迟稍高 ${rounded}ms`, connectionText: '已连接' };
+      return { level: 'bad', label: '延迟较高', latencyText: `延迟较高 ${rounded}ms`, connectionText: '已连接' };
+    }
+
+    function setPresenceDot(dot, level) {
+      if (!dot) return;
+      dot.classList.remove('is-good', 'is-warn', 'is-bad', 'is-off');
+      dot.classList.add(`is-${level || 'off'}`);
+    }
+
+    function renderPresence() {
+      const info = getPresenceInfo();
+      setPresenceDot(homePresenceDot, info.level);
+      setPresenceDot(settingsPresenceDot, info.level);
+      if (homeNetworkStat) homeNetworkStat.textContent = info.latencyText;
+      if (homeConnectionStat) homeConnectionStat.textContent = info.connectionText;
+      if (homeAdminStat) homeAdminStat.textContent = state.isAdmin ? '管理员' : '普通用户';
+      if (settingsLatencyText) settingsLatencyText.textContent = info.latencyText;
+      if (settingsConnectionText) settingsConnectionText.textContent = info.connectionText;
+      if (settingsRoleText) settingsRoleText.textContent = state.isAdmin ? '管理员' : '普通用户';
+    }
+
+    function sendLatencyPing() {
+      if (!state.isConnected) return;
+      socket.emit('latency:ping', performance.now());
+    }
+
+    function startLatencyMonitor() {
+      window.clearInterval(state.latencyTimer);
+      state.latencyTimer = null;
+      state.latencyMs = null;
+      renderPresence();
+      sendLatencyPing();
+      state.latencyTimer = window.setInterval(sendLatencyPing, 4000);
+    }
+
+    function stopLatencyMonitor() {
+      window.clearInterval(state.latencyTimer);
+      state.latencyTimer = null;
+      state.latencyMs = null;
+      renderPresence();
     }
 
     function renderProfileChip() {
@@ -3697,10 +3922,10 @@
       homeRoomStat.textContent = `聊天组 ${state.lobbyRooms.length}`;
       homeOnlineStat.textContent = `在线 ${state.lobbyUsers.length || state.onlineUsers.length || 0}`;
       homeForumStat.textContent = state.forumPosts.length > 0 ? `帖子 ${state.forumPosts.length}` : '社区空间';
-      homeConnectionStat.textContent = state.isConnected ? '已连接' : '连接中';
-      homeAdminStat.textContent = state.isAdmin ? '管理员' : '普通用户';
+      renderPresence();
     }
 
+    // Account settings
     function renderSettingsProfile() {
       settingsAvatarPreview.textContent = '';
       settingsAvatarPreview.append(createAvatar(state.pendingAvatar ? state.pendingAvatar.base64 : state.avatar || state.username, state.username, true));
@@ -3718,7 +3943,9 @@
       settingsModal.hidden = false;
       renderSettingsProfile();
       updateThemeButtons(readThemeMode(), document.documentElement.dataset.theme || 'light');
+      applyGlassIntensity(readGlassIntensity(), false);
       renderSoundToggle();
+      renderPresence();
       requestAnimationFrame(() => settingsClose.focus());
     }
 
@@ -3917,6 +4144,16 @@
     // Socket events
     socket.on('connect', () => {
       setConnection(true);
+    });
+
+    socket.on('latency:pong', (sentAt) => {
+      const sent = Number(sentAt);
+      if (!Number.isFinite(sent)) return;
+      const sample = Math.max(0, performance.now() - sent);
+      state.latencyMs = Number.isFinite(state.latencyMs)
+        ? state.latencyMs * 0.65 + sample * 0.35
+        : sample;
+      renderPresence();
     });
 
     socket.on('disconnect', () => {
@@ -4194,6 +4431,7 @@
       showAdminNotice(msg || '操作完成');
     });
 
+    // Auth
     loginTab.addEventListener('click', () => setAuthMode('login'));
     registerTab.addEventListener('click', () => setAuthMode('register'));
 
@@ -4207,9 +4445,9 @@
       });
     });
 
+    // Navigation and modules
     homeChatOpen.addEventListener('click', openChatModule);
     homeForumOpen.addEventListener('click', openForumPage);
-    homeAccountOpen.addEventListener('click', openSettingsModal);
     homeSettingsOpen.addEventListener('click', openSettingsModal);
     chatHomeOpen.addEventListener('click', returnHome);
     lobbyHomeOpen.addEventListener('click', returnHome);
@@ -4219,6 +4457,7 @@
       if (state.username) socket.emit('get lobby');
     });
 
+    // Forum controls
     forumRefresh.addEventListener('click', () => {
       if (state.username) socket.emit('get forum posts');
     });
@@ -4237,6 +4476,7 @@
     forumPostContent.addEventListener('input', updateForumPostButton);
     forumCommentInput.addEventListener('input', updateForumCommentButton);
 
+    // Chat controls
     backToLobby.addEventListener('click', () => {
       if (!state.username) return;
       stopTyping();
@@ -4261,6 +4501,7 @@
       });
     });
 
+    // Admin controls
     adminEntryButtons.forEach((button) => {
       button.addEventListener('click', openAdminPage);
     });
@@ -4269,6 +4510,7 @@
       setView(state.adminReturnView || (state.currentRoom ? 'chat' : 'lobby'));
     });
 
+    // Account settings and comfort controls
     switchUserButtons.forEach((button) => {
       button.addEventListener('click', openSwitchUserModal);
     });
@@ -4286,6 +4528,7 @@
       button.addEventListener('click', () => setThemeMode(button.dataset.themeMode));
     });
     setThemeMode(readThemeMode(), false);
+    applyGlassIntensity(readGlassIntensity(), false);
     setSoundEnabled(readSoundPreference(), false);
     if (window.matchMedia) {
       const themeMedia = window.matchMedia('(prefers-color-scheme: dark)');
@@ -4325,7 +4568,11 @@
       ensureAudioContext();
       showToast(state.soundEnabled ? '消息提示音已开启' : '消息提示音已关闭');
     });
+    glassRange.addEventListener('input', () => {
+      applyGlassIntensity(glassRange.value);
+    });
 
+    // Composer and profile media controls
     quotePreviewClose.addEventListener('click', clearQuote);
     imagePreviewClear.addEventListener('click', clearPendingImage);
     avatarChoose.addEventListener('click', () => avatarInput.click());
@@ -4764,7 +5011,7 @@
       return icons[name] || '';
     }
 
-    // Forum
+    // Navigation helpers
     function openChatModule() {
       if (!state.username) {
         showToast('请先登录');
@@ -5623,12 +5870,15 @@
       state.isConnected = isOnline;
       connectionDot.classList.toggle('is-online', isOnline);
       connectionText.textContent = isOnline ? '已连接' : '已断开';
+      if (isOnline) startLatencyMonitor();
+      else stopLatencyMonitor();
       if (!isOnline) {
         subtitle.textContent = '连接断开，正在重试';
       } else if (state.username) {
         subtitle.textContent = '实时聊天已就绪';
       }
       renderHome();
+      renderPresence();
     }
 
     function setChatEnabled(enabled) {

@@ -2,7 +2,7 @@
 
 Uni 5 is a lightweight realtime chat and community app with account login, group chat, private chat, forum posts, admin tools, message recall, image paste/upload, voice messages, and a glass-style responsive web UI.
 
-Current release: **Uni 5.4.1 Stability & Forum Persistence Fix**
+Current release: **Uni 5.4.1 Personalization & Presence Update**
 
 ## Features
 
@@ -23,9 +23,31 @@ Current release: **Uni 5.4.1 Stability & Forum Persistence Fix**
 - Uni 5.2.0: user avatar uploads, light/dark/system theme strategy, and optional message notification sound
 - Uni 5.3.0: forum posts, post list/detail views, and realtime comments
 - Uni 5.4.0: redesigned post-login home hub, clearer Chat / Forum module navigation, and refined module UI hierarchy
-- Uni 5.4.1: forum persistence hardening, CORS configuration, and stability cleanup
+- Uni 5.4.1: personalization controls, compact presence status, latency monitoring, forum persistence hardening, CORS configuration, and stability cleanup
 
 ## Release Notes
+
+### Uni 5.4.1 Personalization & Presence Update
+
+Added:
+
+- Added unified Account & Settings hub
+- Added liquid glass intensity customization
+- Added real-time latency monitor
+- Added compact connection status card
+
+Improved:
+
+- Merged account and settings into one primary home module
+- Simplified the home dashboard layout
+- Refined module toolbar actions
+- Improved visual personalization controls
+
+Fixed:
+
+- Cleaned temporary `.gitignore` scratch entries
+- Improved CORS configuration with `ALLOWED_ORIGINS`
+- Verified forum post/comment persistence
 
 ### Uni 5.4.1 Stability & Forum Persistence Fix
 
