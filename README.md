@@ -2,7 +2,7 @@
 
 Uni 5 is a lightweight realtime chat and community app with account login, group chat, private chat, forum posts, admin tools, message recall, image paste/upload, voice messages, and a glass-style responsive web UI.
 
-Current release: **Uni 5.4.1 Personalization & Presence Update**
+Current release: **Uni 5.4.3 Identity & Bulletin Update**
 
 ## Features
 
@@ -13,6 +13,8 @@ Current release: **Uni 5.4.1 Personalization & Presence Update**
 - User-created groups with admin-controlled creation code
 - Private chat and private message notifications
 - Forum MVP with posts, post detail pages, and realtime comments
+- Display-name personalization with weekly rename limits and admin approval
+- Bulletin mailbox with unread badges, version notices, admin announcements, and rename status messages
 - Message recall within the configured recall window
 - Text, image, pasted image, and voice messages
 - Quote, read-aloud, and recall actions from a message context menu
@@ -23,9 +25,28 @@ Current release: **Uni 5.4.1 Personalization & Presence Update**
 - Uni 5.2.0: user avatar uploads, light/dark/system theme strategy, and optional message notification sound
 - Uni 5.3.0: forum posts, post list/detail views, and realtime comments
 - Uni 5.4.0: redesigned post-login home hub, clearer Chat / Forum module navigation, and refined module UI hierarchy
+- Uni 5.4.3: display-name identity layer, rename approval workflow, bulletin mailbox, admin announcements, and forum polish
 - Uni 5.4.1: personalization controls, compact presence status, latency monitoring, forum persistence hardening, CORS configuration, and stability cleanup
 
 ## Release Notes
+
+### Uni 5.4.3 Identity & Bulletin Update
+
+Added:
+
+- Added stable display-name identity separate from login accounts
+- Added weekly rename limits with automatic approval for free changes
+- Added admin approval workflow for rename requests beyond the free window
+- Added bulletin mailbox with unread badges and targeted system messages
+- Added admin global announcement publishing
+- Added forum post/comment deletion controls with server-side permission checks
+
+Improved:
+
+- Forum cards and details now use display names consistently
+- Chat, private chat, online lists, settings, and admin views share the same display-name logic
+- Rename decisions now notify users through the bulletin mailbox
+- Default avatar fallback continues to use the user's display initial
 
 ### Uni 5.4.1 Personalization & Presence Update
 

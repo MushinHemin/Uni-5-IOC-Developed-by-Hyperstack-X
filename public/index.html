@@ -545,6 +545,7 @@
 
     .switch-user-btn,
     .theme-toggle-btn,
+    .bulletin-btn,
     .settings-toggle-btn {
       min-height: 36px;
       padding: 0 12px;
@@ -568,6 +569,7 @@
 
     .switch-user-btn:hover,
     .theme-toggle-btn:hover,
+    .bulletin-btn:hover,
     .settings-toggle-btn:hover {
       transform: translateY(-1px) scale(1.02);
       border-color: rgba(0, 122, 255, 0.24);
@@ -576,12 +578,14 @@
 
     .switch-user-btn:active,
     .theme-toggle-btn:active,
+    .bulletin-btn:active,
     .settings-toggle-btn:active {
       transform: translateY(0) scale(0.97);
     }
 
     .switch-user-btn .icon,
     .theme-toggle-btn .icon,
+    .bulletin-btn .icon,
     .settings-toggle-btn .icon {
       width: 17px;
       height: 17px;
@@ -591,6 +595,31 @@
       position: relative;
       width: 42px;
       padding: 0;
+    }
+
+    .bulletin-btn {
+      position: relative;
+      width: 42px;
+      padding: 0;
+    }
+
+    .bulletin-badge {
+      position: absolute;
+      top: -5px;
+      right: -5px;
+      min-width: 18px;
+      height: 18px;
+      padding: 0 5px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 2px solid var(--panel);
+      border-radius: 999px;
+      color: #fff;
+      background: var(--danger);
+      font-size: 11px;
+      font-weight: 900;
+      box-shadow: 0 8px 18px rgba(255, 59, 48, 0.24);
     }
 
     .settings-toggle-btn {
@@ -1278,6 +1307,75 @@
       min-height: 18px;
       color: var(--muted);
       font-size: 12px;
+    }
+
+    .display-name-card,
+    .bulletin-list,
+    .rename-request-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .display-name-row,
+    .bulletin-item,
+    .rename-request-item {
+      padding: 11px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+      background: var(--glass-bg-soft);
+      box-shadow: inset 0 1px 0 var(--glass-highlight);
+    }
+
+    .bulletin-card {
+      width: min(620px, 100%);
+      max-height: min(720px, calc(100dvh - 44px));
+      display: grid;
+      gap: 14px;
+      overflow: auto;
+    }
+
+    .bulletin-header-row,
+    .bulletin-item-head,
+    .rename-request-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .bulletin-item.is-unread {
+      border-color: rgba(0, 122, 255, 0.24);
+      background: var(--glass-bg-light);
+    }
+
+    .bulletin-type {
+      padding: 3px 8px;
+      border-radius: 999px;
+      color: var(--brand-strong);
+      background: rgba(0, 122, 255, 0.11);
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .bulletin-content,
+    .rename-request-note {
+      margin-top: 7px;
+      color: var(--muted);
+      line-height: 1.6;
+      white-space: pre-wrap;
+    }
+
+    .admin-form textarea,
+    .display-name-card input,
+    .display-name-card textarea {
+      min-height: 38px;
+      min-width: 0;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+      color: var(--ink);
+      background: var(--field-bg);
+      resize: vertical;
     }
 
     .glass-control {
@@ -2168,7 +2266,9 @@
       margin-top: 10px;
     }
 
-    .admin-form input {
+    .admin-form input,
+    .admin-form select,
+    .admin-form textarea {
       min-height: 38px;
       min-width: 0;
       padding: 0 10px;
@@ -2176,6 +2276,13 @@
       border-radius: var(--radius-md);
       color: var(--ink);
       background: var(--field-bg);
+    }
+
+    .admin-form textarea {
+      min-height: 92px;
+      padding: 10px;
+      grid-column: 1 / -1;
+      resize: vertical;
     }
 
     .admin-message {
@@ -3058,6 +3165,10 @@
               <svg class="icon theme-icon moon-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 14.6A7.6 7.6 0 0 1 9.4 3 8.8 8.8 0 1 0 21 14.6z"/></svg>
               <svg class="icon theme-icon sun-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="M4.93 4.93l1.41 1.41"/><path d="M17.66 17.66l1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="M4.93 19.07l1.41-1.41"/><path d="M17.66 6.34l1.41-1.41"/></svg>
             </button>
+            <button class="bulletin-btn" data-bulletin-open type="button" aria-label="公告信箱" title="公告信箱">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v12H4z"/><path d="M4 7l8 6 8-6"/></svg>
+              <span class="bulletin-badge" data-bulletin-badge hidden>0</span>
+            </button>
             <button class="settings-toggle-btn" data-settings-open type="button" aria-label="账户与设置" title="账户与设置">
               <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.05.05a2 2 0 0 1-2.83 2.83l-.05-.05a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 0 1-4 0v-.07A1.7 1.7 0 0 0 9 19.37a1.7 1.7 0 0 0-1.88.34l-.05.05a2 2 0 1 1-2.83-2.83l.05-.05A1.7 1.7 0 0 0 4.63 15 1.7 1.7 0 0 0 3.07 14H3a2 2 0 0 1 0-4h.07A1.7 1.7 0 0 0 4.63 9a1.7 1.7 0 0 0-.34-1.88l-.05-.05a2 2 0 1 1 2.83-2.83l.05.05A1.7 1.7 0 0 0 9 4.63 1.7 1.7 0 0 0 10 3.07V3a2 2 0 0 1 4 0v.07A1.7 1.7 0 0 0 15 4.63a1.7 1.7 0 0 0 1.88-.34l.05-.05a2 2 0 0 1 2.83 2.83l-.05.05A1.7 1.7 0 0 0 19.37 9c.22.61.8 1 1.56 1H21a2 2 0 0 1 0 4h-.07A1.7 1.7 0 0 0 19.4 15z"/></svg>
             </button>
@@ -3193,6 +3304,10 @@
             <svg class="icon theme-icon moon-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 14.6A7.6 7.6 0 0 1 9.4 3 8.8 8.8 0 1 0 21 14.6z"/></svg>
             <svg class="icon theme-icon sun-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="M4.93 4.93l1.41 1.41"/><path d="M17.66 17.66l1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="M4.93 19.07l1.41-1.41"/><path d="M17.66 6.34l1.41-1.41"/></svg>
           </button>
+          <button class="bulletin-btn" data-bulletin-open type="button" aria-label="公告信箱" title="公告信箱">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v12H4z"/><path d="M4 7l8 6 8-6"/></svg>
+            <span class="bulletin-badge" data-bulletin-badge hidden>0</span>
+          </button>
           <button class="settings-toggle-btn" data-settings-open type="button" aria-label="账户与设置" title="账户与设置">
             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.05.05a2 2 0 0 1-2.83 2.83l-.05-.05a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 0 1-4 0v-.07A1.7 1.7 0 0 0 9 19.37a1.7 1.7 0 0 0-1.88.34l-.05.05a2 2 0 1 1-2.83-2.83l.05-.05A1.7 1.7 0 0 0 4.63 15 1.7 1.7 0 0 0 3.07 14H3a2 2 0 0 1 0-4h.07A1.7 1.7 0 0 0 4.63 9a1.7 1.7 0 0 0-.34-1.88l-.05-.05a2 2 0 1 1 2.83-2.83l.05.05A1.7 1.7 0 0 0 9 4.63 1.7 1.7 0 0 0 10 3.07V3a2 2 0 0 1 4 0v.07A1.7 1.7 0 0 0 15 4.63a1.7 1.7 0 0 0 1.88-.34l.05-.05a2 2 0 0 1 2.83 2.83l-.05.05A1.7 1.7 0 0 0 19.37 9c.22.61.8 1 1.56 1H21a2 2 0 0 1 0 4h-.07A1.7 1.7 0 0 0 19.4 15z"/></svg>
           </button>
@@ -3270,6 +3385,10 @@
             <svg class="icon theme-icon moon-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 14.6A7.6 7.6 0 0 1 9.4 3 8.8 8.8 0 1 0 21 14.6z"/></svg>
             <svg class="icon theme-icon sun-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="M4.93 4.93l1.41 1.41"/><path d="M17.66 17.66l1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="M4.93 19.07l1.41-1.41"/><path d="M17.66 6.34l1.41-1.41"/></svg>
           </button>
+          <button class="bulletin-btn" data-bulletin-open type="button" aria-label="公告信箱" title="公告信箱">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v12H4z"/><path d="M4 7l8 6 8-6"/></svg>
+            <span class="bulletin-badge" data-bulletin-badge hidden>0</span>
+          </button>
           <button class="settings-toggle-btn" data-settings-open type="button" aria-label="账户与设置" title="账户与设置">
             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.05.05a2 2 0 0 1-2.83 2.83l-.05-.05a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 0 1-4 0v-.07A1.7 1.7 0 0 0 9 19.37a1.7 1.7 0 0 0-1.88.34l-.05.05a2 2 0 1 1-2.83-2.83l.05-.05A1.7 1.7 0 0 0 4.63 15 1.7 1.7 0 0 0 3.07 14H3a2 2 0 0 1 0-4h.07A1.7 1.7 0 0 0 4.63 9a1.7 1.7 0 0 0-.34-1.88l-.05-.05a2 2 0 1 1 2.83-2.83l.05.05A1.7 1.7 0 0 0 9 4.63 1.7 1.7 0 0 0 10 3.07V3a2 2 0 0 1 4 0v.07A1.7 1.7 0 0 0 15 4.63a1.7 1.7 0 0 0 1.88-.34l.05-.05a2 2 0 0 1 2.83 2.83l-.05.05A1.7 1.7 0 0 0 19.37 9c.22.61.8 1 1.56 1H21a2 2 0 0 1 0 4h-.07A1.7 1.7 0 0 0 19.4 15z"/></svg>
           </button>
@@ -3323,6 +3442,10 @@
           <button class="theme-toggle-btn" data-theme-toggle type="button" aria-label="切换外观" title="切换外观">
             <svg class="icon theme-icon moon-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 14.6A7.6 7.6 0 0 1 9.4 3 8.8 8.8 0 1 0 21 14.6z"/></svg>
             <svg class="icon theme-icon sun-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="M4.93 4.93l1.41 1.41"/><path d="M17.66 17.66l1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="M4.93 19.07l1.41-1.41"/><path d="M17.66 6.34l1.41-1.41"/></svg>
+          </button>
+          <button class="bulletin-btn" data-bulletin-open type="button" aria-label="公告信箱" title="公告信箱">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v12H4z"/><path d="M4 7l8 6 8-6"/></svg>
+            <span class="bulletin-badge" data-bulletin-badge hidden>0</span>
           </button>
           <button class="settings-toggle-btn" data-settings-open type="button" aria-label="账户与设置" title="账户与设置">
             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.05.05a2 2 0 0 1-2.83 2.83l-.05-.05a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 0 1-4 0v-.07A1.7 1.7 0 0 0 9 19.37a1.7 1.7 0 0 0-1.88.34l-.05.05a2 2 0 1 1-2.83-2.83l.05-.05A1.7 1.7 0 0 0 4.63 15 1.7 1.7 0 0 0 3.07 14H3a2 2 0 0 1 0-4h.07A1.7 1.7 0 0 0 4.63 9a1.7 1.7 0 0 0-.34-1.88l-.05-.05a2 2 0 1 1 2.83-2.83l.05.05A1.7 1.7 0 0 0 9 4.63 1.7 1.7 0 0 0 10 3.07V3a2 2 0 0 1 4 0v.07A1.7 1.7 0 0 0 15 4.63a1.7 1.7 0 0 0 1.88-.34l.05-.05a2 2 0 0 1 2.83 2.83l-.05.05A1.7 1.7 0 0 0 19.37 9c.22.61.8 1 1.56 1H21a2 2 0 0 1 0 4h-.07A1.7 1.7 0 0 0 19.4 15z"/></svg>
@@ -3382,6 +3505,10 @@
             <svg class="icon theme-icon moon-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 14.6A7.6 7.6 0 0 1 9.4 3 8.8 8.8 0 1 0 21 14.6z"/></svg>
             <svg class="icon theme-icon sun-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="M4.93 4.93l1.41 1.41"/><path d="M17.66 17.66l1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="M4.93 19.07l1.41-1.41"/><path d="M17.66 6.34l1.41-1.41"/></svg>
           </button>
+          <button class="bulletin-btn" data-bulletin-open type="button" aria-label="公告信箱" title="公告信箱">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v12H4z"/><path d="M4 7l8 6 8-6"/></svg>
+            <span class="bulletin-badge" data-bulletin-badge hidden>0</span>
+          </button>
           <button class="settings-toggle-btn" data-settings-open type="button" aria-label="账户与设置" title="账户与设置">
             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.05.05a2 2 0 0 1-2.83 2.83l-.05-.05a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 0 1-4 0v-.07A1.7 1.7 0 0 0 9 19.37a1.7 1.7 0 0 0-1.88.34l-.05.05a2 2 0 1 1-2.83-2.83l.05-.05A1.7 1.7 0 0 0 4.63 15 1.7 1.7 0 0 0 3.07 14H3a2 2 0 0 1 0-4h.07A1.7 1.7 0 0 0 4.63 9a1.7 1.7 0 0 0-.34-1.88l-.05-.05a2 2 0 1 1 2.83-2.83l.05.05A1.7 1.7 0 0 0 9 4.63 1.7 1.7 0 0 0 10 3.07V3a2 2 0 0 1 4 0v.07A1.7 1.7 0 0 0 15 4.63a1.7 1.7 0 0 0 1.88-.34l.05-.05a2 2 0 0 1 2.83 2.83l-.05.05A1.7 1.7 0 0 0 19.37 9c.22.61.8 1 1.56 1H21a2 2 0 0 1 0 4h-.07A1.7 1.7 0 0 0 19.4 15z"/></svg>
           </button>
@@ -3408,6 +3535,29 @@
           <div class="admin-card">
             <h3>群组管理</h3>
             <div id="adminRooms" class="admin-room-list"></div>
+          </div>
+          <div class="admin-card">
+            <h3>改名审核</h3>
+            <div id="adminRenameRequests" class="rename-request-list"></div>
+          </div>
+          <div class="admin-card">
+            <h3>发布公告</h3>
+            <form id="adminBulletinForm" class="admin-form">
+              <input id="adminBulletinTitle" maxlength="90" placeholder="公告标题">
+              <select id="adminBulletinType" aria-label="公告类型">
+                <option value="admin">管理员</option>
+                <option value="update">版本更新</option>
+                <option value="system">系统</option>
+                <option value="status">状态</option>
+              </select>
+              <textarea id="adminBulletinContent" maxlength="1200" placeholder="公告内容"></textarea>
+              <select id="adminBulletinPriority" aria-label="公告优先级">
+                <option value="normal">普通</option>
+                <option value="high">重要</option>
+                <option value="low">低</option>
+              </select>
+              <button class="admin-btn primary" type="submit">发布</button>
+            </form>
           </div>
           <div id="adminUserDetail" class="admin-card"></div>
           <div class="admin-card">
@@ -3440,6 +3590,21 @@
 
   <div id="toast" class="toast" role="status" hidden></div>
   <div id="messageMenu" class="message-menu" hidden></div>
+  <div id="bulletinModal" class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="bulletinTitle" hidden>
+    <div class="confirm-card bulletin-card">
+      <div class="bulletin-header-row">
+        <div>
+          <h3 id="bulletinTitle">公告信箱</h3>
+          <p id="bulletinSubtitle">系统通知、版本公告和改名审核结果会出现在这里。</p>
+        </div>
+        <button id="bulletinClose" class="admin-btn" type="button">关闭</button>
+      </div>
+      <div class="confirm-actions">
+        <button id="bulletinMarkAll" class="admin-btn primary" type="button">全部标为已读</button>
+      </div>
+      <div id="bulletinList" class="bulletin-list"></div>
+    </div>
+  </div>
   <div id="switchUserModal" class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="switchUserTitle" hidden>
     <div class="confirm-card">
       <h3 id="switchUserTitle">切换用户？</h3>
@@ -3470,6 +3635,20 @@
             <div id="avatarStatus" class="settings-status">支持 JPG、PNG、WebP，最大 2MB。</div>
             <input id="avatarInput" class="sr-only" type="file" accept="image/png,image/jpeg,image/webp">
           </div>
+        </div>
+      </section>
+      <section class="settings-section">
+        <h4>展示昵称</h4>
+        <div class="display-name-card">
+          <div class="display-name-row">
+            <strong id="settingsDisplayName">未登录</strong>
+            <div id="renameLimitText" class="settings-status">每 7 天可直接修改 3 次。</div>
+          </div>
+          <form id="renameForm" class="admin-form">
+            <input id="renameInput" maxlength="20" placeholder="输入新的展示昵称" autocomplete="nickname">
+            <button id="renameSubmit" class="admin-btn primary" type="submit">修改</button>
+          </form>
+          <div id="renameStatusText" class="settings-status">账号不变，只修改别人看到的名字。</div>
         </div>
       </section>
       <section class="settings-section">
@@ -3557,6 +3736,7 @@
     const state = {
       userId: '',
       username: '',
+      displayName: '',
       avatar: '',
       isAdmin: false,
       currentRoom: null,
@@ -3591,6 +3771,9 @@
       forumPosts: [],
       selectedForumPost: null,
       forumComments: [],
+      renameStatus: null,
+      bulletins: [],
+      bulletinUnread: 0,
       viewTransitionTimer: null,
       latencyMs: null,
       latencyTimer: null
@@ -3689,6 +3872,12 @@
     const adminMessages = document.getElementById('adminMessages');
     const adminGroupCode = document.getElementById('adminGroupCode');
     const adminRooms = document.getElementById('adminRooms');
+    const adminRenameRequests = document.getElementById('adminRenameRequests');
+    const adminBulletinForm = document.getElementById('adminBulletinForm');
+    const adminBulletinTitle = document.getElementById('adminBulletinTitle');
+    const adminBulletinType = document.getElementById('adminBulletinType');
+    const adminBulletinContent = document.getElementById('adminBulletinContent');
+    const adminBulletinPriority = document.getElementById('adminBulletinPriority');
     const toast = document.getElementById('toast');
     const quotePreview = document.getElementById('quotePreview');
     const quotePreviewTitle = document.getElementById('quotePreviewTitle');
@@ -3698,6 +3887,8 @@
     const switchUserButtons = Array.from(document.querySelectorAll('[data-switch-user]'));
     const themeToggleButtons = Array.from(document.querySelectorAll('button[data-theme-toggle]'));
     const settingsOpenButtons = Array.from(document.querySelectorAll('[data-settings-open]'));
+    const bulletinOpenButtons = Array.from(document.querySelectorAll('[data-bulletin-open]'));
+    const bulletinBadges = Array.from(document.querySelectorAll('[data-bulletin-badge]'));
     const themeModeButtons = Array.from(document.querySelectorAll('button[data-theme-mode]'));
     const profileChip = document.getElementById('profileChip');
     const profileChipAvatar = document.getElementById('profileChipAvatar');
@@ -3711,6 +3902,12 @@
     const avatarReset = document.getElementById('avatarReset');
     const avatarInput = document.getElementById('avatarInput');
     const avatarStatus = document.getElementById('avatarStatus');
+    const settingsDisplayName = document.getElementById('settingsDisplayName');
+    const renameForm = document.getElementById('renameForm');
+    const renameInput = document.getElementById('renameInput');
+    const renameSubmit = document.getElementById('renameSubmit');
+    const renameLimitText = document.getElementById('renameLimitText');
+    const renameStatusText = document.getElementById('renameStatusText');
     const avatarCropModal = document.getElementById('avatarCropModal');
     const avatarCropStage = document.getElementById('avatarCropStage');
     const avatarCropImage = document.getElementById('avatarCropImage');
@@ -3730,6 +3927,10 @@
     const switchUserModal = document.getElementById('switchUserModal');
     const switchUserCancel = document.getElementById('switchUserCancel');
     const switchUserConfirm = document.getElementById('switchUserConfirm');
+    const bulletinModal = document.getElementById('bulletinModal');
+    const bulletinClose = document.getElementById('bulletinClose');
+    const bulletinMarkAll = document.getElementById('bulletinMarkAll');
+    const bulletinList = document.getElementById('bulletinList');
     const pageLayers = {
       auth: login,
       home: homePage,
@@ -3881,6 +4082,15 @@
       if (settingsRoleText) settingsRoleText.textContent = state.isAdmin ? '管理员' : '普通用户';
     }
 
+    function displayName() {
+      return state.displayName || state.username || '';
+    }
+
+    function userDisplayName(user) {
+      if (!user || typeof user !== 'object') return '';
+      return user.displayName || user.username || '';
+    }
+
     function sendLatencyPing() {
       if (!state.isConnected) return;
       socket.emit('latency:ping', performance.now());
@@ -3905,20 +4115,21 @@
     function renderProfileChip() {
       profileChip.hidden = !state.userId;
       profileChipAvatar.textContent = '';
-      profileChipAvatar.append(createAvatar(state.avatar || state.username, state.username));
-      profileChipName.textContent = state.username || '未登录';
+      profileChipAvatar.append(createAvatar(state.avatar || displayName(), displayName()));
+      profileChipName.textContent = displayName() || '未登录';
       renderHome();
       renderSettingsProfile();
+      renderBulletinBadges();
     }
 
     function renderHome() {
       if (!homePage) return;
-      const name = state.username || '朋友';
+      const name = displayName() || '朋友';
       homeWelcome.textContent = state.username ? `欢迎回来，${name}` : '欢迎回来';
       homeSubtitle.textContent = '选择你想进入的空间。';
       homeProfileAvatar.textContent = '';
-      homeProfileAvatar.append(createAvatar(state.avatar || state.username || 'U', state.username || 'Uni 5'));
-      homeProfileName.textContent = state.username || '未登录';
+      homeProfileAvatar.append(createAvatar(state.avatar || displayName() || 'U', displayName() || 'Uni 5'));
+      homeProfileName.textContent = displayName() || '未登录';
       homeRoomStat.textContent = `聊天组 ${state.lobbyRooms.length}`;
       homeOnlineStat.textContent = `在线 ${state.lobbyUsers.length || state.onlineUsers.length || 0}`;
       homeForumStat.textContent = state.forumPosts.length > 0 ? `帖子 ${state.forumPosts.length}` : '社区空间';
@@ -3928,13 +4139,94 @@
     // Account settings
     function renderSettingsProfile() {
       settingsAvatarPreview.textContent = '';
-      settingsAvatarPreview.append(createAvatar(state.pendingAvatar ? state.pendingAvatar.base64 : state.avatar || state.username, state.username, true));
+      settingsAvatarPreview.append(createAvatar(state.pendingAvatar ? state.pendingAvatar.base64 : state.avatar || displayName(), displayName(), true));
       avatarUpload.disabled = !state.pendingAvatar || !state.userId;
       avatarClear.disabled = !state.pendingAvatar;
       avatarReset.disabled = !state.userId;
       avatarChoose.disabled = !state.userId;
       if (!state.userId) avatarStatus.textContent = '登录后可以设置头像。';
       else if (!state.pendingAvatar) avatarStatus.textContent = '支持 JPG、PNG、WebP，最大 2MB。';
+      renderRenameStatus();
+    }
+
+    function renderRenameStatus() {
+      if (!settingsDisplayName) return;
+      settingsDisplayName.textContent = displayName() || '未登录';
+      renameInput.value = renameInput.value || '';
+      renameSubmit.disabled = !state.userId || !renameInput.value.trim();
+      const status = state.renameStatus || {};
+      const remaining = Number.isFinite(Number(status.remaining)) ? Number(status.remaining) : 3;
+      const limit = Number(status.limit || 3);
+      renameLimitText.textContent = state.userId
+        ? `本 7 天窗口还可直接修改 ${remaining}/${limit} 次；用完后进入管理员审核。`
+        : '登录后可以修改展示昵称。';
+      if (status.pending) {
+        renameStatusText.textContent = `待审核：${status.pending.oldDisplayName} → ${status.pending.newDisplayName}`;
+        renameSubmit.disabled = true;
+      } else if (status.latest && status.latest.status && status.latest.status !== 'pending') {
+        const label = status.latest.status === 'approved' ? '已通过' : '未通过';
+        renameStatusText.textContent = `最近申请${label}${status.latest.decisionNote ? `：${status.latest.decisionNote}` : ''}`;
+      } else {
+        renameStatusText.textContent = '账号不变，只修改别人看到的名字。';
+      }
+    }
+
+    function renderBulletinBadges() {
+      const count = Math.max(0, Number(state.bulletinUnread) || 0);
+      bulletinBadges.forEach((badge) => {
+        badge.hidden = !state.userId || count <= 0;
+        badge.textContent = count > 99 ? '99+' : String(count);
+      });
+    }
+
+    function renderBulletins() {
+      bulletinList.textContent = '';
+      const list = Array.isArray(state.bulletins) ? state.bulletins : [];
+      if (list.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'admin-muted';
+        empty.textContent = '暂时没有公告。';
+        bulletinList.append(empty);
+        return;
+      }
+      list.forEach((item) => {
+        const card = document.createElement('article');
+        card.className = `bulletin-item${item.read ? '' : ' is-unread'}`;
+        const head = document.createElement('div');
+        head.className = 'bulletin-item-head';
+        const title = document.createElement('strong');
+        title.textContent = item.title || '公告';
+        const type = document.createElement('span');
+        type.className = 'bulletin-type';
+        type.textContent = bulletinTypeLabel(item.type);
+        head.append(title, type);
+        const meta = document.createElement('div');
+        meta.className = 'settings-status';
+        meta.textContent = `${formatFullTime(item.createdAt)}${item.read ? ' · 已读' : ' · 未读'}`;
+        const content = document.createElement('div');
+        content.className = 'bulletin-content';
+        content.textContent = item.content || '';
+        card.append(head, meta, content);
+        if (!item.read) {
+          const action = document.createElement('button');
+          action.type = 'button';
+          action.className = 'admin-btn';
+          action.textContent = '标为已读';
+          action.addEventListener('click', () => socket.emit('mark bulletin read', item.id));
+          card.append(action);
+        }
+        bulletinList.append(card);
+      });
+    }
+
+    function bulletinTypeLabel(type) {
+      return {
+        system: '系统',
+        update: '版本',
+        admin: '管理员',
+        rename: '改名',
+        status: '状态'
+      }[type] || '公告';
     }
 
     function openSettingsModal() {
@@ -3956,6 +4248,28 @@
       window.setTimeout(() => {
         settingsModal.hidden = true;
         settingsModal.classList.remove('is-closing');
+      }, delay);
+    }
+
+    function openBulletinModal() {
+      if (!state.userId) {
+        showToast('登录后可以查看公告信箱');
+        return;
+      }
+      closeMessageMenu();
+      bulletinModal.classList.remove('is-closing');
+      bulletinModal.hidden = false;
+      renderBulletins();
+      socket.emit('get bulletins');
+    }
+
+    function closeBulletinModal() {
+      if (bulletinModal.hidden) return;
+      bulletinModal.classList.add('is-closing');
+      const delay = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 20 : 220;
+      window.setTimeout(() => {
+        bulletinModal.hidden = true;
+        bulletinModal.classList.remove('is-closing');
       }, delay);
     }
 
@@ -4096,6 +4410,7 @@
       stopTyping();
       state.userId = '';
       state.username = '';
+      state.displayName = '';
       state.avatar = '';
       state.isAdmin = false;
       state.currentRoom = null;
@@ -4104,6 +4419,9 @@
       state.forumPosts = [];
       state.selectedForumPost = null;
       state.forumComments = [];
+      state.renameStatus = null;
+      state.bulletins = [];
+      state.bulletinUnread = 0;
       state.privateUnread = {};
       state.quotedMessage = null;
       state.pendingAvatar = null;
@@ -4120,6 +4438,7 @@
       clearQuote();
       clearPendingImage();
       closeMessageMenu();
+      closeBulletinModal();
       setChatEnabled(false);
       backToLobby.hidden = true;
       roomStatus.textContent = '等待加入';
@@ -4186,6 +4505,7 @@
       const user = data && data.user ? data.user : {};
       state.userId = user.id || '';
       state.username = user.username || '';
+      state.displayName = user.displayName || user.username || '';
       state.avatar = user.avatar || '';
       state.isAdmin = Boolean(user.isAdmin);
       state.privateUnread = {};
@@ -4197,17 +4517,20 @@
       loginError.textContent = '';
       setChatEnabled(false);
       backToLobby.hidden = true;
-      roomStatus.textContent = `${state.username} 已加入`;
+      roomStatus.textContent = `${displayName()} 已加入`;
       subtitle.textContent = '选择空间开始';
       updateCreateRoomMode();
       socket.emit('get lobby');
       socket.emit('get forum posts');
+      socket.emit('get rename status');
+      socket.emit('get bulletins');
       if (state.isAdmin) socket.emit('admin get dashboard');
     });
 
     socket.on('profile updated', (data) => {
       const user = data && data.user ? data.user : {};
       state.username = user.username || state.username;
+      state.displayName = user.displayName || state.displayName || state.username;
       state.avatar = user.avatar || state.avatar;
       state.isAdmin = Boolean(user.isAdmin);
       state.pendingAvatar = null;
@@ -4223,6 +4546,36 @@
     socket.on('profileNotice', (msg) => {
       avatarStatus.textContent = msg || '头像已更新';
       showToast(msg || '头像已更新');
+    });
+
+    socket.on('rename status', (payload) => {
+      state.renameStatus = payload && typeof payload === 'object' ? payload : null;
+      renderRenameStatus();
+    });
+
+    socket.on('rename result', (payload) => {
+      const message = payload && payload.message ? payload.message : '改名请求已提交';
+      showToast(message);
+      if (payload && payload.displayName) {
+        state.displayName = payload.displayName;
+        renameInput.value = '';
+        renderProfileChip();
+      }
+      socket.emit('get rename status');
+      socket.emit('get bulletins');
+    });
+
+    socket.on('bulletins', (payload) => {
+      state.bulletins = payload && Array.isArray(payload.items) ? payload.items : [];
+      state.bulletinUnread = Number(payload && payload.unreadCount) || 0;
+      renderBulletinBadges();
+      renderBulletins();
+    });
+
+    socket.on('bulletins updated', (payload) => {
+      state.bulletinUnread = Number(payload && payload.unreadCount) || 0;
+      renderBulletinBadges();
+      if (!bulletinModal.hidden) socket.emit('get bulletins');
     });
 
     socket.on('history', (messages) => {
@@ -4287,6 +4640,29 @@
         forumCommentInput.value = '';
       }
       updateForumCommentButton();
+    });
+
+    socket.on('forum post deleted', (payload) => {
+      const postId = payload && payload.postId ? payload.postId : '';
+      if (state.selectedForumPost && state.selectedForumPost.postId === postId) {
+        state.selectedForumPost = null;
+        state.forumComments = [];
+        renderForumDetail();
+      }
+      showToast('帖子已删除');
+      socket.emit('get forum posts');
+    });
+
+    socket.on('forum comment deleted', (payload) => {
+      const commentId = payload && payload.commentId ? payload.commentId : '';
+      if (!commentId) return;
+      state.forumComments = state.forumComments.filter((comment) => comment.commentId !== commentId);
+      if (state.selectedForumPost) {
+        state.selectedForumPost.commentCount = state.forumComments.length;
+      }
+      renderForumComments();
+      renderForumPosts();
+      showToast('评论已删除');
     });
 
     socket.on('forum error', (msg) => {
@@ -4518,6 +4894,9 @@
     settingsOpenButtons.forEach((button) => {
       button.addEventListener('click', openSettingsModal);
     });
+    bulletinOpenButtons.forEach((button) => {
+      button.addEventListener('click', openBulletinModal);
+    });
     themeToggleButtons.forEach((button) => {
       button.addEventListener('click', () => {
         const nextMode = (document.documentElement.dataset.theme || 'light') === 'dark' ? 'light' : 'dark';
@@ -4552,10 +4931,19 @@
     switchUserModal.addEventListener('click', (event) => {
       if (event.target === switchUserModal) closeSwitchUserModal();
     });
+    bulletinClose.addEventListener('click', closeBulletinModal);
+    bulletinMarkAll.addEventListener('click', () => {
+      if (!state.userId) return;
+      socket.emit('mark all bulletins read');
+    });
+    bulletinModal.addEventListener('click', (event) => {
+      if (event.target === bulletinModal) closeBulletinModal();
+    });
 
     document.addEventListener('keydown', (event) => {
       if (event.key === 'Escape' && !switchUserModal.hidden) closeSwitchUserModal();
       if (event.key === 'Escape' && !settingsModal.hidden) closeSettingsModal();
+      if (event.key === 'Escape' && !bulletinModal.hidden) closeBulletinModal();
       if (event.key === 'Escape' && !avatarCropModal.hidden) closeAvatarCropModal();
     });
 
@@ -4570,6 +4958,14 @@
     });
     glassRange.addEventListener('input', () => {
       applyGlassIntensity(glassRange.value);
+    });
+    renameInput.addEventListener('input', renderRenameStatus);
+    renameForm.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const next = renameInput.value.trim();
+      if (!next) return;
+      renameSubmit.disabled = true;
+      socket.emit('rename display name', { displayName: next });
     });
 
     // Composer and profile media controls
@@ -4624,6 +5020,19 @@
         userId: state.selectedAdminUserId,
         username: adminRenameInput.value
       });
+    });
+
+    adminBulletinForm.addEventListener('submit', (event) => {
+      event.preventDefault();
+      if (!state.isAdmin) return;
+      socket.emit('admin publish bulletin', {
+        title: adminBulletinTitle.value,
+        content: adminBulletinContent.value,
+        type: adminBulletinType.value,
+        priority: adminBulletinPriority.value
+      });
+      adminBulletinTitle.value = '';
+      adminBulletinContent.value = '';
     });
 
     adminPasswordForm.addEventListener('submit', (event) => {
@@ -5195,6 +5604,17 @@
       meta.textContent = formatFullTime(post.createdAt);
       authorText.append(authorName, meta);
       author.append(authorText);
+      if (post.userId === state.userId || state.isAdmin) {
+        const deleteButton = document.createElement('button');
+        deleteButton.type = 'button';
+        deleteButton.className = 'admin-btn danger';
+        deleteButton.textContent = '删除帖子';
+        deleteButton.addEventListener('click', () => {
+          if (!confirm(`删除帖子「${post.title}」？`)) return;
+          socket.emit('delete forum post', post.postId);
+        });
+        author.append(deleteButton);
+      }
 
       const title = document.createElement('h1');
       title.className = 'post-title-full';
@@ -5251,6 +5671,17 @@
         meta.textContent = formatFullTime(comment.createdAt);
         text.append(name, meta);
         author.append(text);
+        if (comment.userId === state.userId || state.isAdmin) {
+          const deleteButton = document.createElement('button');
+          deleteButton.type = 'button';
+          deleteButton.className = 'admin-btn danger';
+          deleteButton.textContent = '删除';
+          deleteButton.addEventListener('click', () => {
+            if (!confirm('删除这条评论？')) return;
+            socket.emit('delete forum comment', comment.commentId);
+          });
+          author.append(deleteButton);
+        }
         const content = document.createElement('div');
         content.className = 'comment-content';
         content.textContent = comment.content;
@@ -5293,8 +5724,8 @@
       }
 
       state.onlineUsers.forEach((user) => {
-        const nameValue = typeof user === 'string' ? user : user.username;
-        const avatarValue = typeof user === 'string' ? user : user.avatar || user.username;
+        const nameValue = typeof user === 'string' ? user : userDisplayName(user);
+        const avatarValue = typeof user === 'string' ? user : user.avatar || nameValue;
         const button = document.createElement('button');
         button.type = 'button';
         button.className = 'user-chip';
@@ -5302,14 +5733,14 @@
 
         const name = document.createElement('span');
         name.className = 'user-name';
-        name.textContent = nameValue === state.username ? `${nameValue}（我）` : nameValue;
+        name.textContent = nameValue === displayName() ? `${nameValue}（我）` : nameValue;
         button.append(name);
 
         button.addEventListener('click', () => insertMention(nameValue));
         userList.append(button);
       });
 
-      roomStatus.textContent = state.username ? `${state.username} 已加入` : '等待加入';
+      roomStatus.textContent = state.username ? `${displayName()} 已加入` : '等待加入';
     }
 
     function renderLobby() {
@@ -5317,7 +5748,7 @@
       privateList.textContent = '';
       updateCreateRoomMode();
       lobbyStatus.textContent = state.username
-        ? `${state.username}，选择一个聊天组或在线用户`
+        ? `${displayName()}，选择一个聊天组或在线用户`
         : '选择一个聊天组，或点击在线用户私聊。';
 
       if (state.lobbyRooms.length === 0) {
@@ -5356,9 +5787,10 @@
         button.className = `private-card${unread > 0 ? ' has-unread' : ''}`;
         const titleRow = document.createElement('div');
         titleRow.className = 'card-title-row';
-        titleRow.append(createAvatar(user.avatar || user.username, user.username));
+        const nameText = userDisplayName(user) || user.username;
+        titleRow.append(createAvatar(user.avatar || nameText, nameText));
         const title = document.createElement('strong');
-        title.textContent = user.username;
+        title.textContent = nameText;
         titleRow.append(title);
         if (unread > 0) {
           const badge = document.createElement('span');
@@ -5382,8 +5814,8 @@
     function renderMentionMenu() {
       mentionMenu.textContent = '';
       const users = state.onlineUsers
-        .map((user) => typeof user === 'string' ? user : user.username)
-        .filter((user) => user !== state.username);
+        .map((user) => typeof user === 'string' ? user : userDisplayName(user))
+        .filter((user) => user && user !== displayName());
 
       if (users.length === 0) {
         const empty = document.createElement('div');
@@ -5656,6 +6088,7 @@
       adminGroupCode.textContent = `当前建组码：${groupCode.code || '------'} · 有效期至 ${formatFullTime(groupCode.expiresAt)}`;
       adminUsers.textContent = '';
       renderAdminRooms(Array.isArray(data.rooms) ? data.rooms : []);
+      renderAdminRenameRequests(Array.isArray(data.renameRequests) ? data.renameRequests : []);
 
       if (users.length === 0) {
         const empty = document.createElement('div');
@@ -5671,8 +6104,9 @@
 
         const main = document.createElement('div');
         main.className = 'admin-user-main';
+        const display = user.displayName || user.username;
         const name = document.createElement('span');
-        name.textContent = `${user.username}${user.isAdmin ? ' · 管理员' : ''}`;
+        name.textContent = `${display}${user.isAdmin ? ' · 管理员' : ''}`;
         const online = document.createElement('span');
         online.className = 'admin-muted';
         online.textContent = user.online ? '在线' : '离线';
@@ -5680,7 +6114,7 @@
         identity.style.display = 'inline-flex';
         identity.style.alignItems = 'center';
         identity.style.gap = '8px';
-        identity.append(createAvatar(user.avatar || user.username, user.username), name);
+        identity.append(createAvatar(user.avatar || display, display), name);
         main.append(identity, online);
 
         const account = document.createElement('div');
@@ -5700,6 +6134,56 @@
       });
 
       renderSelectedAdminUser();
+    }
+
+    function renderAdminRenameRequests(requests) {
+      adminRenameRequests.textContent = '';
+      if (requests.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'admin-muted';
+        empty.textContent = '暂无待审核改名申请';
+        adminRenameRequests.append(empty);
+        return;
+      }
+
+      requests.forEach((request) => {
+        const item = document.createElement('div');
+        item.className = 'rename-request-item';
+        const head = document.createElement('div');
+        head.className = 'rename-request-head';
+        const title = document.createElement('strong');
+        title.textContent = `${request.oldDisplayName} → ${request.newDisplayName}`;
+        const meta = document.createElement('span');
+        meta.className = 'settings-status';
+        meta.textContent = `${request.account || '未知账号'} · 最近 ${request.recentCount || 0} 次`;
+        head.append(title, meta);
+        const note = document.createElement('input');
+        note.placeholder = '处理备注（可选）';
+        note.maxLength = 120;
+        const actions = document.createElement('div');
+        actions.className = 'settings-actions';
+        const approve = document.createElement('button');
+        approve.type = 'button';
+        approve.className = 'admin-btn primary';
+        approve.textContent = '通过';
+        approve.addEventListener('click', () => socket.emit('admin decide rename', {
+          requestId: request.id,
+          status: 'approved',
+          note: note.value
+        }));
+        const reject = document.createElement('button');
+        reject.type = 'button';
+        reject.className = 'admin-btn danger';
+        reject.textContent = '拒绝';
+        reject.addEventListener('click', () => socket.emit('admin decide rename', {
+          requestId: request.id,
+          status: 'rejected',
+          note: note.value
+        }));
+        actions.append(approve, reject);
+        item.append(head, note, actions);
+        adminRenameRequests.append(item);
+      });
     }
 
     function renderAdminRooms(rooms) {
@@ -5753,7 +6237,8 @@
       }
 
       const title = document.createElement('h3');
-      title.textContent = `${user.username}${user.isAdmin ? '（管理员）' : ''}`;
+      const display = user.displayName || user.username;
+      title.textContent = `${display}${user.isAdmin ? '（管理员）' : ''}`;
       const info = document.createElement('div');
       info.className = 'admin-muted';
       info.textContent = [
@@ -5766,7 +6251,7 @@
         `密码：${user.passwordStoredAs || 'scrypt hash + salt'}`
       ].join(' ｜ ');
       adminUserDetail.append(title, info);
-      adminRenameInput.value = user.username;
+      adminRenameInput.value = display;
 
       const userMessages = messages.filter((message) => message.userId === user.id);
       if (userMessages.length === 0) {
