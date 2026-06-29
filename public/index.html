@@ -72,6 +72,9 @@
       --radius-lg: 24px;
       --radius-xl: 32px;
       --radius-icon: 26%;
+      --stage-width: min(90vw, 1720px);
+      --stage-height: min(90dvh, 980px);
+      --stage-padding: max(18px, 5dvh);
     }
 
     html[data-theme="dark"] {
@@ -173,7 +176,7 @@
       position: relative;
       z-index: 1;
       height: 100dvh;
-      padding: 22px;
+      padding: var(--stage-padding);
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -279,11 +282,11 @@
     }
 
     .shell {
-      width: min(1120px, 100%);
-      height: min(780px, calc(100dvh - 82px));
+      width: var(--stage-width);
+      height: var(--stage-height);
       min-height: 0;
       display: grid;
-      grid-template-columns: 280px minmax(0, 1fr);
+      grid-template-columns: clamp(300px, 24vw, 420px) minmax(0, 1fr);
       overflow: hidden;
       border: 1px solid var(--glass-border);
       border-radius: var(--radius-xl);
@@ -817,7 +820,7 @@
 
     .bubble {
       width: fit-content;
-      max-width: min(620px, 78%);
+      max-width: min(760px, 76%);
       padding: 10px 12px 11px;
       border: 1px solid rgba(29, 36, 40, 0.08);
       border-radius: var(--radius-lg) var(--radius-lg) var(--radius-lg) var(--radius-sm);
@@ -868,8 +871,8 @@
 
     .chat-img {
       display: block;
-      width: min(340px, 100%);
-      max-height: 360px;
+      width: min(460px, 100%);
+      max-height: 480px;
       object-fit: contain;
       border-radius: var(--radius-md);
       border: 1px solid rgba(29, 36, 40, 0.12);
@@ -1703,7 +1706,7 @@
       inset: 0;
       display: grid;
       place-items: center;
-      padding: 22px;
+      padding: var(--stage-padding);
       background:
         radial-gradient(circle at 48% 18%, var(--glass-bg-soft), transparent 36%),
         transparent;
@@ -1715,8 +1718,8 @@
     }
 
     .home-shell {
-      width: min(1080px, 100%);
-      max-height: min(820px, calc(100dvh - 44px));
+      width: var(--stage-width);
+      height: var(--stage-height);
       display: grid;
       grid-template-rows: auto minmax(0, 1fr) auto;
       overflow: hidden;
@@ -1799,7 +1802,7 @@
 
     .home-card {
       position: relative;
-      min-height: 220px;
+      min-height: clamp(240px, 30dvh, 360px);
       display: grid;
       align-content: space-between;
       gap: 18px;
@@ -1919,7 +1922,7 @@
       inset: 0;
       display: grid;
       place-items: center;
-      padding: 22px;
+      padding: var(--stage-padding);
       background:
         radial-gradient(circle at 54% 30%, var(--glass-bg-soft), transparent 34%),
         transparent;
@@ -1931,8 +1934,8 @@
     }
 
     .lobby-shell {
-      width: min(1040px, 100%);
-      max-height: min(760px, calc(100dvh - 44px));
+      width: var(--stage-width);
+      height: var(--stage-height);
       display: grid;
       grid-template-rows: auto minmax(0, 1fr) auto;
       overflow: hidden;
@@ -2089,7 +2092,7 @@
     .admin-page {
       position: fixed;
       inset: 0;
-      padding: 22px;
+      padding: var(--stage-padding);
       background:
         radial-gradient(circle at 50% 20%, var(--glass-bg-soft), transparent 34%),
         transparent;
@@ -2101,8 +2104,8 @@
     }
 
     .admin-shell {
-      width: min(1120px, 100%);
-      height: min(820px, calc(100dvh - 44px));
+      width: var(--stage-width);
+      height: var(--stage-height);
       margin: 0 auto;
       display: grid;
       grid-template-rows: auto auto minmax(0, 1fr) auto;
@@ -2178,7 +2181,7 @@
     .admin-grid {
       min-height: 0;
       display: grid;
-      grid-template-columns: 330px minmax(0, 1fr);
+      grid-template-columns: clamp(340px, 24vw, 460px) minmax(0, 1fr);
     }
 
     .admin-users,
@@ -2304,7 +2307,7 @@
     .forum-page {
       position: fixed;
       inset: 0;
-      padding: 22px;
+      padding: var(--stage-padding);
       background:
         radial-gradient(circle at 52% 18%, var(--glass-bg-soft), transparent 34%),
         transparent;
@@ -2316,8 +2319,8 @@
     }
 
     .forum-shell {
-      width: min(1120px, 100%);
-      height: min(820px, calc(100dvh - 44px));
+      width: var(--stage-width);
+      height: var(--stage-height);
       margin: 0 auto;
       display: grid;
       grid-template-rows: auto minmax(0, 1fr) auto;
@@ -2346,7 +2349,7 @@
     .forum-body {
       min-height: 0;
       display: grid;
-      grid-template-columns: minmax(340px, 0.46fr) minmax(0, 1fr);
+      grid-template-columns: minmax(420px, 0.42fr) minmax(0, 1fr);
       overflow: hidden;
     }
 
@@ -2932,6 +2935,12 @@
     }
 
     @media (max-width: 820px) {
+      :root {
+        --stage-width: 100vw;
+        --stage-height: 100dvh;
+        --stage-padding: 0;
+      }
+
       .app {
         padding: 0;
       }
