@@ -1845,6 +1845,13 @@ io.on('connection', (socket) => {
       socket.emit('rename result', { status: 'error', message: '新昵称不能和当前昵称一样' });
       return;
     }
+    if (isAdminUser(socket.user)) {
+      const result = applyDisplayName(socket.user, newDisplayName, { approvalStatus: 'approved' });
+      io.emit('system', { type: 'rename', previousUsername: result.oldDisplayName, username: result.newDisplayName });
+      socket.emit('rename result', { status: 'approved', message: '管理员昵称已直接更新', displayName: result.newDisplayName });
+      emitBulletins(socket);
+      return;
+    }
     if (pendingRenameRequest(socket.user.id)) {
       socket.emit('rename result', { status: 'pending', message: '你已经有一个待审核的改名申请' });
       emitRenameStatus(socket);

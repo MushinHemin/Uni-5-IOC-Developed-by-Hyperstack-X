@@ -1,6 +1,6 @@
-# Uni 5
+# Uni 5 Sonoma
 
-Uni 5 is a lightweight realtime chat and community app with account login, group chat, private chat, forum posts, admin tools, message recall, image paste/upload, voice messages, and a glass-style responsive web UI.
+Uni 5 Sonoma is a lightweight realtime chat and community app with account login, group chat, private chat, forum posts, admin tools, message recall, image paste/upload, voice messages, and a glass-style responsive web UI.
 
 Current release: **Uni 5.4.3 Identity & Bulletin Update**
 

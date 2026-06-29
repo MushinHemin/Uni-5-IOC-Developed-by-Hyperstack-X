@@ -2,7 +2,7 @@
   "name": "beluga-chat",
   "version": "5.4.3",
   "private": true,
-  "description": "Uni 5 realtime chat app developed by Hyperstack X.",
+  "description": "Uni 5 Sonoma realtime chat app developed by Hyperstack X.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
