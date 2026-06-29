@@ -10,7 +10,13 @@ loadDotEnv();
 
 const app = express();
 const server = http.createServer(app);
-const DEFAULT_ALLOWED_ORIGINS = ['http://localhost:3200', 'http://127.0.0.1:3200'];
+const APP_PORT = process.env.PORT || 3000;
+const DEFAULT_ALLOWED_ORIGINS = Array.from(new Set([
+  'http://localhost:3200',
+  'http://127.0.0.1:3200',
+  `http://localhost:${APP_PORT}`,
+  `http://127.0.0.1:${APP_PORT}`
+]));
 const ALLOWED_ORIGINS = parseAllowedOrigins(process.env.ALLOWED_ORIGINS);
 const io = new Server(server, {
   cors: {
@@ -2319,7 +2325,6 @@ function clearTyping(socket) {
   }
 }
 
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`Uni 5 已启动 -> 端口 ${PORT}`);
+server.listen(APP_PORT, () => {
+  console.log(`Uni 5 已启动 -> 端口 ${APP_PORT}`);
 });
