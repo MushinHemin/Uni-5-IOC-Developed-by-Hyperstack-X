@@ -2,7 +2,7 @@
 
 Uni 5 Sonoma is a lightweight realtime chat and community app with account login, group chat, private chat, forum posts, admin tools, message recall, image paste/upload, voice messages, and a glass-style responsive web UI.
 
-Current release: **Uni 5.4.3 Identity & Bulletin Update**
+Current release: **Sonoma 5.4.5 Profile & Star Update**
 
 ## Features
 
@@ -15,6 +15,7 @@ Current release: **Uni 5.4.3 Identity & Bulletin Update**
 - Forum MVP with posts, post detail pages, and realtime comments
 - Display-name personalization with weekly rename limits and admin approval
 - Bulletin mailbox with unread badges, version notices, admin announcements, and rename status messages
+- Sonoma user profiles with bio, profile banner, contact actions, and daily Stars
 - Message recall within the configured recall window
 - Text, image, pasted image, and voice messages
 - Quote, read-aloud, and recall actions from a message context menu
@@ -26,9 +27,26 @@ Current release: **Uni 5.4.3 Identity & Bulletin Update**
 - Uni 5.3.0: forum posts, post list/detail views, and realtime comments
 - Uni 5.4.0: redesigned post-login home hub, clearer Chat / Forum module navigation, and refined module UI hierarchy
 - Uni 5.4.3: display-name identity layer, rename approval workflow, bulletin mailbox, admin announcements, and forum polish
+- Sonoma 5.4.5: user profile pages, profile banners, bio editing, daily Stars, and user list sorting
 - Uni 5.4.1: personalization controls, compact presence status, latency monitoring, forum persistence hardening, CORS configuration, and stability cleanup
 
 ## Release Notes
+
+### Sonoma 5.4.5 Profile & Star Update
+
+Added:
+
+- Added Sonoma-style user profile pages opened from user avatars
+- Added profile bio editing and profile banner uploads in Account & Settings
+- Added contact actions with private chat entry and voice-call placeholder UI
+- Added daily user Stars with server-side SQLite enforcement
+- Added user list sorting by display name or Star count
+
+Improved:
+
+- User profile, Star badges, banner previews, and sorting controls reuse Uni's liquid glass UI language
+- New profile surfaces support light/dark themes and liquid glass intensity settings
+- Online users, lobby users, forum posts, comments, and chat avatars can open user profiles where available
 
 ### Uni 5.4.3 Identity & Bulletin Update
 

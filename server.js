@@ -35,6 +35,7 @@ const USERS_FILE = path.join(__dirname, 'users.json');
 const DB_FILE = path.join(__dirname, 'beluga-chat.sqlite');
 const UPLOADS_DIR = path.join(__dirname, 'uploads');
 const AVATAR_UPLOAD_DIR = path.join(UPLOADS_DIR, 'avatars');
+const BANNER_UPLOAD_DIR = path.join(UPLOADS_DIR, 'banners');
 const JSON_FILE_MODE = 0o600;
 const MAX_MESSAGE_LENGTH = 1000;
 const MAX_POST_TITLE_LENGTH = 80;
@@ -49,6 +50,7 @@ const MAX_ACCOUNT_LENGTH = 24;
 const MIN_PASSWORD_LENGTH = 6;
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
+const MAX_BANNER_BYTES = 5 * 1024 * 1024;
 const MAX_VOICE_BYTES = 3 * 1024 * 1024;
 const MAX_HISTORY_MESSAGES = 300;
 const MAX_FORUM_POSTS = 120;
@@ -264,6 +266,10 @@ function cleanCommentContent(value) {
   return cleanText(value, MAX_COMMENT_LENGTH);
 }
 
+function cleanBio(value) {
+  return cleanText(value, 200);
+}
+
 function makeAvatar(name) {
   return (cleanUsername(name) || '?').slice(0, 1).toUpperCase();
 }
@@ -285,14 +291,31 @@ function cleanAvatar(value, fallbackName = '') {
   return cleanText(avatar, 4) || makeAvatar(fallbackName);
 }
 
+function cleanProfileBanner(value) {
+  if (typeof value !== 'string') return '';
+  const banner = value.trim();
+  if (/^\/uploads\/banners\/[a-zA-Z0-9_.-]+\.(jpg|png|webp|gif)$/.test(banner)) return banner;
+  return '';
+}
+
 function isUploadedAvatar(value) {
   return typeof value === 'string' && value.startsWith('/uploads/avatars/');
+}
+
+function isUploadedProfileBanner(value) {
+  return typeof value === 'string' && value.startsWith('/uploads/banners/');
 }
 
 function avatarFilePath(avatarUrl) {
   if (!isUploadedAvatar(avatarUrl)) return '';
   const fileName = path.basename(avatarUrl);
   return path.join(AVATAR_UPLOAD_DIR, fileName);
+}
+
+function bannerFilePath(bannerUrl) {
+  if (!isUploadedProfileBanner(bannerUrl)) return '';
+  const fileName = path.basename(bannerUrl);
+  return path.join(BANNER_UPLOAD_DIR, fileName);
 }
 
 function normalizeUser(user) {
@@ -308,6 +331,8 @@ function normalizeUser(user) {
     username,
     displayName,
     avatar: cleanAvatar(user.avatar, username),
+    bio: cleanBio(user.bio),
+    profileBanner: cleanProfileBanner(user.profileBanner || user.profile_banner),
     passwordHash,
     createdAt: Number.isNaN(Date.parse(user.createdAt)) ? new Date().toISOString() : user.createdAt,
     lastIp: typeof user.lastIp === 'string' ? user.lastIp : '',
@@ -401,6 +426,25 @@ function trimHistory(history) {
   return history.slice(-MAX_HISTORY_MESSAGES);
 }
 
+function todayStarDate() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function starCountForUser(userId) {
+  if (!userId) return 0;
+  const row = db.prepare('SELECT COUNT(*) AS count FROM user_stars WHERE to_user_id = ?').get(userId);
+  return Number(row && row.count ? row.count : 0);
+}
+
+function todaysStarForUser(userId) {
+  if (!userId) return null;
+  return db.prepare(`
+    SELECT * FROM user_stars
+    WHERE from_user_id = ? AND star_date = ?
+    LIMIT 1
+  `).get(userId, todayStarDate()) || null;
+}
+
 function publicUser(user) {
   const displayName = cleanDisplayName(user.displayName || user.username) || user.username;
   return {
@@ -408,6 +452,9 @@ function publicUser(user) {
     username: user.username,
     displayName,
     avatar: user.avatar || makeAvatar(displayName),
+    bio: cleanBio(user.bio),
+    profileBanner: cleanProfileBanner(user.profileBanner),
+    starCount: starCountForUser(user.id),
     isAdmin: isAdminUser(user)
   };
 }
@@ -420,6 +467,8 @@ function privateUser(user) {
     username: user.username,
     displayName,
     avatar: user.avatar || makeAvatar(displayName),
+    bio: cleanBio(user.bio),
+    profileBanner: cleanProfileBanner(user.profileBanner),
     passwordHash: user.passwordHash,
     createdAt: user.createdAt,
     lastIp: user.lastIp || '',
@@ -427,8 +476,25 @@ function privateUser(user) {
   };
 }
 
+function publicProfile(user, viewer = null) {
+  if (!user) return null;
+  const starCount = starCountForUser(user.id);
+  const todaysStar = viewer ? todaysStarForUser(viewer.id) : null;
+  return {
+    ...publicUser(user),
+    bio: cleanBio(user.bio),
+    profileBanner: cleanProfileBanner(user.profileBanner),
+    starCount,
+    isSelf: Boolean(viewer && viewer.id === user.id),
+    starredToday: Boolean(todaysStar && todaysStar.to_user_id === user.id),
+    viewerHasStarredToday: Boolean(todaysStar),
+    viewerStarredUserId: todaysStar ? todaysStar.to_user_id : ''
+  };
+}
+
 function initDatabase() {
   db = new DatabaseSync(DB_FILE);
+  db.exec('PRAGMA busy_timeout = 5000;');
   db.exec(`
     PRAGMA journal_mode = WAL;
     PRAGMA foreign_keys = ON;
@@ -439,6 +505,8 @@ function initDatabase() {
       username TEXT NOT NULL,
       display_name TEXT NOT NULL DEFAULT '',
       avatar TEXT NOT NULL,
+      bio TEXT NOT NULL DEFAULT '',
+      profile_banner TEXT NOT NULL DEFAULT '',
       password_hash TEXT NOT NULL,
       created_at TEXT NOT NULL,
       last_ip TEXT NOT NULL DEFAULT '',
@@ -535,6 +603,15 @@ function initDatabase() {
       PRIMARY KEY (announcement_id, user_id)
     );
 
+    CREATE TABLE IF NOT EXISTS user_stars (
+      id TEXT PRIMARY KEY,
+      from_user_id TEXT NOT NULL,
+      to_user_id TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      star_date TEXT NOT NULL,
+      UNIQUE(from_user_id, star_date)
+    );
+
     CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at);
     CREATE INDEX IF NOT EXISTS idx_messages_user_id ON messages(user_id);
     CREATE INDEX IF NOT EXISTS idx_room_members_user_id ON room_members(user_id);
@@ -548,12 +625,16 @@ function initDatabase() {
     CREATE INDEX IF NOT EXISTS idx_rename_requests_user_created ON rename_requests(user_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_announcements_target_created ON announcements(target_user_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_announcements_created_at ON announcements(created_at);
+    CREATE INDEX IF NOT EXISTS idx_user_stars_to_user_id ON user_stars(to_user_id);
+    CREATE INDEX IF NOT EXISTS idx_user_stars_star_date ON user_stars(star_date);
   `);
   migrateForumTables();
   ensureColumn('users', 'display_name', "TEXT NOT NULL DEFAULT ''");
   db.prepare("UPDATE users SET display_name = username WHERE display_name IS NULL OR TRIM(display_name) = ''").run();
   ensureColumn('users', 'last_ip', "TEXT NOT NULL DEFAULT ''");
   ensureColumn('users', 'last_login_at', "TEXT NOT NULL DEFAULT ''");
+  ensureColumn('users', 'bio', "TEXT NOT NULL DEFAULT ''");
+  ensureColumn('users', 'profile_banner', "TEXT NOT NULL DEFAULT ''");
   ensureColumn('messages', 'room_id', `TEXT NOT NULL DEFAULT '${DEFAULT_ROOM_ID}'`);
   db.exec('CREATE INDEX IF NOT EXISTS idx_messages_room_id ON messages(room_id)');
   ensureDefaultRoom();
@@ -642,6 +723,8 @@ function rowToUser(row) {
     username: row.username,
     displayName: row.display_name,
     avatar: row.avatar,
+    bio: row.bio,
+    profileBanner: row.profile_banner,
     passwordHash: row.password_hash,
     createdAt: row.created_at,
     lastIp: row.last_ip,
@@ -719,13 +802,15 @@ function rowToComment(row) {
 
 function upsertUser(user) {
   db.prepare(`
-    INSERT INTO users (id, account, username, display_name, avatar, password_hash, created_at, last_ip, last_login_at)
-    VALUES (@id, @account, @username, @displayName, @avatar, @passwordHash, @createdAt, @lastIp, @lastLoginAt)
+    INSERT INTO users (id, account, username, display_name, avatar, bio, profile_banner, password_hash, created_at, last_ip, last_login_at)
+    VALUES (@id, @account, @username, @displayName, @avatar, @bio, @profileBanner, @passwordHash, @createdAt, @lastIp, @lastLoginAt)
     ON CONFLICT(id) DO UPDATE SET
       account = excluded.account,
       username = excluded.username,
       display_name = excluded.display_name,
       avatar = excluded.avatar,
+      bio = excluded.bio,
+      profile_banner = excluded.profile_banner,
       password_hash = excluded.password_hash,
       created_at = excluded.created_at,
       last_ip = excluded.last_ip,
@@ -736,6 +821,8 @@ function upsertUser(user) {
     username: user.username,
     displayName: user.displayName || user.username,
     avatar: user.avatar || makeAvatar(user.displayName || user.username),
+    bio: cleanBio(user.bio),
+    profileBanner: cleanProfileBanner(user.profileBanner),
     passwordHash: user.passwordHash,
     createdAt: user.createdAt,
     lastIp: user.lastIp || '',
@@ -833,6 +920,7 @@ function publicForumPost(post) {
     username: displayName,
     displayName,
     avatar: post.avatar || makeAvatar(displayName),
+    starCount: currentUser ? starCountForUser(currentUser.id) : starCountForUser(post.userId),
     title: post.title,
     content: post.content,
     createdAt: post.createdAt,
@@ -852,6 +940,7 @@ function publicForumComment(comment) {
     username: displayName,
     displayName,
     avatar: comment.avatar || makeAvatar(displayName),
+    starCount: currentUser ? starCountForUser(currentUser.id) : starCountForUser(comment.userId),
     content: comment.content,
     createdAt: comment.createdAt
   };
@@ -1150,6 +1239,13 @@ function broadcastBulletinUpdates(targetUserId = '') {
 
 function ensureSystemAnnouncements() {
   createAnnouncement({
+    id: 'update:5.4.5',
+    type: 'update',
+    title: 'Sonoma 5.4.5 已上线',
+    content: '新增用户主页、个人简介、主页背景图、联系方式区域、每日 Star，以及用户列表排序。',
+    priority: 'high'
+  });
+  createAnnouncement({
     id: 'update:5.4.3',
     type: 'update',
     title: 'Uni 5.4.3 已上线',
@@ -1270,6 +1366,43 @@ function saveAvatarUpload(user, dataUrl) {
   const filePath = path.join(AVATAR_UPLOAD_DIR, fileName);
   fs.writeFileSync(filePath, parsed.buffer, { mode: 0o600 });
   return { avatar: `/uploads/avatars/${fileName}` };
+}
+
+function saveProfileBannerUpload(user, dataUrl) {
+  const parsed = parseDataUrl(dataUrl, ALLOWED_IMAGE_TYPES, MAX_BANNER_BYTES);
+  if (!parsed) return { error: '主页背景图仅支持 JPG、PNG、GIF、WebP，最大 5MB' };
+
+  fs.mkdirSync(BANNER_UPLOAD_DIR, { recursive: true });
+  const ext = IMAGE_EXTENSIONS[parsed.mime] || 'png';
+  const fileName = `banner_${user.id}_${Date.now()}_${crypto.randomBytes(4).toString('hex')}.${ext}`;
+  const filePath = path.join(BANNER_UPLOAD_DIR, fileName);
+  fs.writeFileSync(filePath, parsed.buffer, { mode: 0o600 });
+  return { profileBanner: `/uploads/banners/${fileName}` };
+}
+
+function deleteBannerFile(bannerUrl) {
+  if (!isUploadedProfileBanner(bannerUrl)) return;
+  const filePath = bannerFilePath(bannerUrl);
+  if (!filePath.startsWith(BANNER_UPLOAD_DIR)) return;
+  fs.promises.unlink(filePath).catch(() => {});
+}
+
+function syncUserProfile(user, changes = {}) {
+  if (Object.prototype.hasOwnProperty.call(changes, 'bio')) {
+    user.bio = cleanBio(changes.bio);
+  }
+  if (Object.prototype.hasOwnProperty.call(changes, 'profileBanner')) {
+    user.profileBanner = cleanProfileBanner(changes.profileBanner);
+  }
+  saveUsers();
+  socketsForUser(user.id).forEach((connectedSocket) => {
+    connectedSocket.user = user;
+    onlineUsers.set(connectedSocket.id, user);
+    connectedSocket.emit('profile updated', { user: publicUser(user) });
+  });
+  broadcastOnlineUsers();
+  broadcastForumPosts();
+  broadcastAdminDashboards();
 }
 
 function roomChannel(roomId) {
@@ -1446,6 +1579,8 @@ function ensureAdminUser() {
     username: ADMIN_USERNAME,
     displayName: ADMIN_USERNAME,
     avatar: makeAvatar(ADMIN_USERNAME),
+    bio: '',
+    profileBanner: '',
     passwordHash: hashPassword(ADMIN_PASSWORD),
     createdAt: new Date().toISOString(),
     lastIp: '',
@@ -1479,6 +1614,9 @@ function adminUserPayload(user) {
     username: user.username,
     displayName: displayNameOf(user),
     avatar: user.avatar || makeAvatar(displayNameOf(user)),
+    bio: cleanBio(user.bio),
+    profileBanner: cleanProfileBanner(user.profileBanner),
+    starCount: starCountForUser(user.id),
     isAdmin: isAdminUser(user),
     createdAt: user.createdAt,
     lastIp: user.lastIp || '',
@@ -1587,6 +1725,7 @@ const onlineUsers = new Map();
 const typingTimers = new Map();
 
 fs.mkdirSync(AVATAR_UPLOAD_DIR, { recursive: true });
+fs.mkdirSync(BANNER_UPLOAD_DIR, { recursive: true });
 app.use('/uploads', express.static(UPLOADS_DIR));
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -1621,6 +1760,8 @@ io.on('connection', (socket) => {
       username: input.username,
       displayName: input.username,
       avatar: makeAvatar(input.username),
+      bio: '',
+      profileBanner: '',
       passwordHash: hashPassword(input.password),
       createdAt: new Date().toISOString()
     };
@@ -1805,6 +1946,89 @@ io.on('connection', (socket) => {
     broadcastForumPostDetail(comment.post_id);
     broadcastForumPosts();
     broadcastAdminDashboards();
+  });
+
+  socket.on('get user profile', (userIdValue) => {
+    if (!requireAuth(socket, '查看用户主页')) return;
+    const userId = typeof userIdValue === 'string' ? userIdValue.trim() : '';
+    const user = users.find((item) => item.id === userId);
+    if (!user) {
+      socket.emit('profileError', '用户不存在');
+      return;
+    }
+    socket.emit('user profile', { profile: publicProfile(user, socket.user) });
+  });
+
+  socket.on('star user', (userIdValue) => {
+    if (!requireAuth(socket, '点 Star')) return;
+    const userId = typeof userIdValue === 'string' ? userIdValue.trim() : '';
+    const target = users.find((item) => item.id === userId);
+    if (!target) {
+      socket.emit('profileError', '用户不存在');
+      return;
+    }
+    if (target.id === socket.user.id) {
+      socket.emit('profileError', '不能给自己点 Star');
+      return;
+    }
+
+    const todaysStar = todaysStarForUser(socket.user.id);
+    if (todaysStar) {
+      socket.emit('profileError', todaysStar.to_user_id === target.id
+        ? '你今天已经给这位用户点过 Star 了。'
+        : '你今天已经点过 Star 了，明天再来吧。');
+      socket.emit('user profile', { profile: publicProfile(target, socket.user) });
+      return;
+    }
+
+    try {
+      db.prepare(`
+        INSERT INTO user_stars (id, from_user_id, to_user_id, created_at, star_date)
+        VALUES (?, ?, ?, ?, ?)
+      `).run(`star:${crypto.randomUUID()}`, socket.user.id, target.id, new Date().toISOString(), todayStarDate());
+    } catch (error) {
+      socket.emit('profileError', '你今天已经点过 Star 了，明天再来吧。');
+      socket.emit('user profile', { profile: publicProfile(target, socket.user) });
+      return;
+    }
+
+    socket.emit('profileNotice', `已为 ${displayNameOf(target)} 点亮 Star`);
+    socket.emit('user profile', { profile: publicProfile(target, socket.user) });
+    broadcastOnlineUsers();
+    broadcastForumPosts();
+    broadcastAdminDashboards();
+  });
+
+  socket.on('update profile details', (payload) => {
+    if (!requireAuth(socket, '更新个人主页')) return;
+    const bio = cleanBio(payload && payload.bio);
+    syncUserProfile(socket.user, { bio });
+    socket.emit('profileNotice', '个人简介已保存');
+    socket.emit('user profile', { profile: publicProfile(socket.user, socket.user) });
+  });
+
+  socket.on('profile banner upload', (payload) => {
+    if (!requireAuth(socket, '上传主页背景')) return;
+    const base64 = payload && typeof payload.base64 === 'string' ? payload.base64 : '';
+    const previousBanner = socket.user.profileBanner;
+    const result = saveProfileBannerUpload(socket.user, base64);
+    if (result.error) {
+      socket.emit('profileError', result.error);
+      return;
+    }
+    syncUserProfile(socket.user, { profileBanner: result.profileBanner });
+    deleteBannerFile(previousBanner);
+    socket.emit('profileNotice', '主页背景已更新');
+    socket.emit('user profile', { profile: publicProfile(socket.user, socket.user) });
+  });
+
+  socket.on('profile banner reset', () => {
+    if (!requireAuth(socket, '恢复主页背景')) return;
+    const previousBanner = socket.user.profileBanner;
+    syncUserProfile(socket.user, { profileBanner: '' });
+    deleteBannerFile(previousBanner);
+    socket.emit('profileNotice', '主页背景已恢复默认');
+    socket.emit('user profile', { profile: publicProfile(socket.user, socket.user) });
   });
 
   socket.on('avatar upload', (payload) => {

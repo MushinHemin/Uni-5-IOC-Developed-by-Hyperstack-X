@@ -378,6 +378,39 @@
       overflow: auto;
     }
 
+    .user-sort {
+      margin: 0 12px;
+      padding: 5px;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 5px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      background: var(--glass-bg-soft);
+      box-shadow: inset 0 1px 0 var(--glass-highlight);
+    }
+
+    .user-sort button {
+      min-height: 34px;
+      border-radius: var(--radius-md);
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 900;
+      transition: transform var(--duration-fast) var(--ease-pop), background var(--duration-normal) var(--ease-smooth), color var(--duration-normal) var(--ease-smooth);
+    }
+
+    .user-sort button:hover {
+      transform: translateY(-1px);
+      color: var(--ink);
+      background: var(--glass-bg-soft);
+    }
+
+    .user-sort button.is-active {
+      color: var(--ink);
+      background: var(--glass-bg-light);
+      box-shadow: inset 0 1px 0 var(--glass-highlight);
+    }
+
     .user-chip {
       width: 100%;
       min-height: 42px;
@@ -389,6 +422,36 @@
       color: var(--ink);
       background: transparent;
       text-align: left;
+    }
+
+    .avatar.profile-open {
+      cursor: pointer;
+    }
+
+    .avatar.profile-open:hover {
+      transform: translateY(-1px) scale(1.04);
+    }
+
+    .star-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      margin-left: auto;
+      padding: 3px 8px;
+      border: 1px solid rgba(255, 196, 0, 0.32);
+      border-radius: 999px;
+      color: #8a6200;
+      background: rgba(255, 214, 96, 0.22);
+      font-size: 11px;
+      font-weight: 900;
+      white-space: nowrap;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.34);
+    }
+
+    html[data-theme="dark"] .star-badge {
+      color: #ffd56b;
+      background: rgba(255, 214, 96, 0.13);
+      border-color: rgba(255, 214, 96, 0.26);
     }
 
     .user-chip:hover {
@@ -1230,6 +1293,142 @@
       animation: modalIn var(--duration-normal) var(--ease-pop);
     }
 
+    .user-profile-card {
+      width: min(620px, 100%);
+      max-height: min(820px, calc(100dvh - 44px));
+      padding: 0;
+      overflow: hidden;
+    }
+
+    .profile-hero {
+      min-height: 190px;
+      position: relative;
+      display: flex;
+      align-items: flex-end;
+      padding: 22px;
+      background:
+        radial-gradient(circle at 18% 22%, rgba(255, 255, 255, 0.72), transparent 28%),
+        linear-gradient(135deg, rgba(255, 168, 168, 0.56), rgba(123, 166, 255, 0.56) 50%, rgba(168, 226, 128, 0.52));
+      background-size: cover;
+      background-position: center;
+    }
+
+    .profile-hero::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.50));
+      backdrop-filter: blur(2px) saturate(1.16);
+    }
+
+    html[data-theme="dark"] .profile-hero::before {
+      background: linear-gradient(180deg, rgba(10, 14, 24, 0.08), rgba(10, 14, 24, 0.62));
+    }
+
+    .profile-hero-content {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 14px;
+    }
+
+    .profile-identity {
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .profile-identity .avatar {
+      width: 86px;
+      height: 86px;
+      border-radius: var(--radius-xl);
+      font-size: 30px;
+      border: 1px solid var(--glass-border);
+      box-shadow: 0 18px 36px rgba(40, 60, 120, 0.18), inset 0 1px 0 var(--glass-highlight);
+    }
+
+    .profile-title {
+      min-width: 0;
+      display: grid;
+      gap: 4px;
+    }
+
+    .profile-title h3 {
+      margin: 0;
+      font-size: clamp(26px, 4vw, 42px);
+      line-height: 1;
+      letter-spacing: 0;
+    }
+
+    .profile-title span {
+      color: var(--muted);
+      font-weight: 800;
+    }
+
+    .profile-star-pill {
+      flex: 0 0 auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 9px 12px;
+      border: 1px solid rgba(255, 196, 0, 0.34);
+      border-radius: 999px;
+      color: #8a6200;
+      background: rgba(255, 220, 112, 0.26);
+      font-weight: 950;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.36), 0 14px 32px rgba(120, 88, 0, 0.10);
+    }
+
+    html[data-theme="dark"] .profile-star-pill {
+      color: #ffd56b;
+      background: rgba(255, 220, 112, 0.14);
+    }
+
+    .profile-body {
+      display: grid;
+      gap: 14px;
+      padding: 18px;
+      overflow: auto;
+      max-height: calc(100dvh - 270px);
+    }
+
+    .profile-panel {
+      display: grid;
+      gap: 10px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      background: var(--glass-bg-soft);
+      box-shadow: inset 0 1px 0 var(--glass-highlight);
+    }
+
+    .profile-panel h4 {
+      margin: 0;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .profile-bio {
+      margin: 0;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      line-height: 1.62;
+    }
+
+    .profile-actions {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .profile-actions .admin-btn {
+      min-height: 44px;
+    }
+
     .settings-card {
       width: min(520px, 100%);
       max-height: min(720px, calc(100dvh - 44px));
@@ -1310,6 +1509,57 @@
       min-height: 18px;
       color: var(--muted);
       font-size: 12px;
+    }
+
+    .profile-field-grid {
+      display: grid;
+      gap: 10px;
+    }
+
+    .profile-field-grid textarea {
+      min-height: 82px;
+      resize: vertical;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      color: var(--ink);
+      background: var(--panel);
+      font: inherit;
+      line-height: 1.5;
+      outline: none;
+      transition: border-color var(--duration-normal) var(--ease-smooth), box-shadow var(--duration-normal) var(--ease-smooth), background var(--duration-normal) var(--ease-smooth);
+    }
+
+    .profile-field-grid textarea:focus {
+      border-color: rgba(0, 122, 255, 0.44);
+      background: var(--glass-bg-light);
+      box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.10);
+    }
+
+    .banner-preview {
+      min-height: 118px;
+      position: relative;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      background:
+        radial-gradient(circle at 18% 22%, rgba(255, 255, 255, 0.78), transparent 28%),
+        linear-gradient(135deg, rgba(255, 168, 168, 0.55), rgba(123, 166, 255, 0.54) 52%, rgba(170, 226, 126, 0.54));
+      box-shadow: inset 0 1px 0 var(--glass-highlight), 0 14px 28px rgba(40, 60, 120, 0.10);
+    }
+
+    .banner-preview.has-image {
+      background-size: cover;
+      background-position: center;
+    }
+
+    .banner-preview::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.34));
+      backdrop-filter: blur(1px) saturate(1.08);
+      pointer-events: none;
     }
 
     .display-name-card,
@@ -2973,6 +3223,7 @@
       }
 
       .online-summary,
+      .user-sort,
       .user-list {
         display: none;
       }
@@ -3007,6 +3258,19 @@
 
       .segmented,
       .profile-settings {
+        grid-template-columns: 1fr;
+      }
+
+      .profile-hero-content,
+      .profile-identity {
+        align-items: flex-start;
+      }
+
+      .profile-hero-content {
+        flex-direction: column;
+      }
+
+      .profile-actions {
         grid-template-columns: 1fr;
       }
 
@@ -3158,6 +3422,11 @@
             <div class="metric-label">历史消息</div>
             <div id="messageCount" class="metric-value">0</div>
           </div>
+        </div>
+
+        <div class="user-sort" role="group" aria-label="用户列表排序">
+          <button id="sortUsersByName" class="is-active" type="button">名称</button>
+          <button id="sortUsersByStars" type="button">Stars</button>
         </div>
 
         <div id="userList" class="user-list" aria-label="在线用户"></div>
@@ -3639,6 +3908,25 @@
         </div>
       </section>
       <section class="settings-section">
+        <h4>用户主页</h4>
+        <div class="profile-field-grid">
+          <label class="settings-status" for="bioInput">个人简介，最多 200 字。</label>
+          <textarea id="bioInput" maxlength="200" placeholder="写一点别人能在你的主页看到的简介"></textarea>
+          <div class="settings-actions">
+            <button id="bioSave" class="admin-btn primary" type="button">保存简介</button>
+            <div id="bioStatus" class="settings-status">这个简介会显示在你的用户主页。</div>
+          </div>
+          <div id="bannerPreview" class="banner-preview" aria-label="主页背景预览"></div>
+          <div class="settings-actions">
+            <button id="bannerChoose" class="admin-btn" type="button">更换主页背景</button>
+            <button id="bannerUpload" class="admin-btn primary" type="button" disabled>确认上传</button>
+            <button id="bannerReset" class="admin-btn" type="button">恢复默认背景</button>
+          </div>
+          <div id="bannerStatus" class="settings-status">支持 JPG、PNG、GIF、WebP，最大 5MB。</div>
+          <input id="bannerInput" class="sr-only" type="file" accept="image/png,image/jpeg,image/gif,image/webp">
+        </div>
+      </section>
+      <section class="settings-section">
         <h4>展示昵称</h4>
         <div class="display-name-card">
           <div class="display-name-row">
@@ -3716,6 +4004,40 @@
       </div>
     </div>
   </div>
+  <div id="userProfileModal" class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="userProfileName" hidden>
+    <div class="confirm-card user-profile-card">
+      <div id="userProfileHero" class="profile-hero">
+        <div class="profile-hero-content">
+          <div class="profile-identity">
+            <span id="userProfileAvatar"></span>
+            <div class="profile-title">
+              <h3 id="userProfileName">用户主页</h3>
+              <span id="userProfileUsername">@username</span>
+            </div>
+          </div>
+          <div id="userProfileStars" class="profile-star-pill">★ 0 Stars</div>
+        </div>
+      </div>
+      <div class="profile-body">
+        <section class="profile-panel">
+          <h4>个人简介</h4>
+          <p id="userProfileBio" class="profile-bio">这个用户还没有填写简介。</p>
+        </section>
+        <section class="profile-panel">
+          <h4>联系方式</h4>
+          <div class="profile-actions">
+            <button id="profilePrivateChat" class="admin-btn primary" type="button">私聊</button>
+            <button id="profileVoiceCall" class="admin-btn" type="button">语音通话</button>
+            <button id="profileStar" class="admin-btn" type="button">点亮 Star</button>
+          </div>
+          <div id="userProfileStatus" class="settings-status"></div>
+        </section>
+        <div class="confirm-actions">
+          <button id="userProfileClose" class="admin-btn primary" type="button">完成</button>
+        </div>
+      </div>
+    </div>
+  </div>
   <div id="avatarCropModal" class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="avatarCropTitle" hidden>
     <div class="confirm-card crop-card">
       <div>
@@ -3746,6 +4068,8 @@
       username: '',
       displayName: '',
       avatar: '',
+      bio: '',
+      profileBanner: '',
       isAdmin: false,
       currentRoom: null,
       lobbyRooms: [],
@@ -3784,7 +4108,10 @@
       bulletinUnread: 0,
       viewTransitionTimer: null,
       latencyMs: null,
-      latencyTimer: null
+      latencyTimer: null,
+      userSort: 'name',
+      profileUser: null,
+      pendingBanner: null
     };
 
     // DOM refs
@@ -3798,6 +4125,8 @@
     const onlineCount = document.getElementById('onlineCount');
     const messageCount = document.getElementById('messageCount');
     const userList = document.getElementById('userList');
+    const sortUsersByName = document.getElementById('sortUsersByName');
+    const sortUsersByStars = document.getElementById('sortUsersByStars');
     const roomStatus = document.getElementById('roomStatus');
     const subtitle = document.getElementById('subtitle');
     const connectionDot = document.getElementById('connectionDot');
@@ -3911,6 +4240,15 @@
     const avatarInput = document.getElementById('avatarInput');
     const avatarStatus = document.getElementById('avatarStatus');
     const settingsDisplayName = document.getElementById('settingsDisplayName');
+    const bioInput = document.getElementById('bioInput');
+    const bioSave = document.getElementById('bioSave');
+    const bioStatus = document.getElementById('bioStatus');
+    const bannerPreview = document.getElementById('bannerPreview');
+    const bannerChoose = document.getElementById('bannerChoose');
+    const bannerUpload = document.getElementById('bannerUpload');
+    const bannerReset = document.getElementById('bannerReset');
+    const bannerInput = document.getElementById('bannerInput');
+    const bannerStatus = document.getElementById('bannerStatus');
     const renameForm = document.getElementById('renameForm');
     const renameInput = document.getElementById('renameInput');
     const renameSubmit = document.getElementById('renameSubmit');
@@ -3932,6 +4270,18 @@
     const settingsLatencyText = document.getElementById('settingsLatencyText');
     const settingsConnectionText = document.getElementById('settingsConnectionText');
     const settingsRoleText = document.getElementById('settingsRoleText');
+    const userProfileModal = document.getElementById('userProfileModal');
+    const userProfileHero = document.getElementById('userProfileHero');
+    const userProfileAvatar = document.getElementById('userProfileAvatar');
+    const userProfileName = document.getElementById('userProfileName');
+    const userProfileUsername = document.getElementById('userProfileUsername');
+    const userProfileStars = document.getElementById('userProfileStars');
+    const userProfileBio = document.getElementById('userProfileBio');
+    const userProfileStatus = document.getElementById('userProfileStatus');
+    const profilePrivateChat = document.getElementById('profilePrivateChat');
+    const profileVoiceCall = document.getElementById('profileVoiceCall');
+    const profileStar = document.getElementById('profileStar');
+    const userProfileClose = document.getElementById('userProfileClose');
     const switchUserModal = document.getElementById('switchUserModal');
     const switchUserCancel = document.getElementById('switchUserCancel');
     const switchUserConfirm = document.getElementById('switchUserConfirm');
@@ -3952,6 +4302,7 @@
     const SOUND_KEY = 'uni5-message-sound';
     const GLASS_KEY = 'uni5-glass-intensity';
     const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
+    const MAX_BANNER_BYTES = 5 * 1024 * 1024;
 
     // Theme / glass / latency
     function systemTheme() {
@@ -4154,7 +4505,81 @@
       avatarChoose.disabled = !state.userId;
       if (!state.userId) avatarStatus.textContent = '登录后可以设置头像。';
       else if (!state.pendingAvatar) avatarStatus.textContent = '支持 JPG、PNG、WebP，最大 2MB。';
+      if (bioInput && document.activeElement !== bioInput) bioInput.value = state.bio || '';
+      if (bannerPreview) {
+        const preview = state.pendingBanner ? state.pendingBanner.base64 : state.profileBanner;
+        bannerPreview.classList.toggle('has-image', Boolean(preview));
+        bannerPreview.style.backgroundImage = preview ? `url("${preview}")` : '';
+      }
+      if (bannerUpload) bannerUpload.disabled = !state.pendingBanner || !state.userId;
+      if (bannerChoose) bannerChoose.disabled = !state.userId;
+      if (bannerReset) bannerReset.disabled = !state.userId || (!state.profileBanner && !state.pendingBanner);
+      if (bannerStatus && !state.pendingBanner) bannerStatus.textContent = state.profileBanner ? '主页背景已设置。' : '支持 JPG、PNG、GIF、WebP，最大 5MB。';
       renderRenameStatus();
+    }
+
+    function renderUserProfile() {
+      const profile = state.profileUser;
+      if (!profile) return;
+      const name = userDisplayName(profile) || profile.username || 'Uni 用户';
+      const banner = profile.profileBanner || '';
+      userProfileHero.style.backgroundImage = banner ? `url("${banner}")` : '';
+      userProfileAvatar.textContent = '';
+      userProfileAvatar.append(createAvatar(profile.avatar || name, name));
+      userProfileName.textContent = name;
+      userProfileUsername.textContent = profile.username ? `@${profile.username}` : '@uni-user';
+      userProfileStars.textContent = `★ ${Number(profile.starCount || 0)} Stars`;
+      userProfileBio.textContent = profile.bio && profile.bio.trim() ? profile.bio.trim() : '这个用户还没有填写简介。';
+      userProfileStatus.textContent = profile.isSelf ? '这是你的个人主页。' : '';
+      profilePrivateChat.disabled = !state.userId || profile.isSelf;
+      profileStar.disabled = !state.userId || profile.isSelf;
+      profileStar.textContent = profile.isSelf
+        ? '自己的主页'
+        : profile.starredToday
+          ? '今日已 Star'
+          : profile.viewerHasStarredToday
+            ? '今日 Star 已用'
+            : '点亮 Star';
+    }
+
+    function openUserProfile(userId) {
+      if (!state.userId || !userId) return;
+      state.profileUser = null;
+      userProfileStatus.textContent = '正在载入用户主页...';
+      userProfileModal.classList.remove('is-closing');
+      userProfileModal.hidden = false;
+      socket.emit('get user profile', userId);
+    }
+
+    function closeUserProfile() {
+      if (userProfileModal.hidden) return;
+      userProfileModal.classList.add('is-closing');
+      window.setTimeout(() => {
+        userProfileModal.hidden = true;
+        userProfileModal.classList.remove('is-closing');
+      }, 180);
+    }
+
+    function attachProfileOpen(avatar, user) {
+      if (!avatar || !user || !user.id) return avatar;
+      avatar.classList.add('profile-open');
+      avatar.title = '查看用户主页';
+      avatar.addEventListener('click', (event) => {
+        event.stopPropagation();
+        openUserProfile(user.id);
+      });
+      return avatar;
+    }
+
+    function saveBioProfile() {
+      if (!state.userId) return;
+      const next = bioInput.value.trim();
+      if (next === (state.bio || '')) {
+        bioStatus.textContent = '简介没有变化。';
+        return;
+      }
+      bioStatus.textContent = '正在保存简介...';
+      socket.emit('update profile details', { bio: next });
     }
 
     function renderRenameStatus() {
@@ -4423,6 +4848,8 @@
       state.username = '';
       state.displayName = '';
       state.avatar = '';
+      state.bio = '';
+      state.profileBanner = '';
       state.isAdmin = false;
       state.currentRoom = null;
       state.adminData = null;
@@ -4433,6 +4860,8 @@
       state.renameStatus = null;
       state.bulletins = [];
       state.bulletinUnread = 0;
+      state.profileUser = null;
+      state.pendingBanner = null;
       state.privateUnread = {};
       state.quotedMessage = null;
       state.pendingAvatar = null;
@@ -4518,9 +4947,12 @@
       state.username = user.username || '';
       state.displayName = user.displayName || user.username || '';
       state.avatar = user.avatar || '';
+      state.bio = user.bio || '';
+      state.profileBanner = user.profileBanner || '';
       state.isAdmin = Boolean(user.isAdmin);
       state.privateUnread = {};
       state.pendingAvatar = null;
+      state.pendingBanner = null;
       renderProfileChip();
       updateAdminEntries();
       renderHome();
@@ -4543,20 +4975,42 @@
       state.username = user.username || state.username;
       state.displayName = user.displayName || state.displayName || state.username;
       state.avatar = user.avatar || state.avatar;
+      state.bio = user.bio || '';
+      state.profileBanner = user.profileBanner || '';
       state.isAdmin = Boolean(user.isAdmin);
       state.pendingAvatar = null;
+      state.pendingBanner = null;
       renderProfileChip();
       updateAdminEntries();
     });
 
     socket.on('profileError', (msg) => {
       avatarStatus.textContent = msg || '头像更新失败';
+      if (bannerStatus) bannerStatus.textContent = msg || bannerStatus.textContent;
+      if (userProfileStatus) userProfileStatus.textContent = msg || '';
       showToast(msg || '头像更新失败');
     });
 
     socket.on('profileNotice', (msg) => {
       avatarStatus.textContent = msg || '头像已更新';
+      if (bannerStatus) bannerStatus.textContent = msg || bannerStatus.textContent;
+      if (bioStatus) bioStatus.textContent = msg || bioStatus.textContent;
+      if (userProfileStatus) userProfileStatus.textContent = msg || '';
       showToast(msg || '头像已更新');
+    });
+
+    socket.on('user profile', (payload) => {
+      const profile = payload && payload.profile ? payload.profile : null;
+      if (!profile) return;
+      state.profileUser = profile;
+      if (profile.id === state.userId) {
+        state.bio = profile.bio || '';
+        state.profileBanner = profile.profileBanner || '';
+        renderSettingsProfile();
+      }
+      renderUserProfile();
+      renderOnlineUsers();
+      renderLobby();
     });
 
     socket.on('rename status', (payload) => {
@@ -4941,6 +5395,7 @@
     document.addEventListener('keydown', (event) => {
       if (event.key === 'Escape' && !switchUserModal.hidden) closeSwitchUserModal();
       if (event.key === 'Escape' && !settingsModal.hidden) closeSettingsModal();
+      if (event.key === 'Escape' && !userProfileModal.hidden) closeUserProfile();
       if (event.key === 'Escape' && !bulletinModal.hidden) closeBulletinModal();
       if (event.key === 'Escape' && !avatarCropModal.hidden) closeAvatarCropModal();
     });
@@ -4965,6 +5420,37 @@
       renameSubmit.disabled = true;
       socket.emit('rename display name', { displayName: next });
     });
+    bioInput.addEventListener('input', () => {
+      bioStatus.textContent = `${bioInput.value.length}/200`;
+    });
+    bioInput.addEventListener('change', saveBioProfile);
+    bioSave.addEventListener('click', saveBioProfile);
+    sortUsersByName.addEventListener('click', () => {
+      state.userSort = 'name';
+      renderOnlineUsers();
+    });
+    sortUsersByStars.addEventListener('click', () => {
+      state.userSort = 'stars';
+      renderOnlineUsers();
+    });
+    userProfileClose.addEventListener('click', closeUserProfile);
+    userProfileModal.addEventListener('click', (event) => {
+      if (event.target === userProfileModal) closeUserProfile();
+    });
+    profileVoiceCall.addEventListener('click', () => {
+      userProfileStatus.textContent = '语音通话功能敬请期待。';
+      showToast('语音通话功能敬请期待。');
+    });
+    profileStar.addEventListener('click', () => {
+      if (!state.profileUser || !state.profileUser.id) return;
+      socket.emit('star user', state.profileUser.id);
+    });
+    profilePrivateChat.addEventListener('click', () => {
+      const profile = state.profileUser;
+      if (!profile || !profile.id || profile.isSelf) return;
+      closeUserProfile();
+      socket.emit('open private chat', profile.id);
+    });
 
     // Composer and profile media controls
     quotePreviewClose.addEventListener('click', clearQuote);
@@ -4985,6 +5471,23 @@
       clearPendingAvatar();
       avatarStatus.textContent = '正在恢复默认头像...';
       socket.emit('avatar reset');
+    });
+    bannerChoose.addEventListener('click', () => bannerInput.click());
+    bannerInput.addEventListener('change', async (event) => {
+      const file = event.target.files && event.target.files[0];
+      await prepareBannerFile(file);
+    });
+    bannerUpload.addEventListener('click', () => {
+      if (!state.pendingBanner) return;
+      bannerStatus.textContent = '正在上传主页背景...';
+      socket.emit('profile banner upload', { base64: state.pendingBanner.base64 });
+    });
+    bannerReset.addEventListener('click', () => {
+      if (!state.userId) return;
+      state.pendingBanner = null;
+      bannerStatus.textContent = '正在恢复默认背景...';
+      socket.emit('profile banner reset');
+      renderSettingsProfile();
     });
     avatarCropScale.addEventListener('input', () => {
       if (!state.avatarCrop) return;
@@ -5127,7 +5630,12 @@
       if (options.animate === false) row.classList.add('is-history');
       row.dataset.messageId = message.id;
 
-      const avatar = createAvatar(message.avatar || message.username, message.username);
+      const avatar = attachProfileOpen(createAvatar(message.avatar || message.username, message.username), {
+        id: message.userId,
+        username: message.username,
+        displayName: message.displayName || message.username,
+        avatar: message.avatar
+      });
       avatar.classList.add('message-avatar');
 
       const bubble = document.createElement('article');
@@ -5535,6 +6043,7 @@
         userId: typeof post.userId === 'string' ? post.userId : '',
         username,
         avatar: typeof post.avatar === 'string' ? post.avatar : '',
+        starCount: Number(post.starCount || 0),
         title,
         content,
         createdAt: post.createdAt || new Date().toISOString(),
@@ -5555,6 +6064,7 @@
         userId: typeof comment.userId === 'string' ? comment.userId : '',
         username,
         avatar: typeof comment.avatar === 'string' ? comment.avatar : '',
+        starCount: Number(comment.starCount || 0),
         content,
         createdAt: comment.createdAt || new Date().toISOString()
       };
@@ -5577,7 +6087,7 @@
         const button = document.createElement('button');
         button.type = 'button';
         button.className = `post-card${state.selectedForumPost && state.selectedForumPost.postId === post.postId ? ' is-active' : ''}`;
-        button.append(createAvatar(post.avatar || post.username, post.username));
+        button.append(attachProfileOpen(createAvatar(post.avatar || post.username, post.username), post));
 
         const main = document.createElement('div');
         main.className = 'post-card-main';
@@ -5615,7 +6125,7 @@
       forumPostDetail.className = 'post-detail';
       const author = document.createElement('div');
       author.className = 'post-author';
-      author.append(createAvatar(post.avatar || post.username, post.username));
+      author.append(attachProfileOpen(createAvatar(post.avatar || post.username, post.username), post));
       const authorText = document.createElement('div');
       const authorName = document.createElement('strong');
       authorName.textContent = post.username;
@@ -5682,7 +6192,7 @@
         item.className = 'comment-card';
         const author = document.createElement('div');
         author.className = 'comment-author';
-        author.append(createAvatar(comment.avatar || comment.username, comment.username));
+        author.append(attachProfileOpen(createAvatar(comment.avatar || comment.username, comment.username), comment));
         const text = document.createElement('div');
         const name = document.createElement('strong');
         name.textContent = comment.username;
@@ -5735,6 +6245,8 @@
     function renderOnlineUsers() {
       onlineCount.textContent = String(state.onlineUsers.length);
       userList.textContent = '';
+      sortUsersByName.classList.toggle('is-active', state.userSort === 'name');
+      sortUsersByStars.classList.toggle('is-active', state.userSort === 'stars');
 
       if (state.onlineUsers.length === 0) {
         const empty = document.createElement('div');
@@ -5743,24 +6255,47 @@
         userList.append(empty);
       }
 
-      state.onlineUsers.forEach((user) => {
+      sortedUsers(state.onlineUsers).forEach((user) => {
         const nameValue = typeof user === 'string' ? user : userDisplayName(user);
         const avatarValue = typeof user === 'string' ? user : user.avatar || nameValue;
         const button = document.createElement('button');
         button.type = 'button';
         button.className = 'user-chip';
-        button.append(createAvatar(avatarValue, nameValue));
+        button.append(attachProfileOpen(createAvatar(avatarValue, nameValue), user));
 
         const name = document.createElement('span');
         name.className = 'user-name';
         name.textContent = nameValue === displayName() ? `${nameValue}（我）` : nameValue;
         button.append(name);
+        if (user && typeof user === 'object') {
+          button.append(createStarBadge(user.starCount || 0));
+        }
 
         button.addEventListener('click', () => insertMention(nameValue));
         userList.append(button);
       });
 
       roomStatus.textContent = state.username ? `${displayName()} 已加入` : '等待加入';
+    }
+
+    function sortedUsers(users) {
+      const list = Array.isArray(users) ? [...users] : [];
+      return list.sort((a, b) => {
+        const nameA = typeof a === 'string' ? a : userDisplayName(a) || a.username || '';
+        const nameB = typeof b === 'string' ? b : userDisplayName(b) || b.username || '';
+        if (state.userSort === 'stars') {
+          const starDiff = Number((b && b.starCount) || 0) - Number((a && a.starCount) || 0);
+          if (starDiff !== 0) return starDiff;
+        }
+        return nameA.localeCompare(nameB, 'zh-Hans-CN', { numeric: true, sensitivity: 'base' });
+      });
+    }
+
+    function createStarBadge(count) {
+      const badge = document.createElement('span');
+      badge.className = 'star-badge';
+      badge.textContent = `★ ${Number(count || 0)}`;
+      return badge;
     }
 
     function renderLobby() {
@@ -5808,10 +6343,11 @@
         const titleRow = document.createElement('div');
         titleRow.className = 'card-title-row';
         const nameText = userDisplayName(user) || user.username;
-        titleRow.append(createAvatar(user.avatar || nameText, nameText));
+        titleRow.append(attachProfileOpen(createAvatar(user.avatar || nameText, nameText), user));
         const title = document.createElement('strong');
         title.textContent = nameText;
         titleRow.append(title);
+        titleRow.append(createStarBadge(user.starCount || 0));
         if (unread > 0) {
           const badge = document.createElement('span');
           badge.className = 'badge';
@@ -5929,6 +6465,37 @@
       } catch (error) {
         avatarStatus.textContent = '头像读取失败';
         showToast('头像读取失败');
+      }
+    }
+
+    async function prepareBannerFile(file) {
+      if (!state.userId) {
+        showToast('请先登录后再设置主页背景');
+        return;
+      }
+      if (!file) return;
+      if (!['image/jpeg', 'image/png', 'image/gif', 'image/webp'].includes(file.type)) {
+        bannerStatus.textContent = '主页背景仅支持 JPG、PNG、GIF、WebP';
+        showToast('主页背景格式不支持');
+        return;
+      }
+      if (file.size > MAX_BANNER_BYTES) {
+        bannerStatus.textContent = '主页背景最大 5MB';
+        showToast('主页背景最大 5MB');
+        return;
+      }
+      try {
+        const base64 = await readFileAsDataUrl(file);
+        state.pendingBanner = {
+          base64,
+          name: file.name || '主页背景',
+          size: file.size
+        };
+        bannerStatus.textContent = `${state.pendingBanner.name} · ${formatFileSize(file.size)} · 待上传`;
+        renderSettingsProfile();
+      } catch (error) {
+        bannerStatus.textContent = '主页背景读取失败';
+        showToast('主页背景读取失败');
       }
     }
 
