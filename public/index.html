@@ -2650,6 +2650,7 @@
     }
 
     .forum-form,
+    .report-form,
     .comment-form {
       display: grid;
       gap: 8px;
@@ -2657,6 +2658,9 @@
 
     .forum-form input,
     .forum-form textarea,
+    .report-form select,
+    .report-form textarea,
+    .report-note,
     .comment-form textarea {
       width: 100%;
       min-width: 0;
@@ -2677,11 +2681,27 @@
     }
 
     .forum-form textarea,
+    .report-form textarea,
+    .report-note,
     .comment-form textarea {
       min-height: 92px;
       resize: vertical;
       padding: 11px 12px;
       line-height: 1.55;
+    }
+
+    .report-form select {
+      min-height: 42px;
+      padding: 0 38px 0 12px;
+      appearance: none;
+      background-image:
+        linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+        linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+      background-position:
+        calc(100% - 18px) 50%,
+        calc(100% - 13px) 50%;
+      background-size: 5px 5px, 5px 5px;
+      background-repeat: no-repeat;
     }
 
     .comment-form textarea {
@@ -2691,10 +2711,60 @@
 
     .forum-form input:focus,
     .forum-form textarea:focus,
+    .report-form select:focus,
+    .report-form textarea:focus,
+    .report-note:focus,
     .comment-form textarea:focus {
       border-color: rgba(0, 122, 255, 0.48);
       box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.1);
       background: var(--glass-bg-light);
+    }
+
+    .report-card {
+      display: grid;
+      gap: 10px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      background: var(--glass-bg-soft);
+      box-shadow: inset 0 1px 0 var(--glass-highlight);
+    }
+
+    .report-card.is-pending {
+      border-color: rgba(0, 122, 255, 0.28);
+      background: color-mix(in srgb, var(--brand) 7%, var(--glass-bg-soft));
+    }
+
+    .report-head,
+    .report-actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .report-meta {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .report-note {
+      min-height: 38px;
+      font: inherit;
+    }
+
+    .report-status {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 8px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--muted);
+      background: var(--glass-bg-light);
+      font-size: 11px;
+      font-weight: 900;
     }
 
     .forum-error {
@@ -3811,6 +3881,10 @@
             <div id="adminRenameRequests" class="rename-request-list"></div>
           </div>
           <div class="admin-card">
+            <h3>举报中心</h3>
+            <div id="adminReports" class="rename-request-list"></div>
+          </div>
+          <div class="admin-card">
             <h3>发布公告</h3>
             <form id="adminBulletinForm" class="admin-form">
               <input id="adminBulletinTitle" maxlength="90" placeholder="公告标题">
@@ -4038,6 +4112,30 @@
       </div>
     </div>
   </div>
+  <div id="reportModal" class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="reportTitle" hidden>
+    <div class="confirm-card settings-card">
+      <div>
+        <h3 id="reportTitle">举报帖子</h3>
+        <p id="reportPostTitle">选择原因并提交给管理员处理。</p>
+      </div>
+      <form id="reportForm" class="report-form">
+        <select id="reportReason" aria-label="举报原因" required>
+          <option value="">选择举报原因</option>
+          <option value="spam">垃圾广告</option>
+          <option value="abuse">辱骂 / 攻击</option>
+          <option value="sexual">色情或不适内容</option>
+          <option value="danger">违法 / 危险内容</option>
+          <option value="other">其他</option>
+        </select>
+        <textarea id="reportDetails" maxlength="200" placeholder="补充说明（可选，最多 200 字）"></textarea>
+        <div id="reportStatus" class="settings-status"></div>
+        <div class="confirm-actions">
+          <button id="reportCancel" class="admin-btn" type="button">取消</button>
+          <button id="reportSubmit" class="admin-btn primary" type="submit">提交举报</button>
+        </div>
+      </form>
+    </div>
+  </div>
   <div id="avatarCropModal" class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="avatarCropTitle" hidden>
     <div class="confirm-card crop-card">
       <div>
@@ -4111,7 +4209,8 @@
       latencyTimer: null,
       userSort: 'name',
       profileUser: null,
-      pendingBanner: null
+      pendingBanner: null,
+      reportingPost: null
     };
 
     // DOM refs
@@ -4210,6 +4309,7 @@
     const adminGroupCode = document.getElementById('adminGroupCode');
     const adminRooms = document.getElementById('adminRooms');
     const adminRenameRequests = document.getElementById('adminRenameRequests');
+    const adminReports = document.getElementById('adminReports');
     const adminBulletinForm = document.getElementById('adminBulletinForm');
     const adminBulletinTitle = document.getElementById('adminBulletinTitle');
     const adminBulletinType = document.getElementById('adminBulletinType');
@@ -4282,6 +4382,14 @@
     const profileVoiceCall = document.getElementById('profileVoiceCall');
     const profileStar = document.getElementById('profileStar');
     const userProfileClose = document.getElementById('userProfileClose');
+    const reportModal = document.getElementById('reportModal');
+    const reportForm = document.getElementById('reportForm');
+    const reportPostTitle = document.getElementById('reportPostTitle');
+    const reportReason = document.getElementById('reportReason');
+    const reportDetails = document.getElementById('reportDetails');
+    const reportStatus = document.getElementById('reportStatus');
+    const reportCancel = document.getElementById('reportCancel');
+    const reportSubmit = document.getElementById('reportSubmit');
     const switchUserModal = document.getElementById('switchUserModal');
     const switchUserCancel = document.getElementById('switchUserCancel');
     const switchUserConfirm = document.getElementById('switchUserConfirm');
@@ -4557,6 +4665,30 @@
       window.setTimeout(() => {
         userProfileModal.hidden = true;
         userProfileModal.classList.remove('is-closing');
+      }, 180);
+    }
+
+    function openReportModal(post) {
+      const target = normalizeForumPost(post);
+      if (!target || target.userId === state.userId) return;
+      state.reportingPost = target;
+      reportPostTitle.textContent = `举报：${target.title}`;
+      reportReason.value = '';
+      reportDetails.value = '';
+      reportStatus.textContent = '请选择一个举报原因。';
+      reportSubmit.disabled = false;
+      reportModal.classList.remove('is-closing');
+      reportModal.hidden = false;
+      requestAnimationFrame(() => reportReason.focus());
+    }
+
+    function closeReportModal() {
+      if (reportModal.hidden) return;
+      reportModal.classList.add('is-closing');
+      window.setTimeout(() => {
+        reportModal.hidden = true;
+        reportModal.classList.remove('is-closing');
+        state.reportingPost = null;
       }, 180);
     }
 
@@ -4862,6 +4994,7 @@
       state.bulletinUnread = 0;
       state.profileUser = null;
       state.pendingBanner = null;
+      state.reportingPost = null;
       state.privateUnread = {};
       state.quotedMessage = null;
       state.pendingAvatar = null;
@@ -5132,9 +5265,22 @@
 
     socket.on('forum error', (msg) => {
       forumError.textContent = msg || '论坛操作失败';
+      if (!reportModal.hidden) {
+        reportStatus.textContent = msg || '举报提交失败';
+        reportSubmit.disabled = false;
+      }
       updateForumPostButton();
       updateForumCommentButton();
       showToast(msg || '论坛操作失败');
+    });
+
+    socket.on('forum notice', (msg) => {
+      const message = msg || '操作完成';
+      forumError.textContent = '';
+      if (!reportModal.hidden) closeReportModal();
+      updateForumPostButton();
+      updateForumCommentButton();
+      showToast(message);
     });
 
     socket.on('room joined', (payload) => {
@@ -5272,6 +5418,21 @@
       showAdminNotice(msg || '操作完成');
     });
 
+    socket.on('admin open reported post', (payload) => {
+      const post = payload && payload.post ? normalizeForumPost(payload.post) : null;
+      if (!post) {
+        showAdminNotice('原帖已删除，无法打开');
+        return;
+      }
+      state.selectedForumPost = post;
+      state.forumComments = Array.isArray(payload.comments) ? payload.comments : [];
+      state.forumReturnView = 'admin';
+      setView('forum');
+      renderForumPosts();
+      renderForumDetail();
+      socket.emit('get forum post', post.postId);
+    });
+
     // Auth
     loginTab.addEventListener('click', () => setAuthMode('login'));
     registerTab.addEventListener('click', () => setAuthMode('register'));
@@ -5396,6 +5557,7 @@
       if (event.key === 'Escape' && !switchUserModal.hidden) closeSwitchUserModal();
       if (event.key === 'Escape' && !settingsModal.hidden) closeSettingsModal();
       if (event.key === 'Escape' && !userProfileModal.hidden) closeUserProfile();
+      if (event.key === 'Escape' && !reportModal.hidden) closeReportModal();
       if (event.key === 'Escape' && !bulletinModal.hidden) closeBulletinModal();
       if (event.key === 'Escape' && !avatarCropModal.hidden) closeAvatarCropModal();
     });
@@ -5436,6 +5598,28 @@
     userProfileClose.addEventListener('click', closeUserProfile);
     userProfileModal.addEventListener('click', (event) => {
       if (event.target === userProfileModal) closeUserProfile();
+    });
+    reportCancel.addEventListener('click', closeReportModal);
+    reportModal.addEventListener('click', (event) => {
+      if (event.target === reportModal) closeReportModal();
+    });
+    reportReason.addEventListener('change', () => {
+      reportStatus.textContent = reportReason.value ? '可以提交举报。' : '请选择一个举报原因。';
+    });
+    reportForm.addEventListener('submit', (event) => {
+      event.preventDefault();
+      if (!state.reportingPost || !state.reportingPost.postId) return;
+      if (!reportReason.value) {
+        reportStatus.textContent = '请选择举报原因';
+        return;
+      }
+      reportSubmit.disabled = true;
+      reportStatus.textContent = '正在提交举报...';
+      socket.emit('report forum post', {
+        postId: state.reportingPost.postId,
+        reason: reportReason.value,
+        details: reportDetails.value
+      });
     });
     profileVoiceCall.addEventListener('click', () => {
       userProfileStatus.textContent = '语音通话功能敬请期待。';
@@ -6144,6 +6328,13 @@
           socket.emit('delete forum post', post.postId);
         });
         author.append(deleteButton);
+      } else if (state.userId) {
+        const reportButton = document.createElement('button');
+        reportButton.type = 'button';
+        reportButton.className = 'admin-btn';
+        reportButton.textContent = '举报';
+        reportButton.addEventListener('click', () => openReportModal(post));
+        author.append(reportButton);
       }
 
       const title = document.createElement('h1');
@@ -6672,11 +6863,13 @@
       }
 
       const pendingRenameCount = Array.isArray(data.renameRequests) ? data.renameRequests.length : 0;
-      adminSummary.textContent = `用户 ${users.length} · 在线 ${data.onlineCount || 0} · 消息 ${data.messageCount || messages.length} · 改名待审 ${pendingRenameCount}`;
+      const pendingReportCount = Array.isArray(data.postReports) ? data.postReports.filter((report) => report.status === 'pending').length : 0;
+      adminSummary.textContent = `用户 ${users.length} · 在线 ${data.onlineCount || 0} · 消息 ${data.messageCount || messages.length} · 改名待审 ${pendingRenameCount} · 举报待处理 ${pendingReportCount}`;
       adminGroupCode.textContent = `当前建组码：${groupCode.code || '------'} · 有效期至 ${formatFullTime(groupCode.expiresAt)}`;
       adminUsers.textContent = '';
       renderAdminRooms(Array.isArray(data.rooms) ? data.rooms : []);
       renderAdminRenameRequests(Array.isArray(data.renameRequests) ? data.renameRequests : []);
+      renderAdminReports(Array.isArray(data.postReports) ? data.postReports : []);
 
       if (users.length === 0) {
         const empty = document.createElement('div');
@@ -6722,6 +6915,82 @@
       });
 
       renderSelectedAdminUser();
+    }
+
+    function renderAdminReports(reports) {
+      adminReports.textContent = '';
+      if (reports.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'admin-muted';
+        empty.textContent = '暂无举报';
+        adminReports.append(empty);
+        return;
+      }
+
+      reports.forEach((report) => {
+        const item = document.createElement('div');
+        item.className = `report-card${report.status === 'pending' ? ' is-pending' : ''}`;
+        const head = document.createElement('div');
+        head.className = 'report-head';
+        const title = document.createElement('strong');
+        title.textContent = report.postTitle || '原帖已删除';
+        const status = document.createElement('span');
+        status.className = 'report-status';
+        status.textContent = reportStatusLabel(report.status);
+        head.append(title, status);
+
+        const meta = document.createElement('div');
+        meta.className = 'report-meta';
+        meta.textContent = `作者：${report.reportedName || '未知'} · 举报人：${report.reporterName || '未知'} · ${report.reasonLabel || '其他'} · ${formatFullTime(report.createdAt)}`;
+
+        const details = document.createElement('div');
+        details.className = 'report-meta';
+        details.textContent = report.details ? `说明：${report.details}` : '没有补充说明';
+
+        const note = document.createElement('textarea');
+        note.className = 'report-note';
+        note.maxLength = 240;
+        note.placeholder = '处理备注（可选）';
+        note.value = report.adminNote || '';
+        note.disabled = report.status !== 'pending';
+
+        const actions = document.createElement('div');
+        actions.className = 'report-actions';
+        actions.append(
+          createReportActionButton('查看原文', 'view', report, note),
+          createReportActionButton('忽略', 'dismiss', report, note),
+          createReportActionButton('删除帖子', 'delete_post', report, note, 'danger'),
+          createReportActionButton('封禁用户', 'ban_user', report, note, 'danger'),
+          createReportActionButton('删除+封禁', 'delete_and_ban', report, note, 'danger')
+        );
+        item.append(head, meta, details, note, actions);
+        adminReports.append(item);
+      });
+    }
+
+    function reportStatusLabel(status) {
+      return {
+        pending: '待处理',
+        dismissed: '已忽略',
+        post_deleted: '已删帖',
+        user_banned: '已封禁'
+      }[status] || '已处理';
+    }
+
+    function createReportActionButton(label, action, report, note, tone = '') {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = `admin-btn${tone ? ` ${tone}` : ''}`;
+      button.textContent = label;
+      button.disabled = action !== 'view' && report.status !== 'pending';
+      button.addEventListener('click', () => {
+        socket.emit('admin handle report', {
+          reportId: report.id,
+          action,
+          note: note.value
+        });
+      });
+      return button;
     }
 
     function renderAdminRenameRequests(requests) {

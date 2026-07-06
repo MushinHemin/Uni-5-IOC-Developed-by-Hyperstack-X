@@ -69,6 +69,8 @@ const ALLOWED_AVATAR_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const ALLOWED_AUDIO_TYPES = new Set(['audio/webm', 'audio/mp4', 'audio/mpeg', 'audio/ogg', 'audio/wav']);
 const ANNOUNCEMENT_TYPES = new Set(['system', 'update', 'admin', 'rename', 'status']);
 const ANNOUNCEMENT_PRIORITIES = new Set(['low', 'normal', 'high']);
+const REPORT_REASONS = new Set(['spam', 'abuse', 'sexual', 'danger', 'other']);
+const REPORT_STATUSES = new Set(['pending', 'dismissed', 'post_deleted', 'user_banned']);
 const IMAGE_EXTENSIONS = {
   'image/jpeg': 'jpg',
   'image/png': 'png',
@@ -270,6 +272,19 @@ function cleanBio(value) {
   return cleanText(value, 200);
 }
 
+function cleanReportReason(value) {
+  const reason = typeof value === 'string' ? value.trim().toLowerCase() : '';
+  return REPORT_REASONS.has(reason) ? reason : '';
+}
+
+function cleanReportDetails(value) {
+  return cleanText(value, 200);
+}
+
+function cleanAdminNote(value) {
+  return cleanText(value, 240);
+}
+
 function makeAvatar(name) {
   return (cleanUsername(name) || '?').slice(0, 1).toUpperCase();
 }
@@ -336,7 +351,10 @@ function normalizeUser(user) {
     passwordHash,
     createdAt: Number.isNaN(Date.parse(user.createdAt)) ? new Date().toISOString() : user.createdAt,
     lastIp: typeof user.lastIp === 'string' ? user.lastIp : '',
-    lastLoginAt: Number.isNaN(Date.parse(user.lastLoginAt)) ? '' : user.lastLoginAt
+    lastLoginAt: Number.isNaN(Date.parse(user.lastLoginAt)) ? '' : user.lastLoginAt,
+    isBanned: Boolean(user.isBanned || user.is_banned),
+    bannedAt: Number.isNaN(Date.parse(user.bannedAt || user.banned_at)) ? '' : (user.bannedAt || user.banned_at),
+    bannedReason: cleanText(user.bannedReason || user.banned_reason, 240)
   };
 }
 
@@ -455,7 +473,8 @@ function publicUser(user) {
     bio: cleanBio(user.bio),
     profileBanner: cleanProfileBanner(user.profileBanner),
     starCount: starCountForUser(user.id),
-    isAdmin: isAdminUser(user)
+    isAdmin: isAdminUser(user),
+    isBanned: Boolean(user.isBanned)
   };
 }
 
@@ -472,7 +491,10 @@ function privateUser(user) {
     passwordHash: user.passwordHash,
     createdAt: user.createdAt,
     lastIp: user.lastIp || '',
-    lastLoginAt: user.lastLoginAt || ''
+    lastLoginAt: user.lastLoginAt || '',
+    isBanned: Boolean(user.isBanned),
+    bannedAt: user.bannedAt || '',
+    bannedReason: user.bannedReason || ''
   };
 }
 
@@ -510,7 +532,10 @@ function initDatabase() {
       password_hash TEXT NOT NULL,
       created_at TEXT NOT NULL,
       last_ip TEXT NOT NULL DEFAULT '',
-      last_login_at TEXT NOT NULL DEFAULT ''
+      last_login_at TEXT NOT NULL DEFAULT '',
+      is_banned INTEGER NOT NULL DEFAULT 0,
+      banned_at TEXT NOT NULL DEFAULT '',
+      banned_reason TEXT NOT NULL DEFAULT ''
     );
 
     CREATE TABLE IF NOT EXISTS messages (
@@ -612,6 +637,22 @@ function initDatabase() {
       UNIQUE(from_user_id, star_date)
     );
 
+    CREATE TABLE IF NOT EXISTS post_reports (
+      id TEXT PRIMARY KEY,
+      post_id TEXT NOT NULL,
+      reporter_user_id TEXT NOT NULL,
+      reported_user_id TEXT NOT NULL,
+      reason TEXT NOT NULL,
+      details TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'pending',
+      admin_user_id TEXT NOT NULL DEFAULT '',
+      admin_note TEXT NOT NULL DEFAULT '',
+      action_taken TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL,
+      reviewed_at TEXT NOT NULL DEFAULT '',
+      UNIQUE(post_id, reporter_user_id)
+    );
+
     CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at);
     CREATE INDEX IF NOT EXISTS idx_messages_user_id ON messages(user_id);
     CREATE INDEX IF NOT EXISTS idx_room_members_user_id ON room_members(user_id);
@@ -627,6 +668,9 @@ function initDatabase() {
     CREATE INDEX IF NOT EXISTS idx_announcements_created_at ON announcements(created_at);
     CREATE INDEX IF NOT EXISTS idx_user_stars_to_user_id ON user_stars(to_user_id);
     CREATE INDEX IF NOT EXISTS idx_user_stars_star_date ON user_stars(star_date);
+    CREATE INDEX IF NOT EXISTS idx_post_reports_status_created ON post_reports(status, created_at);
+    CREATE INDEX IF NOT EXISTS idx_post_reports_post_id ON post_reports(post_id);
+    CREATE INDEX IF NOT EXISTS idx_post_reports_reported_user_id ON post_reports(reported_user_id);
   `);
   migrateForumTables();
   ensureColumn('users', 'display_name', "TEXT NOT NULL DEFAULT ''");
@@ -635,6 +679,9 @@ function initDatabase() {
   ensureColumn('users', 'last_login_at', "TEXT NOT NULL DEFAULT ''");
   ensureColumn('users', 'bio', "TEXT NOT NULL DEFAULT ''");
   ensureColumn('users', 'profile_banner', "TEXT NOT NULL DEFAULT ''");
+  ensureColumn('users', 'is_banned', "INTEGER NOT NULL DEFAULT 0");
+  ensureColumn('users', 'banned_at', "TEXT NOT NULL DEFAULT ''");
+  ensureColumn('users', 'banned_reason', "TEXT NOT NULL DEFAULT ''");
   ensureColumn('messages', 'room_id', `TEXT NOT NULL DEFAULT '${DEFAULT_ROOM_ID}'`);
   db.exec('CREATE INDEX IF NOT EXISTS idx_messages_room_id ON messages(room_id)');
   ensureDefaultRoom();
@@ -728,7 +775,10 @@ function rowToUser(row) {
     passwordHash: row.password_hash,
     createdAt: row.created_at,
     lastIp: row.last_ip,
-    lastLoginAt: row.last_login_at
+    lastLoginAt: row.last_login_at,
+    isBanned: Boolean(row.is_banned),
+    bannedAt: row.banned_at,
+    bannedReason: row.banned_reason
   });
 }
 
@@ -802,8 +852,8 @@ function rowToComment(row) {
 
 function upsertUser(user) {
   db.prepare(`
-    INSERT INTO users (id, account, username, display_name, avatar, bio, profile_banner, password_hash, created_at, last_ip, last_login_at)
-    VALUES (@id, @account, @username, @displayName, @avatar, @bio, @profileBanner, @passwordHash, @createdAt, @lastIp, @lastLoginAt)
+    INSERT INTO users (id, account, username, display_name, avatar, bio, profile_banner, password_hash, created_at, last_ip, last_login_at, is_banned, banned_at, banned_reason)
+    VALUES (@id, @account, @username, @displayName, @avatar, @bio, @profileBanner, @passwordHash, @createdAt, @lastIp, @lastLoginAt, @isBanned, @bannedAt, @bannedReason)
     ON CONFLICT(id) DO UPDATE SET
       account = excluded.account,
       username = excluded.username,
@@ -814,7 +864,10 @@ function upsertUser(user) {
       password_hash = excluded.password_hash,
       created_at = excluded.created_at,
       last_ip = excluded.last_ip,
-      last_login_at = excluded.last_login_at
+      last_login_at = excluded.last_login_at,
+      is_banned = excluded.is_banned,
+      banned_at = excluded.banned_at,
+      banned_reason = excluded.banned_reason
   `).run({
     id: user.id,
     account: user.account,
@@ -826,7 +879,10 @@ function upsertUser(user) {
     passwordHash: user.passwordHash,
     createdAt: user.createdAt,
     lastIp: user.lastIp || '',
-    lastLoginAt: user.lastLoginAt || ''
+    lastLoginAt: user.lastLoginAt || '',
+    isBanned: user.isBanned ? 1 : 0,
+    bannedAt: user.bannedAt || '',
+    bannedReason: user.bannedReason || ''
   });
 }
 
@@ -1004,6 +1060,89 @@ function rawForumComment(commentId) {
   const id = cleanForumId(commentId);
   if (!id) return null;
   return db.prepare('SELECT * FROM comments WHERE id = ?').get(id) || null;
+}
+
+function reportReasonLabel(reason) {
+  return {
+    spam: '垃圾广告',
+    abuse: '辱骂 / 攻击',
+    sexual: '色情或不适内容',
+    danger: '违法 / 危险内容',
+    other: '其他'
+  }[reason] || '其他';
+}
+
+function publicPostReport(row) {
+  if (!row) return null;
+  const post = rawForumPost(row.post_id);
+  const reporter = userById(row.reporter_user_id);
+  const reported = userById(row.reported_user_id);
+  return {
+    id: row.id,
+    postId: row.post_id,
+    postTitle: post ? cleanPostTitle(post.title) : '原帖已删除',
+    postContent: post ? cleanPostContent(post.content) : '',
+    reporterUserId: row.reporter_user_id,
+    reporterName: reporter ? displayNameOf(reporter) : '未知用户',
+    reportedUserId: row.reported_user_id,
+    reportedName: reported ? displayNameOf(reported) : '未知用户',
+    reason: row.reason,
+    reasonLabel: reportReasonLabel(row.reason),
+    details: row.details || '',
+    status: REPORT_STATUSES.has(row.status) ? row.status : 'pending',
+    adminUserId: row.admin_user_id || '',
+    adminNote: row.admin_note || '',
+    actionTaken: row.action_taken || '',
+    createdAt: row.created_at,
+    reviewedAt: row.reviewed_at || '',
+    postExists: Boolean(post)
+  };
+}
+
+function listPostReports() {
+  return db.prepare(`
+    SELECT * FROM post_reports
+    ORDER BY
+      CASE status WHEN 'pending' THEN 0 ELSE 1 END,
+      created_at DESC
+    LIMIT 120
+  `).all().map(publicPostReport).filter(Boolean);
+}
+
+function updateReportStatus(reportId, status, adminUserId, note = '', actionTaken = '') {
+  db.prepare(`
+    UPDATE post_reports
+    SET status = ?, admin_user_id = ?, admin_note = ?, action_taken = ?, reviewed_at = ?
+    WHERE id = ?
+  `).run(status, adminUserId, cleanAdminNote(note), actionTaken, new Date().toISOString(), reportId);
+}
+
+function deleteForumPostById(postId) {
+  const id = cleanForumId(postId);
+  if (!id) return false;
+  const post = rawForumPost(id);
+  if (!post) return false;
+  db.prepare('DELETE FROM comments WHERE post_id = ?').run(id);
+  db.prepare('DELETE FROM posts WHERE id = ?').run(id);
+  io.to(forumPostChannel(id)).emit('forum post deleted', { postId: id });
+  broadcastForumPosts();
+  return true;
+}
+
+function banUser(user, reason = '') {
+  if (!user || isAdminUser(user)) return false;
+  user.isBanned = true;
+  user.bannedAt = new Date().toISOString();
+  user.bannedReason = cleanAdminNote(reason) || '违反社区规则';
+  saveUsers();
+  socketsForUser(user.id).forEach((connectedSocket) => {
+    connectedSocket.user = user;
+    connectedSocket.emit('profile updated', { user: publicUser(user) });
+    connectedSocket.emit('forum error', '你的账号已被限制使用社区功能');
+  });
+  broadcastOnlineUsers();
+  broadcastAdminDashboards();
+  return true;
 }
 
 function forumPostChannel(postId) {
@@ -1238,6 +1377,13 @@ function broadcastBulletinUpdates(targetUserId = '') {
 }
 
 function ensureSystemAnnouncements() {
+  createAnnouncement({
+    id: 'update:5.4.6',
+    type: 'update',
+    title: 'Sonoma 5.4.6 已上线',
+    content: '新增论坛举报、管理员举报中心、基础封禁系统，并修复用户主页、Star 和移动端社区体验稳定性。',
+    priority: 'high'
+  });
   createAnnouncement({
     id: 'update:5.4.5',
     type: 'update',
@@ -1606,6 +1752,22 @@ function requireAuth(socket, action = '操作') {
   return false;
 }
 
+function requireCommunityAccess(socket, action = '使用社区功能') {
+  if (!requireAuth(socket, action)) return false;
+  if (!socket.user.isBanned) return true;
+  const message = '你的账号已被限制使用社区功能';
+  socket.emit('forum error', message);
+  socket.emit('profileError', message);
+  return false;
+}
+
+function requireAdmin(socket, action = '管理后台') {
+  if (!requireAuth(socket, action)) return false;
+  if (isAdminUser(socket.user)) return true;
+  socket.emit('admin error', '没有管理员权限');
+  return false;
+}
+
 function adminUserPayload(user) {
   const userMessages = messages.filter((message) => message.userId === user.id);
   return {
@@ -1621,6 +1783,9 @@ function adminUserPayload(user) {
     createdAt: user.createdAt,
     lastIp: user.lastIp || '',
     lastLoginAt: user.lastLoginAt || '',
+    isBanned: Boolean(user.isBanned),
+    bannedAt: user.bannedAt || '',
+    bannedReason: user.bannedReason || '',
     online: Array.from(onlineUsers.values()).some((onlineUser) => onlineUser.id === user.id),
     messageCount: userMessages.length,
     passwordStoredAs: 'scrypt hash + salt'
@@ -1644,7 +1809,8 @@ function buildAdminDashboard() {
     groupCode: groupCodeInfo(),
     messageCount: messages.length,
     onlineCount: onlineUsers.size,
-    renameRequests: listPendingRenameRequests()
+    renameRequests: listPendingRenameRequests(),
+    postReports: listPostReports()
   };
 }
 
@@ -1817,7 +1983,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('create forum post', (payload) => {
-    if (!requireAuth(socket, '发帖')) return;
+    if (!requireCommunityAccess(socket, '发帖')) return;
     const title = cleanPostTitle(payload && payload.title);
     const content = cleanPostContent(payload && payload.content);
     if (!title) {
@@ -1866,7 +2032,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('create forum comment', (payload) => {
-    if (!requireAuth(socket, '评论')) return;
+    if (!requireCommunityAccess(socket, '评论')) return;
     const postId = cleanForumId(payload && payload.postId);
     const content = cleanCommentContent(payload && payload.content);
     if (!postId || !getForumPost(postId)) {
@@ -1910,14 +2076,11 @@ io.on('connection', (socket) => {
       return;
     }
     try {
-      db.prepare('DELETE FROM comments WHERE post_id = ?').run(postId);
-      db.prepare('DELETE FROM posts WHERE id = ?').run(postId);
+      deleteForumPostById(postId);
     } catch (error) {
       socket.emit('forum error', '删除帖子失败');
       return;
     }
-    io.to(forumPostChannel(postId)).emit('forum post deleted', { postId });
-    broadcastForumPosts();
     broadcastAdminDashboards();
   });
 
@@ -1948,6 +2111,45 @@ io.on('connection', (socket) => {
     broadcastAdminDashboards();
   });
 
+  socket.on('report forum post', (payload) => {
+    if (!requireCommunityAccess(socket, '举报帖子')) return;
+    const postId = cleanForumId(payload && payload.postId);
+    const reason = cleanReportReason(payload && payload.reason);
+    const details = cleanReportDetails(payload && payload.details);
+    const post = rawForumPost(postId);
+    if (!post) {
+      socket.emit('forum error', '帖子不存在');
+      return;
+    }
+    if (post.user_id === socket.user.id) {
+      socket.emit('forum error', '不能举报自己的帖子');
+      return;
+    }
+    if (!reason) {
+      socket.emit('forum error', '请选择举报原因');
+      return;
+    }
+    try {
+      db.prepare(`
+        INSERT INTO post_reports (id, post_id, reporter_user_id, reported_user_id, reason, details, status, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)
+      `).run(
+        `report:${crypto.randomUUID()}`,
+        postId,
+        socket.user.id,
+        post.user_id,
+        reason,
+        details,
+        new Date().toISOString()
+      );
+    } catch (error) {
+      socket.emit('forum error', '你已经举报过该帖子了');
+      return;
+    }
+    socket.emit('forum notice', '举报已提交，管理员会尽快处理');
+    broadcastAdminDashboards();
+  });
+
   socket.on('get user profile', (userIdValue) => {
     if (!requireAuth(socket, '查看用户主页')) return;
     const userId = typeof userIdValue === 'string' ? userIdValue.trim() : '';
@@ -1960,7 +2162,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('star user', (userIdValue) => {
-    if (!requireAuth(socket, '点 Star')) return;
+    if (!requireCommunityAccess(socket, '点 Star')) return;
     const userId = typeof userIdValue === 'string' ? userIdValue.trim() : '';
     const target = users.find((item) => item.id === userId);
     if (!target) {
@@ -2000,7 +2202,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('update profile details', (payload) => {
-    if (!requireAuth(socket, '更新个人主页')) return;
+    if (!requireCommunityAccess(socket, '更新个人主页')) return;
     const bio = cleanBio(payload && payload.bio);
     syncUserProfile(socket.user, { bio });
     socket.emit('profileNotice', '个人简介已保存');
@@ -2008,7 +2210,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('profile banner upload', (payload) => {
-    if (!requireAuth(socket, '上传主页背景')) return;
+    if (!requireCommunityAccess(socket, '上传主页背景')) return;
     const base64 = payload && typeof payload.base64 === 'string' ? payload.base64 : '';
     const previousBanner = socket.user.profileBanner;
     const result = saveProfileBannerUpload(socket.user, base64);
@@ -2023,7 +2225,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('profile banner reset', () => {
-    if (!requireAuth(socket, '恢复主页背景')) return;
+    if (!requireCommunityAccess(socket, '恢复主页背景')) return;
     const previousBanner = socket.user.profileBanner;
     syncUserProfile(socket.user, { profileBanner: '' });
     deleteBannerFile(previousBanner);
@@ -2032,7 +2234,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('avatar upload', (payload) => {
-    if (!requireAuth(socket, '修改头像')) return;
+    if (!requireCommunityAccess(socket, '修改头像')) return;
     const base64 = payload && typeof payload.base64 === 'string' ? payload.base64 : '';
     const previousAvatar = socket.user.avatar;
     const result = saveAvatarUpload(socket.user, base64);
@@ -2046,7 +2248,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('avatar reset', () => {
-    if (!requireAuth(socket, '恢复默认头像')) return;
+    if (!requireCommunityAccess(socket, '恢复默认头像')) return;
     const previousAvatar = socket.user.avatar;
     syncUserAvatar(socket.user, makeAvatar(displayNameOf(socket.user)));
     deleteAvatarFile(previousAvatar);
@@ -2059,7 +2261,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('rename display name', (payload) => {
-    if (!requireAuth(socket, '修改昵称')) return;
+    if (!requireCommunityAccess(socket, '修改昵称')) return;
     const newDisplayName = cleanDisplayName(payload && payload.displayName);
     if (!newDisplayName) {
       socket.emit('rename result', { status: 'error', message: `昵称需要 ${MIN_DISPLAY_NAME_LENGTH}-${MAX_DISPLAY_NAME_LENGTH} 个字符` });
@@ -2413,6 +2615,65 @@ io.on('connection', (socket) => {
       return;
     }
     socket.emit('admin notice', '公告已发布');
+    broadcastAdminDashboards();
+  });
+
+  socket.on('admin handle report', (payload) => {
+    if (!requireAdmin(socket)) return;
+    const reportId = payload && typeof payload.reportId === 'string' ? payload.reportId : '';
+    const action = payload && typeof payload.action === 'string' ? payload.action : '';
+    const note = cleanAdminNote(payload && payload.note);
+    const report = db.prepare('SELECT * FROM post_reports WHERE id = ?').get(reportId);
+    if (!report) {
+      socket.emit('admin error', '举报不存在');
+      return;
+    }
+    const post = rawForumPost(report.post_id);
+    const reportedUser = userById(report.reported_user_id);
+    let status = 'dismissed';
+    let actionTaken = 'dismissed';
+
+    try {
+      if (action === 'view') {
+        socket.emit('admin open reported post', {
+          postId: report.post_id,
+          post: post ? publicForumPost(rowToPost({ ...post, comment_count: 0 })) : null,
+          comments: post ? listForumComments(report.post_id) : []
+        });
+        return;
+      }
+
+      if (action === 'delete_post' || action === 'delete_and_ban') {
+        deleteForumPostById(report.post_id);
+        status = 'post_deleted';
+        actionTaken = 'post_deleted';
+      }
+
+      if (action === 'ban_user' || action === 'delete_and_ban') {
+        if (!reportedUser) {
+          socket.emit('admin error', '被举报用户不存在');
+          return;
+        }
+        if (!banUser(reportedUser, note || reportReasonLabel(report.reason))) {
+          socket.emit('admin error', '不能封禁该用户');
+          return;
+        }
+        status = 'user_banned';
+        actionTaken = action === 'delete_and_ban' ? 'post_deleted,user_banned' : 'user_banned';
+      }
+
+      if (!['dismiss', 'delete_post', 'ban_user', 'delete_and_ban'].includes(action)) {
+        socket.emit('admin error', '请选择有效处理方式');
+        return;
+      }
+
+      updateReportStatus(reportId, status, socket.user.id, note, actionTaken);
+    } catch (error) {
+      socket.emit('admin error', '处理举报失败');
+      return;
+    }
+
+    socket.emit('admin notice', '举报已处理');
     broadcastAdminDashboards();
   });
 

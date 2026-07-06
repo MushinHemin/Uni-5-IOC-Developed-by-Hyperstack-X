@@ -2,7 +2,7 @@
 
 Uni 5 Sonoma is a lightweight realtime chat and community app with account login, group chat, private chat, forum posts, admin tools, message recall, image paste/upload, voice messages, and a glass-style responsive web UI.
 
-Current release: **Sonoma 5.4.5 Profile & Star Update**
+Current release: **Sonoma 5.4.6 Community Safety & Stability Update**
 
 ## Features
 
@@ -16,6 +16,7 @@ Current release: **Sonoma 5.4.5 Profile & Star Update**
 - Display-name personalization with weekly rename limits and admin approval
 - Bulletin mailbox with unread badges, version notices, admin announcements, and rename status messages
 - Sonoma user profiles with bio, profile banner, contact actions, and daily Stars
+- Forum report workflow, admin report review center, and basic community bans
 - Message recall within the configured recall window
 - Text, image, pasted image, and voice messages
 - Quote, read-aloud, and recall actions from a message context menu
@@ -28,9 +29,31 @@ Current release: **Sonoma 5.4.5 Profile & Star Update**
 - Uni 5.4.0: redesigned post-login home hub, clearer Chat / Forum module navigation, and refined module UI hierarchy
 - Uni 5.4.3: display-name identity layer, rename approval workflow, bulletin mailbox, admin announcements, and forum polish
 - Sonoma 5.4.5: user profile pages, profile banners, bio editing, daily Stars, and user list sorting
+- Sonoma 5.4.6: community safety tools, forum reports, admin review actions, bans, and stability fixes
 - Uni 5.4.1: personalization controls, compact presence status, latency monitoring, forum persistence hardening, CORS configuration, and stability cleanup
 
 ## Release Notes
+
+### Sonoma 5.4.6 Community Safety & Stability Update
+
+Added:
+
+- Added forum post reporting with Sonoma-style report dialog
+- Added SQLite-backed report persistence and duplicate-report protection
+- Added admin report center with view, dismiss, delete post, ban user, and combined moderation actions
+- Added basic community ban fields and enforcement for posting, commenting, Stars, reports, and profile edits
+
+Improved:
+
+- Hardened Star and community actions with server-side permission checks
+- Improved profile fallback handling for empty bio and missing banner images
+- Refined user list sorting and Star badge consistency
+- Preserved the Sonoma liquid glass UI style across new safety surfaces
+
+Fixed:
+
+- Fixed community action bypasses for banned accounts
+- Fixed report and moderation status updates across admin and forum views
 
 ### Sonoma 5.4.5 Profile & Star Update
 
