@@ -38,6 +38,7 @@ const UPLOADS_DIR = path.join(__dirname, 'uploads');
 const AVATAR_UPLOAD_DIR = path.join(UPLOADS_DIR, 'avatars');
 const BANNER_UPLOAD_DIR = path.join(UPLOADS_DIR, 'banners');
 const STICKER_UPLOAD_DIR = path.join(UPLOADS_DIR, 'stickers');
+const POST_IMAGE_UPLOAD_DIR = path.join(UPLOADS_DIR, 'post-images');
 const JSON_FILE_MODE = 0o600;
 const MAX_MESSAGE_LENGTH = 1000;
 const MAX_POST_TITLE_LENGTH = 80;
@@ -54,6 +55,7 @@ const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
 const MAX_BANNER_BYTES = 5 * 1024 * 1024;
 const MAX_STICKER_BYTES = 2 * 1024 * 1024;
+const MAX_POST_IMAGES = 9;
 const MAX_PERSONAL_STICKERS = 50;
 const MAX_VOICE_BYTES = 3 * 1024 * 1024;
 const MAX_HISTORY_MESSAGES = 300;
@@ -290,6 +292,77 @@ function cleanCommentContent(value) {
   return cleanText(value, MAX_COMMENT_LENGTH);
 }
 
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function stripHtml(value) {
+  if (typeof value !== 'string') return '';
+  return value
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function isSafeLink(value) {
+  if (typeof value !== 'string') return false;
+  const href = value.trim();
+  if (!href) return false;
+  if (href.startsWith('/')) return true;
+  return /^https?:\/\//i.test(href) || /^mailto:/i.test(href);
+}
+
+function isSafePostImageUrl(value) {
+  return typeof value === 'string' && /^\/uploads\/post-images\/[a-zA-Z0-9_.-]+\.(jpg|jpeg|png|webp|gif)$/.test(value.trim());
+}
+
+function sanitizeRichHtml(value) {
+  const raw = typeof value === 'string' ? value.slice(0, 60000) : '';
+  if (!raw.trim()) return '';
+  const blocked = raw
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/<\/?(script|iframe|object|embed|form|input|button|textarea|select|option|video|audio|svg|math|link|meta|base)[^>]*>/gi, '');
+  const allowed = new Set(['p', 'br', 'strong', 'b', 'em', 'i', 'u', 's', 'h2', 'h3', 'ul', 'ol', 'li', 'blockquote', 'code', 'pre', 'a', 'img']);
+  return blocked.replace(/<\/?([a-z0-9]+)([^>]*)>/gi, (match, tagName, attrText = '') => {
+    const tag = String(tagName || '').toLowerCase();
+    if (!allowed.has(tag)) return '';
+    if (tag === 'br') return '<br>';
+    if (match.startsWith('</')) return `</${tag}>`;
+    if (tag === 'a') {
+      const hrefMatch = String(attrText).match(/\shref\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/i);
+      const href = hrefMatch ? (hrefMatch[2] || hrefMatch[3] || hrefMatch[4] || '').trim() : '';
+      if (!isSafeLink(href)) return '<a>';
+      return `<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">`;
+    }
+    if (tag === 'img') {
+      const srcMatch = String(attrText).match(/\ssrc\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/i);
+      const altMatch = String(attrText).match(/\salt\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/i);
+      const src = srcMatch ? (srcMatch[2] || srcMatch[3] || srcMatch[4] || '').trim() : '';
+      const alt = altMatch ? cleanText(altMatch[2] || altMatch[3] || altMatch[4] || '', 120) : '';
+      if (!isSafePostImageUrl(src)) return '';
+      return `<img src="${escapeHtml(src)}" alt="${escapeHtml(alt)}" loading="lazy" decoding="async">`;
+    }
+    return `<${tag}>`;
+  });
+}
+
+function richHtmlToText(html, fallback = '') {
+  return cleanPostContent(stripHtml(html) || fallback);
+}
+
 function cleanBio(value) {
   return cleanText(value, 200);
 }
@@ -408,6 +481,10 @@ function isUploadedSticker(value) {
   return typeof value === 'string' && value.startsWith('/uploads/stickers/');
 }
 
+function isUploadedPostImage(value) {
+  return typeof value === 'string' && value.startsWith('/uploads/post-images/');
+}
+
 function avatarFilePath(avatarUrl) {
   if (!isUploadedAvatar(avatarUrl)) return '';
   const fileName = path.basename(avatarUrl);
@@ -424,6 +501,12 @@ function stickerFilePath(stickerUrl) {
   if (!isUploadedSticker(stickerUrl)) return '';
   const fileName = path.basename(stickerUrl);
   return path.join(STICKER_UPLOAD_DIR, fileName);
+}
+
+function postImageFilePath(imageUrl) {
+  if (!isUploadedPostImage(imageUrl)) return '';
+  const fileName = path.basename(imageUrl);
+  return path.join(POST_IMAGE_UPLOAD_DIR, fileName);
 }
 
 function stickerSvgDataUri(label, fill, accent = '#ffffff') {
@@ -722,6 +805,9 @@ function initDatabase() {
       avatar TEXT NOT NULL,
       title TEXT NOT NULL,
       content TEXT NOT NULL,
+      content_html TEXT NOT NULL DEFAULT '',
+      content_text TEXT NOT NULL DEFAULT '',
+      content_format TEXT NOT NULL DEFAULT 'plain',
       created_at TEXT NOT NULL
     );
 
@@ -732,7 +818,46 @@ function initDatabase() {
       username TEXT NOT NULL,
       avatar TEXT NOT NULL,
       content TEXT NOT NULL,
+      parent_comment_id TEXT NOT NULL DEFAULT '',
+      floor_number INTEGER NOT NULL DEFAULT 0,
+      reply_number INTEGER NOT NULL DEFAULT 0,
+      is_deleted INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS post_images (
+      id TEXT PRIMARY KEY,
+      post_id TEXT NOT NULL DEFAULT '',
+      user_id TEXT NOT NULL,
+      url TEXT NOT NULL,
+      filename TEXT NOT NULL,
+      mime_type TEXT NOT NULL,
+      size_bytes INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS post_likes (
+      id TEXT PRIMARY KEY,
+      post_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      UNIQUE(post_id, user_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS post_favorites (
+      id TEXT PRIMARY KEY,
+      post_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      UNIQUE(post_id, user_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS comment_likes (
+      id TEXT PRIMARY KEY,
+      comment_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      UNIQUE(comment_id, user_id)
     );
 
     CREATE TABLE IF NOT EXISTS rename_history (
@@ -914,7 +1039,17 @@ function initDatabase() {
   ensureColumn('messages', 'room_id', `TEXT NOT NULL DEFAULT '${DEFAULT_ROOM_ID}'`);
   ensureColumn('messages', 'sticker_id', "TEXT NOT NULL DEFAULT ''");
   db.exec('CREATE INDEX IF NOT EXISTS idx_messages_room_id ON messages(room_id)');
+  ensureColumn('posts', 'content_html', "TEXT NOT NULL DEFAULT ''");
+  ensureColumn('posts', 'content_text', "TEXT NOT NULL DEFAULT ''");
+  ensureColumn('posts', 'content_format', "TEXT NOT NULL DEFAULT 'plain'");
+  ensureColumn('comments', 'parent_comment_id', "TEXT NOT NULL DEFAULT ''");
+  ensureColumn('comments', 'floor_number', "INTEGER NOT NULL DEFAULT 0");
+  ensureColumn('comments', 'reply_number', "INTEGER NOT NULL DEFAULT 0");
+  ensureColumn('comments', 'is_deleted', "INTEGER NOT NULL DEFAULT 0");
   ensureColumn('notifications', 'dedupe_key', "TEXT NOT NULL DEFAULT ''");
+  db.exec('CREATE INDEX IF NOT EXISTS idx_comments_parent ON comments(parent_comment_id)');
+  backfillForumContentFields();
+  backfillCommentFloors();
   ensureOfficialStickers();
   ensureDefaultRoom();
   ensureSystemAnnouncements();
@@ -965,6 +1100,14 @@ function migrateForumTables() {
     CREATE INDEX IF NOT EXISTS idx_comments_post_id ON comments(post_id);
     CREATE INDEX IF NOT EXISTS idx_comments_created_at ON comments(created_at);
     CREATE INDEX IF NOT EXISTS idx_comments_user_id ON comments(user_id);
+    CREATE INDEX IF NOT EXISTS idx_post_images_post_id ON post_images(post_id);
+    CREATE INDEX IF NOT EXISTS idx_post_images_user_id ON post_images(user_id);
+    CREATE INDEX IF NOT EXISTS idx_post_likes_post_id ON post_likes(post_id);
+    CREATE INDEX IF NOT EXISTS idx_post_likes_user_id ON post_likes(user_id);
+    CREATE INDEX IF NOT EXISTS idx_post_favorites_post_id ON post_favorites(post_id);
+    CREATE INDEX IF NOT EXISTS idx_post_favorites_user_id ON post_favorites(user_id);
+    CREATE INDEX IF NOT EXISTS idx_comment_likes_comment_id ON comment_likes(comment_id);
+    CREATE INDEX IF NOT EXISTS idx_comment_likes_user_id ON comment_likes(user_id);
   `);
 }
 
@@ -992,6 +1135,47 @@ function ensureColumn(tableName, columnName, definition) {
   const columns = db.prepare(`PRAGMA table_info(${tableName})`).all();
   if (columns.some((column) => column.name === columnName)) return;
   db.exec(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${definition}`);
+}
+
+function backfillForumContentFields() {
+  db.prepare(`
+    UPDATE posts
+    SET content_text = content
+    WHERE TRIM(COALESCE(content_text, '')) = ''
+  `).run();
+  db.prepare(`
+    UPDATE posts
+    SET content_format = 'plain'
+    WHERE TRIM(COALESCE(content_format, '')) = ''
+  `).run();
+}
+
+function backfillCommentFloors() {
+  const postRows = db.prepare('SELECT DISTINCT post_id FROM comments').all();
+  postRows.forEach((postRow) => {
+    const postId = postRow.post_id;
+    const roots = db.prepare(`
+      SELECT id, floor_number FROM comments
+      WHERE post_id = ? AND (parent_comment_id = '' OR parent_comment_id IS NULL)
+      ORDER BY created_at ASC, id ASC
+    `).all(postId);
+    roots.forEach((comment, index) => {
+      const floor = Number(comment.floor_number) > 0 ? Number(comment.floor_number) : index + 1;
+      if (Number(comment.floor_number) <= 0) {
+        db.prepare('UPDATE comments SET floor_number = ?, reply_number = 0 WHERE id = ?').run(floor, comment.id);
+      }
+      const replies = db.prepare(`
+        SELECT id, reply_number FROM comments
+        WHERE post_id = ? AND parent_comment_id = ?
+        ORDER BY created_at ASC, id ASC
+      `).all(postId, comment.id);
+      replies.forEach((reply, replyIndex) => {
+        if (Number(reply.reply_number) <= 0 || Number(reply.floor_number) <= 0) {
+          db.prepare('UPDATE comments SET floor_number = ?, reply_number = ? WHERE id = ?').run(floor, replyIndex + 1, reply.id);
+        }
+      });
+    });
+  });
 }
 
 function rowToUser(row) {
@@ -1052,7 +1236,9 @@ function rowToPost(row) {
   if (!row) return null;
   const postId = cleanForumId(row.id || row.post_id);
   const title = cleanPostTitle(row.title);
-  const content = cleanPostContent(row.content);
+  const contentHtml = sanitizeRichHtml(row.content_html || '');
+  const contentText = cleanPostContent(row.content_text || stripHtml(contentHtml) || row.content);
+  const content = cleanPostContent(row.content || contentText);
   if (!postId || !title || !content) return null;
   return {
     id: postId,
@@ -1062,6 +1248,9 @@ function rowToPost(row) {
     avatar: cleanAvatar(row.avatar, row.username),
     title,
     content,
+    contentHtml,
+    contentText,
+    contentFormat: row.content_format === 'html' ? 'html' : 'plain',
     createdAt: Number.isNaN(Date.parse(row.created_at)) ? new Date().toISOString() : row.created_at,
     commentCount: Number(row.comment_count || 0)
   };
@@ -1081,6 +1270,10 @@ function rowToComment(row) {
     username: cleanUsername(row.username) || '匿名',
     avatar: cleanAvatar(row.avatar, row.username),
     content,
+    parentCommentId: cleanForumId(row.parent_comment_id || ''),
+    floorNumber: Number(row.floor_number || 0),
+    replyNumber: Number(row.reply_number || 0),
+    isDeleted: Boolean(row.is_deleted),
     createdAt: Number.isNaN(Date.parse(row.created_at)) ? new Date().toISOString() : row.created_at
   };
 }
@@ -1257,7 +1450,31 @@ function publicMessage(message, viewerUserId = '') {
   };
 }
 
-function publicForumPost(post) {
+function postLikeCount(postId) {
+  return Number(db.prepare('SELECT COUNT(*) AS count FROM post_likes WHERE post_id = ?').get(postId).count || 0);
+}
+
+function postFavoriteCount(postId) {
+  return Number(db.prepare('SELECT COUNT(*) AS count FROM post_favorites WHERE post_id = ?').get(postId).count || 0);
+}
+
+function commentLikeCount(commentId) {
+  return Number(db.prepare('SELECT COUNT(*) AS count FROM comment_likes WHERE comment_id = ?').get(commentId).count || 0);
+}
+
+function userLikedPost(userId, postId) {
+  return Boolean(userId && postId && db.prepare('SELECT 1 FROM post_likes WHERE post_id = ? AND user_id = ?').get(postId, userId));
+}
+
+function userFavoritedPost(userId, postId) {
+  return Boolean(userId && postId && db.prepare('SELECT 1 FROM post_favorites WHERE post_id = ? AND user_id = ?').get(postId, userId));
+}
+
+function userLikedComment(userId, commentId) {
+  return Boolean(userId && commentId && db.prepare('SELECT 1 FROM comment_likes WHERE comment_id = ? AND user_id = ?').get(commentId, userId));
+}
+
+function publicForumPost(post, viewerUserId = '') {
   if (!post) return null;
   const currentUser = userById(post.userId);
   const displayName = currentUser ? displayNameOf(currentUser) : displayNameOf(post.username);
@@ -1271,12 +1488,19 @@ function publicForumPost(post) {
     starCount: currentUser ? starCountForUser(currentUser.id) : starCountForUser(post.userId),
     title: post.title,
     content: post.content,
+    contentHtml: post.contentHtml || '',
+    contentText: post.contentText || post.content,
+    contentFormat: post.contentFormat || 'plain',
     createdAt: post.createdAt,
-    commentCount: Number(post.commentCount || 0)
+    commentCount: Number(post.commentCount || 0),
+    likeCount: postLikeCount(post.postId),
+    favoriteCount: postFavoriteCount(post.postId),
+    likedByMe: userLikedPost(viewerUserId, post.postId),
+    favoritedByMe: userFavoritedPost(viewerUserId, post.postId)
   };
 }
 
-function publicForumComment(comment) {
+function publicForumComment(comment, viewerUserId = '') {
   if (!comment) return null;
   const currentUser = userById(comment.userId);
   const displayName = currentUser ? displayNameOf(currentUser) : displayNameOf(comment.username);
@@ -1290,55 +1514,62 @@ function publicForumComment(comment) {
     avatar: comment.avatar || makeAvatar(displayName),
     starCount: currentUser ? starCountForUser(currentUser.id) : starCountForUser(comment.userId),
     content: comment.content,
+    parentCommentId: comment.parentCommentId || '',
+    floorNumber: Number(comment.floorNumber || 0),
+    replyNumber: Number(comment.replyNumber || 0),
+    floorLabel: comment.parentCommentId ? `#${comment.floorNumber}-${comment.replyNumber}` : `#${comment.floorNumber || '?'}`,
+    isDeleted: Boolean(comment.isDeleted),
+    likeCount: commentLikeCount(comment.commentId),
+    likedByMe: userLikedComment(viewerUserId, comment.commentId),
     createdAt: comment.createdAt
   };
 }
 
-function listForumPosts() {
+function listForumPosts(viewerUserId = '') {
   return db.prepare(`
     SELECT posts.*, COUNT(comments.id) AS comment_count
     FROM posts
-    LEFT JOIN comments ON comments.post_id = posts.id
+    LEFT JOIN comments ON comments.post_id = posts.id AND comments.is_deleted = 0
     GROUP BY posts.id
     ORDER BY posts.created_at DESC
     LIMIT ?
-  `).all(MAX_FORUM_POSTS).map(rowToPost).filter(Boolean).map(publicForumPost);
+  `).all(MAX_FORUM_POSTS).map(rowToPost).filter(Boolean).map((post) => publicForumPost(post, viewerUserId));
 }
 
-function getForumPost(postIdValue) {
+function getForumPost(postIdValue, viewerUserId = '') {
   const postId = cleanForumId(postIdValue);
   if (!postId) return null;
   const row = db.prepare(`
     SELECT posts.*, COUNT(comments.id) AS comment_count
     FROM posts
-    LEFT JOIN comments ON comments.post_id = posts.id
+    LEFT JOIN comments ON comments.post_id = posts.id AND comments.is_deleted = 0
     WHERE posts.id = ?
     GROUP BY posts.id
   `).get(postId);
-  return publicForumPost(rowToPost(row));
+  return publicForumPost(rowToPost(row), viewerUserId);
 }
 
-function listForumComments(postIdValue) {
+function listForumComments(postIdValue, viewerUserId = '') {
   const postId = cleanForumId(postIdValue);
   if (!postId) return [];
   return db.prepare(`
     SELECT * FROM comments
-    WHERE post_id = ?
-    ORDER BY created_at ASC
-  `).all(postId).map(rowToComment).filter(Boolean).map(publicForumComment);
+    WHERE post_id = ? AND is_deleted = 0
+    ORDER BY floor_number ASC, reply_number ASC, created_at ASC
+  `).all(postId).map(rowToComment).filter(Boolean).map((comment) => publicForumComment(comment, viewerUserId));
 }
 
 function insertForumPost(post) {
   db.prepare(`
-    INSERT INTO posts (id, user_id, username, avatar, title, content, created_at)
-    VALUES (@postId, @userId, @username, @avatar, @title, @content, @createdAt)
+    INSERT INTO posts (id, user_id, username, avatar, title, content, content_html, content_text, content_format, created_at)
+    VALUES (@postId, @userId, @username, @avatar, @title, @content, @contentHtml, @contentText, @contentFormat, @createdAt)
   `).run(post);
 }
 
 function insertForumComment(comment) {
   db.prepare(`
-    INSERT INTO comments (id, post_id, user_id, username, avatar, content, created_at)
-    VALUES (@commentId, @postId, @userId, @username, @avatar, @content, @createdAt)
+    INSERT INTO comments (id, post_id, user_id, username, avatar, content, parent_comment_id, floor_number, reply_number, is_deleted, created_at)
+    VALUES (@commentId, @postId, @userId, @username, @avatar, @content, @parentCommentId, @floorNumber, @replyNumber, 0, @createdAt)
   `).run(comment);
 }
 
@@ -1352,6 +1583,110 @@ function rawForumComment(commentId) {
   const id = cleanForumId(commentId);
   if (!id) return null;
   return db.prepare('SELECT * FROM comments WHERE id = ?').get(id) || null;
+}
+
+function nextCommentFloor(postId, parentCommentId = '') {
+  if (parentCommentId) {
+    const parent = rowToComment(rawForumComment(parentCommentId));
+    if (!parent || parent.postId !== postId || parent.parentCommentId) return null;
+    const nextReply = Number(db.prepare(`
+      SELECT COALESCE(MAX(reply_number), 0) + 1 AS next FROM comments
+      WHERE post_id = ? AND parent_comment_id = ?
+    `).get(postId, parentCommentId).next || 1);
+    return { floorNumber: parent.floorNumber || 1, replyNumber: nextReply };
+  }
+  const nextFloor = Number(db.prepare(`
+    SELECT COALESCE(MAX(floor_number), 0) + 1 AS next FROM comments
+    WHERE post_id = ? AND (parent_comment_id = '' OR parent_comment_id IS NULL)
+  `).get(postId).next || 1);
+  return { floorNumber: nextFloor, replyNumber: 0 };
+}
+
+function updatePostImagesForPost(userId, postId, contentHtml) {
+  const urls = Array.from(new Set(String(contentHtml || '').match(/\/uploads\/post-images\/[a-zA-Z0-9_.-]+\.(?:jpg|jpeg|png|webp|gif)/g) || []))
+    .filter(isSafePostImageUrl)
+    .slice(0, MAX_POST_IMAGES);
+  if (urls.length === 0) return;
+  const placeholders = urls.map(() => '?').join(',');
+  db.prepare(`
+    UPDATE post_images SET post_id = ?
+    WHERE user_id = ? AND url IN (${placeholders})
+  `).run(postId, userId, ...urls);
+}
+
+function togglePostLike(user, postIdValue) {
+  if (!user) return { error: '请先登录', status: 401 };
+  if (user.isBanned) return { error: '你的账号已被限制使用社区功能', status: 403 };
+  const postId = cleanForumId(postIdValue);
+  const post = rawForumPost(postId);
+  if (!post) return { error: '帖子不存在', status: 404 };
+  const existing = db.prepare('SELECT id FROM post_likes WHERE post_id = ? AND user_id = ?').get(postId, user.id);
+  let liked = false;
+  if (existing) {
+    db.prepare('DELETE FROM post_likes WHERE post_id = ? AND user_id = ?').run(postId, user.id);
+  } else {
+    db.prepare('INSERT INTO post_likes (id, post_id, user_id, created_at) VALUES (?, ?, ?, ?)').run(`post-like:${crypto.randomUUID()}`, postId, user.id, new Date().toISOString());
+    liked = true;
+    if (post.user_id !== user.id) {
+      createNotification({
+        userId: post.user_id,
+        actorUserId: user.id,
+        type: 'reaction_received',
+        title: `${displayNameOf(user)} 点赞了你的帖子`,
+        body: cleanPostTitle(post.title),
+        targetType: 'post',
+        targetId: postId,
+        dedupeKey: `post-like:${postId}:${user.id}:${post.user_id}`
+      });
+    }
+  }
+  return { post: getForumPost(postId, user.id), liked, likeCount: postLikeCount(postId) };
+}
+
+function togglePostFavorite(user, postIdValue) {
+  if (!user) return { error: '请先登录', status: 401 };
+  if (user.isBanned) return { error: '你的账号已被限制使用社区功能', status: 403 };
+  const postId = cleanForumId(postIdValue);
+  if (!rawForumPost(postId)) return { error: '帖子不存在', status: 404 };
+  const existing = db.prepare('SELECT id FROM post_favorites WHERE post_id = ? AND user_id = ?').get(postId, user.id);
+  let favorited = false;
+  if (existing) {
+    db.prepare('DELETE FROM post_favorites WHERE post_id = ? AND user_id = ?').run(postId, user.id);
+  } else {
+    db.prepare('INSERT INTO post_favorites (id, post_id, user_id, created_at) VALUES (?, ?, ?, ?)').run(`post-favorite:${crypto.randomUUID()}`, postId, user.id, new Date().toISOString());
+    favorited = true;
+  }
+  return { post: getForumPost(postId, user.id), favorited, favoriteCount: postFavoriteCount(postId) };
+}
+
+function toggleCommentLike(user, commentIdValue) {
+  if (!user) return { error: '请先登录', status: 401 };
+  if (user.isBanned) return { error: '你的账号已被限制使用社区功能', status: 403 };
+  const commentId = cleanForumId(commentIdValue);
+  const raw = rawForumComment(commentId);
+  const comment = rowToComment(raw);
+  if (!comment || comment.isDeleted) return { error: '评论不存在', status: 404 };
+  const existing = db.prepare('SELECT id FROM comment_likes WHERE comment_id = ? AND user_id = ?').get(commentId, user.id);
+  let liked = false;
+  if (existing) {
+    db.prepare('DELETE FROM comment_likes WHERE comment_id = ? AND user_id = ?').run(commentId, user.id);
+  } else {
+    db.prepare('INSERT INTO comment_likes (id, comment_id, user_id, created_at) VALUES (?, ?, ?, ?)').run(`comment-like:${crypto.randomUUID()}`, commentId, user.id, new Date().toISOString());
+    liked = true;
+    if (comment.userId !== user.id) {
+      createNotification({
+        userId: comment.userId,
+        actorUserId: user.id,
+        type: 'reaction_received',
+        title: `${displayNameOf(user)} 点赞了你的评论`,
+        body: cleanCommentContent(comment.content),
+        targetType: 'post',
+        targetId: comment.postId,
+        dedupeKey: `comment-like:${commentId}:${user.id}:${comment.userId}`
+      });
+    }
+  }
+  return { comment: publicForumComment(rowToComment(rawForumComment(commentId)), user.id), liked, likeCount: commentLikeCount(commentId) };
 }
 
 function reportReasonLabel(reason) {
@@ -1610,19 +1945,25 @@ function forumPostChannel(postId) {
 }
 
 function emitForumPosts(socket) {
-  socket.emit('forum posts', { posts: listForumPosts() });
+  socket.emit('forum posts', { posts: listForumPosts(socket.user ? socket.user.id : '') });
 }
 
 function broadcastForumPosts() {
-  io.emit('forum posts', { posts: listForumPosts() });
+  io.sockets.sockets.forEach((connectedSocket) => {
+    connectedSocket.emit('forum posts', { posts: listForumPosts(connectedSocket.user ? connectedSocket.user.id : '') });
+  });
 }
 
 function broadcastForumPostDetail(postId) {
-  const post = getForumPost(postId);
-  if (!post) return;
-  io.to(forumPostChannel(postId)).emit('forum post detail', {
-    post,
-    comments: listForumComments(postId)
+  io.sockets.sockets.forEach((connectedSocket) => {
+    if (connectedSocket.currentForumPostId !== postId) return;
+    const userId = connectedSocket.user ? connectedSocket.user.id : '';
+    const post = getForumPost(postId, userId);
+    if (!post) return;
+    connectedSocket.emit('forum post detail', {
+      post,
+      comments: listForumComments(postId, userId)
+    });
   });
 }
 
@@ -2246,17 +2587,19 @@ function searchUni(user, { q, scope = 'all', limit = 30, offset = 0 } = {}) {
     db.prepare(`
       SELECT posts.*, COUNT(comments.id) AS comment_count
       FROM posts
-      LEFT JOIN comments ON comments.post_id = posts.id
-      WHERE posts.title LIKE ? ESCAPE '\\' OR posts.content LIKE ? ESCAPE '\\'
+      LEFT JOIN comments ON comments.post_id = posts.id AND comments.is_deleted = 0
+      WHERE posts.title LIKE ? ESCAPE '\\'
+        OR posts.content LIKE ? ESCAPE '\\'
+        OR posts.content_text LIKE ? ESCAPE '\\'
       GROUP BY posts.id
       ORDER BY posts.created_at DESC
       LIMIT ? OFFSET ?
-    `).all(pattern, pattern, safeLimit, safeOffset).map(rowToPost).filter(Boolean).forEach((post) => {
+    `).all(pattern, pattern, pattern, safeLimit, safeOffset).map(rowToPost).filter(Boolean).forEach((post) => {
       results.push({
         type: 'post',
         id: post.postId,
         title: post.title,
-        summary: cleanText(post.content, 160),
+        summary: cleanText(post.contentText || post.content, 160),
         avatar: post.avatar,
         createdAt: post.createdAt,
         targetType: 'post',
@@ -2268,7 +2611,7 @@ function searchUni(user, { q, scope = 'all', limit = 30, offset = 0 } = {}) {
       SELECT comments.*, posts.title AS post_title
       FROM comments
       JOIN posts ON posts.id = comments.post_id
-      WHERE comments.content LIKE ? ESCAPE '\\'
+      WHERE comments.is_deleted = 0 AND comments.content LIKE ? ESCAPE '\\'
       ORDER BY comments.created_at DESC
       LIMIT ? OFFSET ?
     `).all(pattern, safeLimit, safeOffset).map(rowToComment).filter(Boolean).forEach((comment) => {
@@ -2357,6 +2700,13 @@ function searchUni(user, { q, scope = 'all', limit = 30, offset = 0 } = {}) {
 }
 
 function ensureSystemAnnouncements() {
+  createAnnouncement({
+    id: 'update:5.5.6',
+    type: 'update',
+    title: 'Sonoma 5.5.6 已上线',
+    content: '新增独立论坛发帖页面、富文本编辑器、帖子图片、点赞收藏、评论回复与楼层，并优化移动端显示和 Sonoma Web 渲染性能。',
+    priority: 'high'
+  });
   createAnnouncement({
     id: 'update:5.5.5',
     type: 'update',
@@ -2532,6 +2882,34 @@ function saveProfileBannerUpload(user, dataUrl) {
   const filePath = path.join(BANNER_UPLOAD_DIR, fileName);
   fs.writeFileSync(filePath, parsed.buffer, { mode: 0o600 });
   return { profileBanner: `/uploads/banners/${fileName}` };
+}
+
+function savePostImageUpload(user, dataUrl) {
+  if (!user) return { error: '请先登录' };
+  if (user.isBanned) return { error: '你的账号已被限制使用社区功能' };
+  const parsed = parseDataUrl(dataUrl, ALLOWED_IMAGE_TYPES, MAX_IMAGE_BYTES);
+  if (!parsed) return { error: '帖子图片仅支持 JPG、PNG、GIF、WebP，最大 5MB' };
+
+  fs.mkdirSync(POST_IMAGE_UPLOAD_DIR, { recursive: true });
+  const ext = IMAGE_EXTENSIONS[parsed.mime] || 'png';
+  const fileName = `post_${user.id}_${Date.now()}_${crypto.randomBytes(5).toString('hex')}.${ext}`;
+  const filePath = path.join(POST_IMAGE_UPLOAD_DIR, fileName);
+  fs.writeFileSync(filePath, parsed.buffer, { mode: 0o600 });
+  const image = {
+    id: `post-image:${crypto.randomUUID()}`,
+    postId: '',
+    userId: user.id,
+    url: `/uploads/post-images/${fileName}`,
+    filename: fileName,
+    mimeType: parsed.mime,
+    sizeBytes: parsed.buffer.length,
+    createdAt: new Date().toISOString()
+  };
+  db.prepare(`
+    INSERT INTO post_images (id, post_id, user_id, url, filename, mime_type, size_bytes, created_at)
+    VALUES (@id, @postId, @userId, @url, @filename, @mimeType, @sizeBytes, @createdAt)
+  `).run(image);
+  return { image };
 }
 
 function deleteBannerFile(bannerUrl) {
@@ -2940,6 +3318,7 @@ const typingTimers = new Map();
 fs.mkdirSync(AVATAR_UPLOAD_DIR, { recursive: true });
 fs.mkdirSync(BANNER_UPLOAD_DIR, { recursive: true });
 fs.mkdirSync(STICKER_UPLOAD_DIR, { recursive: true });
+fs.mkdirSync(POST_IMAGE_UPLOAD_DIR, { recursive: true });
 app.use('/uploads', express.static(UPLOADS_DIR));
 app.get('/api/notifications', (req, res) => {
   const user = requireApiUser(req, res);
@@ -3206,16 +3585,33 @@ io.on('connection', (socket) => {
     emitForumPosts(socket);
   });
 
+  socket.on('upload post image', (payload = {}) => {
+    if (!requireCommunityAccess(socket, '上传帖子图片')) return;
+    const result = savePostImageUpload(socket.user, payload && payload.base64);
+    if (result.error) {
+      socket.emit('forum error', result.error);
+      return;
+    }
+    socket.emit('post image uploaded', { image: result.image });
+  });
+
   socket.on('create forum post', (payload) => {
     if (!requireCommunityAccess(socket, '发帖')) return;
     const title = cleanPostTitle(payload && payload.title);
-    const content = cleanPostContent(payload && payload.content);
+    const incomingHtml = sanitizeRichHtml(payload && payload.contentHtml);
+    const contentText = richHtmlToText(incomingHtml, payload && payload.content);
+    const content = cleanPostContent(payload && payload.content) || contentText;
     if (!title) {
       socket.emit('forum error', '请输入帖子标题');
       return;
     }
-    if (!content) {
+    if (!contentText && !content) {
       socket.emit('forum error', '请输入帖子正文');
+      return;
+    }
+    const imageCount = (incomingHtml.match(/<img\b/gi) || []).length;
+    if (imageCount > MAX_POST_IMAGES) {
+      socket.emit('forum error', `每个帖子最多插入 ${MAX_POST_IMAGES} 张图片`);
       return;
     }
 
@@ -3225,16 +3621,20 @@ io.on('connection', (socket) => {
       username: displayNameOf(socket.user),
       avatar: socket.user.avatar || makeAvatar(displayNameOf(socket.user)),
       title,
-      content,
+      content: contentText || content,
+      contentHtml: incomingHtml,
+      contentText: contentText || content,
+      contentFormat: incomingHtml ? 'html' : 'plain',
       createdAt: new Date().toISOString()
     };
     try {
       insertForumPost(post);
+      updatePostImagesForPost(socket.user.id, post.postId, incomingHtml);
     } catch (error) {
       socket.emit('forum error', '发帖失败，请稍后再试');
       return;
     }
-    const publicPost = publicForumPost({ ...post, commentCount: 0 });
+    const publicPost = publicForumPost({ ...post, commentCount: 0 }, socket.user.id);
     socket.emit('forum post created', { post: publicPost, comments: [] });
     broadcastForumPosts();
   });
@@ -3242,7 +3642,7 @@ io.on('connection', (socket) => {
   socket.on('get forum post', (postIdValue) => {
     if (!requireAuth(socket, '查看帖子')) return;
     const postId = cleanForumId(postIdValue);
-    const post = getForumPost(postId);
+    const post = getForumPost(postId, socket.user.id);
     if (!post) {
       socket.emit('forum error', '帖子不存在');
       return;
@@ -3252,15 +3652,21 @@ io.on('connection', (socket) => {
     }
     socket.currentForumPostId = postId;
     socket.join(forumPostChannel(postId));
-    socket.emit('forum post detail', { post, comments: listForumComments(postId) });
+    socket.emit('forum post detail', { post, comments: listForumComments(postId, socket.user.id) });
   });
 
   socket.on('create forum comment', (payload) => {
     if (!requireCommunityAccess(socket, '评论')) return;
     const postId = cleanForumId(payload && payload.postId);
     const content = cleanCommentContent(payload && payload.content);
-    if (!postId || !getForumPost(postId)) {
+    const parentCommentId = cleanForumId(payload && payload.parentCommentId);
+    if (!postId || !getForumPost(postId, socket.user.id)) {
       socket.emit('forum error', '帖子不存在');
+      return;
+    }
+    const floor = nextCommentFloor(postId, parentCommentId);
+    if (!floor) {
+      socket.emit('forum error', '要回复的评论不存在');
       return;
     }
     if (!content) {
@@ -3275,6 +3681,9 @@ io.on('connection', (socket) => {
       username: displayNameOf(socket.user),
       avatar: socket.user.avatar || makeAvatar(displayNameOf(socket.user)),
       content,
+      parentCommentId,
+      floorNumber: floor.floorNumber,
+      replyNumber: floor.replyNumber,
       createdAt: new Date().toISOString()
     };
     try {
@@ -3284,21 +3693,59 @@ io.on('connection', (socket) => {
       return;
     }
     const post = rawForumPost(postId);
-    if (post && post.user_id !== socket.user.id) {
+    const parent = parentCommentId ? rowToComment(rawForumComment(parentCommentId)) : null;
+    const notifyTargetId = parent && parent.userId !== socket.user.id ? parent.userId : post && post.user_id !== socket.user.id ? post.user_id : '';
+    if (notifyTargetId) {
       createNotification({
-        userId: post.user_id,
+        userId: notifyTargetId,
         actorUserId: socket.user.id,
         type: 'forum_comment',
-        title: `${displayNameOf(socket.user)} 评论了你的帖子`,
+        title: parent ? `${displayNameOf(socket.user)} 回复了你的评论` : `${displayNameOf(socket.user)} 评论了你的帖子`,
         body: content,
         targetType: 'post',
         targetId: postId,
         metadata: { commentId: comment.commentId },
-        dedupeKey: `forum-comment:${comment.commentId}:${post.user_id}`
+        dedupeKey: `forum-comment:${comment.commentId}:${notifyTargetId}`
       });
     }
     io.to(forumPostChannel(postId)).emit('forum comment created', { comment: publicForumComment(comment) });
+    broadcastForumPostDetail(postId);
     broadcastForumPosts();
+  });
+
+  socket.on('toggle post like', (postIdValue) => {
+    if (!requireCommunityAccess(socket, '点赞帖子')) return;
+    const result = togglePostLike(socket.user, postIdValue);
+    if (result.error) {
+      socket.emit('forum error', result.error);
+      return;
+    }
+    socket.emit('forum post interaction', result);
+    broadcastForumPostDetail(result.post.postId);
+    broadcastForumPosts();
+  });
+
+  socket.on('toggle post favorite', (postIdValue) => {
+    if (!requireCommunityAccess(socket, '收藏帖子')) return;
+    const result = togglePostFavorite(socket.user, postIdValue);
+    if (result.error) {
+      socket.emit('forum error', result.error);
+      return;
+    }
+    socket.emit('forum post interaction', result);
+    broadcastForumPostDetail(result.post.postId);
+    broadcastForumPosts();
+  });
+
+  socket.on('toggle comment like', (commentIdValue) => {
+    if (!requireCommunityAccess(socket, '点赞评论')) return;
+    const result = toggleCommentLike(socket.user, commentIdValue);
+    if (result.error) {
+      socket.emit('forum error', result.error);
+      return;
+    }
+    socket.emit('forum comment interaction', result);
+    if (result.comment && result.comment.postId) broadcastForumPostDetail(result.comment.postId);
   });
 
   socket.on('delete forum post', (postIdValue) => {

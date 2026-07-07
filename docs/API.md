@@ -56,10 +56,21 @@ These notes document the current Web implementation for future Uni 6 Nordkapp na
 
 - `get forum posts`: retrieves posts sorted by newest first.
 - `get forum post`: retrieves a post detail and comments.
-- `create forum post`: creates a post with title and content validation.
-- `create forum comment`: creates a comment for a post.
+- `upload post image`: uploads a post-editor image from a data URL. Server validates image type and max size, stores it under `/uploads/post-images/`, and returns `post image uploaded`.
+- `create forum post`: creates a post with title, plain-text content, and optional sanitized `contentHtml`.
+- `create forum comment`: creates a root comment or a one-level reply when `parentCommentId` is provided.
+- `toggle post like`: toggles the current user's like for one post.
+- `toggle post favorite`: toggles the current user's favorite state for one post.
+- `toggle comment like`: toggles the current user's like for one comment or reply.
+- `forum post interaction`: returns updated post interaction state after like/favorite changes.
+- `forum comment interaction`: returns updated comment interaction state after comment-like changes.
 - `delete forum post` / `delete forum comment`: existing moderation/owner flows.
 - `report forum post`: creates a report for admin review.
+- Forum post payloads include `content`, `contentHtml`, `contentText`, `contentFormat`, `likeCount`, `favoriteCount`, `likedByMe`, and `favoritedByMe`.
+- Forum comment payloads include `parentCommentId`, `floorNumber`, `replyNumber`, `floorLabel`, `likeCount`, and `likedByMe`.
+- Rich text is sanitized server-side with an allowlist for text formatting, links, lists, quotes, code, and uploaded post images. Dangerous tags, event attributes, unsafe protocols, and arbitrary style injection are stripped.
+- Global search uses safe plain-text post content (`content_text`) and comment text rather than raw rich HTML.
+- Replies and selected forum engagement events feed the notification center without notifying the actor about their own action.
 
 ## Bulletins
 

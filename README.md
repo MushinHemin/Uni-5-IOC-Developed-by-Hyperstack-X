@@ -2,7 +2,7 @@
 
 Uni 5 Sonoma is a lightweight realtime chat and community app with account login, group chat, private chat, forum posts, admin tools, message recall, image paste/upload, voice messages, and a glass-style responsive web UI.
 
-Current release: **Sonoma 5.5.5 Engagement & Discovery Update**
+Current release: **Sonoma 5.5.6 Forum Editor & Performance Overhaul Update**
 
 ## Features
 
@@ -13,6 +13,8 @@ Current release: **Sonoma 5.5.5 Engagement & Discovery Update**
 - User-created groups with admin-controlled creation code
 - Private chat and private message notifications
 - Forum MVP with posts, post detail pages, and realtime comments
+- Independent forum composer with a Sonoma-style rich text editor and post image insertion
+- Forum post likes, favorites, comment likes, comment replies, and stable floor labels
 - Display-name personalization with weekly rename limits and admin approval
 - Bulletin mailbox with unread badges, version notices, admin announcements, and rename status messages
 - Unified notification center for chat, forum, profile, Star, report, sticker, and announcement activity
@@ -39,6 +41,7 @@ Current release: **Sonoma 5.5.5 Engagement & Discovery Update**
 - Sonoma 5.5.1: sticker panel polish, mobile layout reliability, upload/review feedback, and safer sticker history fallbacks
 - Sonoma 5.5.3: PWA foundation, mobile app-style layout, bottom navigation, and API / Socket documentation for Uni 6 planning
 - Sonoma 5.5.5: notification center, chat unread state, global discovery search, and message Reactions
+- Sonoma 5.5.6: forum rich editor, post images, forum likes/favorites, comment replies/floors, and GPU/mobile performance polish
 - Uni 5.4.1: personalization controls, compact presence status, latency monitoring, forum persistence hardening, CORS configuration, and stability cleanup
 
 ## PWA and Native App Preparation
@@ -50,6 +53,25 @@ Current release: **Sonoma 5.5.5 Engagement & Discovery Update**
 - Authentication is still based on the current web Socket.IO/session flow; a dedicated token flow should be evaluated before a native production app.
 
 ## Release Notes
+
+### Sonoma 5.5.6 Forum Editor & Performance Overhaul Update
+
+Added:
+
+- Added an independent forum publishing page with a Sonoma glass editor surface
+- Added a lightweight rich text editor for bold, italic, underline, strikethrough, headings, lists, quotes, code, alignment, links, image insertion, clear formatting, and preview
+- Added secure post image uploads with random filenames, size/type validation, lazy-loaded rounded images, and Git-ignored storage
+- Added SQLite-backed post likes, post favorites, comment likes, comment replies, and stable floor labels
+- Added forum interaction notifications for replies and selected engagement events
+
+Improved:
+
+- Upgraded forum list/detail UI with like, favorite, comment, floor, and rich-content metadata
+- Added backend HTML sanitization with an allowlist for safe rich text rendering
+- Updated global search to use safe plain-text content for rich posts and replies
+- Improved mobile forum/editor layout with safe-area spacing and sticky publishing controls
+- Reduced scroll pressure with `content-visibility`, containment, lighter repeated list surfaces, and more careful image sizing
+- Preserved 5.5.5 notifications, unread chat, search, and message Reaction systems
 
 ### Sonoma 5.5.5 Engagement & Discovery Update
 

@@ -964,6 +964,8 @@
       margin: 12px 0;
       animation: messageInLeft 360ms var(--ease-smooth) both;
       transform-origin: left bottom;
+      content-visibility: auto;
+      contain-intrinsic-size: 88px;
     }
 
     .message-row.is-me {
@@ -2702,6 +2704,7 @@
     }
 
     .forum-shell {
+      position: relative;
       width: var(--stage-width);
       height: var(--stage-height);
       margin: 0 auto;
@@ -2768,6 +2771,18 @@
 
     .forum-compose {
       align-self: start;
+    }
+
+    .forum-compose-copy {
+      margin: 0 0 12px;
+      color: var(--muted);
+      line-height: 1.5;
+      font-size: 13px;
+    }
+
+    .forum-compose-open {
+      width: 100%;
+      justify-content: center;
     }
 
     .forum-compose h3,
@@ -2844,6 +2859,8 @@
 
     .forum-form input:focus,
     .forum-form textarea:focus,
+    .forum-title-input:focus,
+    .forum-editor:focus,
     .report-form select:focus,
     .report-form textarea:focus,
     .report-note:focus,
@@ -2851,6 +2868,261 @@
       border-color: rgba(0, 122, 255, 0.48);
       box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.1);
       background: var(--glass-bg-light);
+    }
+
+    .forum-composer-page {
+      position: absolute;
+      inset: 72px 18px 56px;
+      z-index: 4;
+      display: grid;
+      min-height: 0;
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-xl);
+      background: linear-gradient(180deg, var(--glass-bg-light), var(--glass-bg));
+      box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-highlight);
+      backdrop-filter: blur(var(--glass-blur-sm)) saturate(1.1);
+      animation: forumDetailIn 260ms var(--ease-smooth) both;
+    }
+
+    .forum-composer-page[hidden] {
+      display: none;
+    }
+
+    .forum-editor-shell {
+      min-height: 0;
+      display: grid;
+      grid-template-rows: auto auto auto minmax(0, 1fr) auto auto;
+      gap: 12px;
+      padding: 18px;
+      overflow: auto;
+      scroll-padding-bottom: calc(var(--mobile-nav-height) + env(safe-area-inset-bottom));
+    }
+
+    .forum-editor-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .forum-editor-head h3 {
+      margin: 0;
+      font-size: 22px;
+    }
+
+    .forum-editor-head p {
+      margin: 4px 0 0;
+      color: var(--muted);
+    }
+
+    .forum-title-input {
+      width: 100%;
+      min-height: 52px;
+      padding: 0 16px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      color: var(--ink);
+      background: var(--field-bg);
+      font-size: clamp(20px, 3vw, 30px);
+      font-weight: 900;
+      outline: 0;
+    }
+
+    .editor-toolbar {
+      display: flex;
+      gap: 7px;
+      overflow-x: auto;
+      padding: 8px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--glass-bg-soft);
+      box-shadow: inset 0 1px 0 var(--glass-highlight);
+      scrollbar-width: none;
+    }
+
+    .editor-toolbar::-webkit-scrollbar {
+      display: none;
+    }
+
+    .editor-toolbar button {
+      flex: 0 0 auto;
+      min-height: 34px;
+      padding: 0 12px;
+      border: 1px solid transparent;
+      border-radius: 999px;
+      color: var(--ink);
+      background: transparent;
+      font-weight: 850;
+      transition: transform var(--duration-fast) var(--ease-pop), background var(--duration-fast) var(--ease-smooth);
+    }
+
+	    .editor-toolbar button:hover,
+	    .editor-toolbar button.is-active {
+	      transform: translateY(-1px);
+	      background: var(--glass-bg-light);
+	      border-color: var(--glass-border);
+	    }
+
+	    .forum-link-panel {
+	      display: flex;
+	      align-items: center;
+	      gap: 8px;
+	      padding: 8px;
+	      border: 1px solid var(--line);
+	      border-radius: var(--radius-lg);
+	      background: var(--glass-bg-soft);
+	      box-shadow: inset 0 1px 0 var(--glass-highlight);
+	    }
+
+	    .forum-link-panel[hidden] {
+	      display: none;
+	    }
+
+	    .forum-link-panel input {
+	      flex: 1 1 auto;
+	      min-width: 0;
+	      min-height: 38px;
+	      padding: 0 12px;
+	      border: 1px solid var(--line);
+	      border-radius: var(--radius-md);
+	      color: var(--ink);
+	      background: var(--field-bg);
+	      outline: 0;
+	    }
+
+	    .forum-link-panel input:focus {
+	      border-color: rgba(0, 122, 255, 0.36);
+	      box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.1);
+	    }
+
+    .forum-editor,
+    .forum-editor-preview {
+      min-height: 360px;
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-xl);
+      color: var(--ink);
+      background: var(--field-bg);
+      overflow: auto;
+      outline: 0;
+      line-height: 1.72;
+      contain: layout paint style;
+    }
+
+    .forum-editor:empty::before {
+      content: attr(data-placeholder);
+      color: var(--muted);
+    }
+
+    .forum-editor img,
+    .forum-rich-content img,
+    .forum-editor-preview img {
+      display: block;
+      max-width: 100%;
+      height: auto;
+      max-height: 520px;
+      margin: 12px 0;
+      border-radius: var(--radius-lg);
+      box-shadow: 0 10px 28px rgba(31, 44, 43, 0.12);
+    }
+
+    .forum-editor blockquote,
+    .forum-rich-content blockquote,
+    .forum-editor-preview blockquote {
+      margin: 12px 0;
+      padding: 10px 14px;
+      border-left: 4px solid var(--brand);
+      border-radius: var(--radius-md);
+      background: var(--glass-bg-soft);
+      color: var(--muted);
+    }
+
+    .forum-editor pre,
+    .forum-rich-content pre,
+    .forum-editor-preview pre,
+    .forum-editor code,
+    .forum-rich-content code,
+    .forum-editor-preview code {
+      border-radius: var(--radius-md);
+      background: color-mix(in srgb, var(--ink) 8%, transparent);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    .forum-editor pre,
+    .forum-rich-content pre,
+    .forum-editor-preview pre {
+      padding: 12px;
+      overflow: auto;
+    }
+
+    .forum-editor code,
+    .forum-rich-content code,
+    .forum-editor-preview code {
+      padding: 2px 5px;
+    }
+
+    .forum-editor-footer {
+      position: sticky;
+      bottom: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding-top: 10px;
+      background: linear-gradient(180deg, transparent, var(--glass-bg-light) 24%);
+    }
+
+    .post-actions,
+    .comment-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+
+    .forum-action-pill {
+      min-height: 34px;
+      padding: 0 12px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--ink);
+      background: var(--glass-bg-soft);
+      font-weight: 850;
+      transition: transform var(--duration-fast) var(--ease-pop), background var(--duration-fast) var(--ease-smooth);
+    }
+
+    .forum-action-pill:hover {
+      transform: translateY(-1px);
+      background: var(--glass-bg-light);
+    }
+
+    .forum-action-pill.is-active {
+      color: #fff;
+      border-color: rgba(0, 122, 255, .24);
+      background: linear-gradient(145deg, var(--brand), #69a9ff);
+    }
+
+    .floor-badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      padding: 0 8px;
+      border-radius: 999px;
+      color: var(--muted);
+      background: var(--glass-bg-soft);
+      border: 1px solid var(--line);
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .reply-target {
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+      color: var(--muted);
+      background: var(--glass-bg-soft);
+      font-size: 13px;
     }
 
     .report-card {
@@ -2927,6 +3199,8 @@
         background var(--duration-normal) var(--ease-smooth),
         border-color var(--duration-normal) var(--ease-smooth);
       animation: forumItemIn 260ms var(--ease-smooth) both;
+      content-visibility: auto;
+      contain-intrinsic-size: 120px;
     }
 
     .post-card:hover,
@@ -3037,6 +3311,13 @@
       border-radius: var(--radius-lg);
       background: var(--glass-bg-soft);
       animation: commentIn 300ms var(--ease-pop) both;
+      content-visibility: auto;
+      contain-intrinsic-size: 118px;
+    }
+
+    .comment-card.is-reply {
+      margin-left: 38px;
+      background: color-mix(in srgb, var(--brand) 5%, var(--glass-bg-soft));
     }
 
     .comment-content {
@@ -3597,6 +3878,43 @@
         grid-template-columns: 1fr;
         grid-template-rows: minmax(220px, 45%) minmax(0, 1fr);
         padding-bottom: var(--mobile-nav-height);
+      }
+
+      .forum-composer-page {
+        inset: 0 0 var(--mobile-nav-height);
+        border-radius: 0;
+        border-left: 0;
+        border-right: 0;
+      }
+
+      .forum-editor-shell {
+        padding: 14px;
+        padding-bottom: calc(var(--mobile-nav-height) + env(safe-area-inset-bottom) + 18px);
+      }
+
+      .forum-editor-head,
+      .forum-editor-footer {
+        align-items: stretch;
+        flex-direction: column;
+      }
+
+      .forum-editor-footer {
+        bottom: calc(var(--mobile-nav-height) + env(safe-area-inset-bottom));
+        padding-bottom: 8px;
+      }
+
+      .editor-toolbar {
+        border-radius: 22px;
+      }
+
+      .forum-editor,
+      .forum-editor-preview {
+        min-height: 320px;
+        max-height: none;
+      }
+
+      .comment-form {
+        margin-bottom: calc(var(--mobile-nav-height) + env(safe-area-inset-bottom) + 8px);
       }
 
       .admin-grid {
@@ -4566,13 +4884,8 @@
         <aside class="forum-sidebar">
           <section class="forum-compose">
             <h3>发布帖子</h3>
-            <form id="forumPostForm" class="forum-form">
-              <input id="forumPostTitle" maxlength="80" placeholder="帖子标题" autocomplete="off">
-              <textarea id="forumPostContent" maxlength="3000" placeholder="写下正文"></textarea>
-              <div class="forum-actions-row">
-                <button id="forumPostSubmit" class="admin-btn primary" type="submit">发布</button>
-              </div>
-            </form>
+            <p class="forum-compose-copy">打开独立编辑器，写一篇带图片、链接和排版的帖子。</p>
+            <button id="forumComposeOpen" class="admin-btn primary forum-compose-open" type="button">发布帖子</button>
             <div id="forumError" class="forum-error" role="alert"></div>
           </section>
           <section class="forum-list-section">
@@ -4583,13 +4896,64 @@
         <section class="forum-detail-section" aria-label="帖子详情">
           <article id="forumPostDetail" class="post-detail is-empty">选择一个帖子查看详情。</article>
           <form id="forumCommentForm" class="comment-form" hidden>
+            <div id="forumReplyTarget" class="reply-target" hidden></div>
             <textarea id="forumCommentInput" maxlength="1000" placeholder="写评论"></textarea>
             <div class="forum-actions-row">
+              <button id="forumReplyCancel" class="admin-btn" type="button" hidden>取消回复</button>
               <button id="forumCommentSubmit" class="admin-btn primary" type="submit">评论</button>
             </div>
           </form>
         </section>
       </div>
+      <section id="forumComposerPage" class="forum-composer-page" hidden aria-label="发布帖子">
+        <form id="forumPostForm" class="forum-editor-shell">
+          <header class="forum-editor-head">
+            <div>
+              <p class="eyebrow">Forum Editor</p>
+              <h3>发布帖子</h3>
+              <p>支持富文本、图片、链接和预览。</p>
+            </div>
+            <button id="forumComposerClose" class="admin-btn" type="button">返回论坛</button>
+          </header>
+          <input id="forumPostTitle" class="forum-title-input" maxlength="80" placeholder="帖子标题" autocomplete="off">
+          <div class="editor-toolbar" aria-label="富文本工具栏">
+            <button type="button" data-editor-command="bold"><strong>B</strong></button>
+            <button type="button" data-editor-command="italic"><em>I</em></button>
+            <button type="button" data-editor-command="underline"><u>U</u></button>
+            <button type="button" data-editor-command="strikeThrough"><s>S</s></button>
+            <button type="button" data-editor-format="h2">H2</button>
+            <button type="button" data-editor-format="h3">H3</button>
+            <button type="button" data-editor-format="p">正文</button>
+            <button type="button" data-editor-command="insertUnorderedList">• 列表</button>
+            <button type="button" data-editor-command="insertOrderedList">1. 列表</button>
+            <button type="button" data-editor-block="blockquote">引用</button>
+            <button type="button" data-editor-block="pre">代码</button>
+            <button type="button" data-editor-command="justifyLeft">左</button>
+            <button type="button" data-editor-command="justifyCenter">中</button>
+            <button type="button" data-editor-command="justifyRight">右</button>
+            <button id="forumLinkInsert" type="button">链接</button>
+	            <button id="forumImageInsert" type="button">图片</button>
+	            <button id="forumPreviewToggle" type="button">预览</button>
+	            <button type="button" data-editor-command="removeFormat">清除</button>
+	          </div>
+	          <div id="forumLinkPanel" class="forum-link-panel" hidden>
+	            <input id="forumLinkUrl" type="url" placeholder="https://example.com" autocomplete="off">
+	            <button id="forumLinkApply" class="admin-btn primary" type="button">插入链接</button>
+	            <button id="forumLinkCancel" class="admin-btn" type="button">取消</button>
+	          </div>
+	          <input id="forumImageInput" type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden>
+          <div id="forumEditor" class="forum-editor" contenteditable="true" data-placeholder="写下你的内容。可以粘贴文字，也可以插入图片。"></div>
+          <textarea id="forumPostContent" hidden></textarea>
+          <div id="forumEditorPreview" class="forum-editor-preview" hidden></div>
+          <footer class="forum-editor-footer">
+            <span id="forumEditorStatus" class="settings-status">正文最多 3000 字，图片最多 9 张。</span>
+            <div class="forum-actions-row">
+              <button id="forumComposerCancel" class="admin-btn" type="button">取消</button>
+              <button id="forumPostSubmit" class="admin-btn primary" type="submit">发布</button>
+            </div>
+          </footer>
+        </form>
+      </section>
       <footer class="copyright-footer">
         <div>&copy;2026 Hyperstack X Copyright all rights reserved.</div>
         <div>Developed by Hyperstack X</div>
@@ -5035,6 +5399,9 @@
       forumPosts: [],
       selectedForumPost: null,
       forumComments: [],
+      forumReplyParentId: '',
+      forumPreviewMode: false,
+      forumEditorBusy: false,
       renameStatus: null,
       bulletins: [],
       bulletinUnread: 0,
@@ -5063,11 +5430,12 @@
         creator: { isCreator: false, status: '', request: null }
       },
       pendingStickerFile: null,
-      pendingOfficialStickerFile: null,
-      stickerBusy: false
-    };
+	      pendingOfficialStickerFile: null,
+	      stickerBusy: false
+	    };
+	    let forumSavedRange = null;
 
-    // DOM refs
+	    // DOM refs
     const messagesDiv = document.getElementById('messages');
     const emptyState = document.getElementById('emptyState');
     const input = document.getElementById('input');
@@ -5165,16 +5533,34 @@
     const forumStatus = document.getElementById('forumStatus');
     const forumHomeOpen = document.getElementById('forumHomeOpen');
     const forumRefresh = document.getElementById('forumRefresh');
+    const forumComposeOpen = document.getElementById('forumComposeOpen');
+    const forumComposerPage = document.getElementById('forumComposerPage');
+    const forumComposerClose = document.getElementById('forumComposerClose');
+    const forumComposerCancel = document.getElementById('forumComposerCancel');
     const forumPostForm = document.getElementById('forumPostForm');
     const forumPostTitle = document.getElementById('forumPostTitle');
     const forumPostContent = document.getElementById('forumPostContent');
     const forumPostSubmit = document.getElementById('forumPostSubmit');
+    const forumEditor = document.getElementById('forumEditor');
+    const forumEditorPreview = document.getElementById('forumEditorPreview');
+    const forumEditorStatus = document.getElementById('forumEditorStatus');
+    const forumPreviewToggle = document.getElementById('forumPreviewToggle');
+	    const forumImageInsert = document.getElementById('forumImageInsert');
+	    const forumImageInput = document.getElementById('forumImageInput');
+	    const forumLinkInsert = document.getElementById('forumLinkInsert');
+	    const forumLinkPanel = document.getElementById('forumLinkPanel');
+	    const forumLinkUrl = document.getElementById('forumLinkUrl');
+	    const forumLinkApply = document.getElementById('forumLinkApply');
+	    const forumLinkCancel = document.getElementById('forumLinkCancel');
+	    const editorToolbarButtons = Array.from(document.querySelectorAll('[data-editor-command], [data-editor-format], [data-editor-block]'));
     const forumError = document.getElementById('forumError');
     const forumPostList = document.getElementById('forumPostList');
     const forumPostDetail = document.getElementById('forumPostDetail');
     const forumCommentForm = document.getElementById('forumCommentForm');
     const forumCommentInput = document.getElementById('forumCommentInput');
     const forumCommentSubmit = document.getElementById('forumCommentSubmit');
+    const forumReplyTarget = document.getElementById('forumReplyTarget');
+    const forumReplyCancel = document.getElementById('forumReplyCancel');
     const adminPage = document.getElementById('adminPage');
     const adminClose = document.getElementById('adminClose');
     const adminRefresh = document.getElementById('adminRefresh');
@@ -6166,6 +6552,9 @@
       state.forumPosts = [];
       state.selectedForumPost = null;
       state.forumComments = [];
+      state.forumReplyParentId = '';
+      state.forumPreviewMode = false;
+      state.forumEditorBusy = false;
       state.renameStatus = null;
       state.bulletins = [];
       state.bulletinUnread = 0;
@@ -6199,6 +6588,8 @@
       clearQuote();
       clearPendingImage();
       closeMessageMenu();
+      closeForumComposer();
+      clearForumComposer();
       closeReactionPicker();
       closeNotificationModal();
       closeSearchModal();
@@ -6474,8 +6865,8 @@
     socket.on('forum post created', (payload) => {
       const post = payload && payload.post ? payload.post : null;
       if (!post) return;
-      forumPostTitle.value = '';
-      forumPostContent.value = '';
+      clearForumComposer();
+      closeForumComposer();
       state.selectedForumPost = post;
       state.forumComments = [];
       forumError.textContent = '';
@@ -6503,8 +6894,38 @@
       renderForumComments();
       if (comment.userId === state.userId) {
         forumCommentInput.value = '';
+        setForumReplyTarget(null);
       }
       updateForumCommentButton();
+    });
+
+    socket.on('post image uploaded', (payload) => {
+      const image = payload && payload.image ? payload.image : null;
+      if (!image || !image.url) return;
+      forumEditor.focus();
+      document.execCommand('insertHTML', false, `<img src="${image.url}" alt="帖子图片" loading="lazy" decoding="async">`);
+      forumEditorStatus.textContent = '图片已插入正文。';
+      forumImageInput.value = '';
+      syncForumEditorState();
+    });
+
+    socket.on('forum post interaction', (payload) => {
+      const post = payload && payload.post ? payload.post : null;
+      if (post) {
+        state.forumPosts = state.forumPosts.map((item) => item.postId === post.postId ? { ...item, ...post } : item);
+        if (state.selectedForumPost && state.selectedForumPost.postId === post.postId) {
+          state.selectedForumPost = { ...state.selectedForumPost, ...post };
+        }
+      }
+      renderForumPosts();
+      renderForumDetail();
+    });
+
+    socket.on('forum comment interaction', (payload) => {
+      const comment = payload && payload.comment ? payload.comment : null;
+      if (!comment) return;
+      state.forumComments = state.forumComments.map((item) => item.commentId === comment.commentId ? { ...item, ...comment } : item);
+      renderForumComments();
     });
 
     socket.on('forum post deleted', (payload) => {
@@ -6762,6 +7183,12 @@
     });
 
     // Forum controls
+    forumComposeOpen.addEventListener('click', openForumComposer);
+    forumComposerClose.addEventListener('click', closeForumComposer);
+    forumComposerCancel.addEventListener('click', () => {
+      clearForumComposer();
+      closeForumComposer();
+    });
     forumRefresh.addEventListener('click', () => {
       if (state.username) socket.emit('get forum posts');
     });
@@ -6776,9 +7203,68 @@
       createForumComment();
     });
 
-    forumPostTitle.addEventListener('input', updateForumPostButton);
-    forumPostContent.addEventListener('input', updateForumPostButton);
+	    forumPostTitle.addEventListener('input', updateForumPostButton);
+	    forumEditor.addEventListener('input', () => {
+	      saveForumSelection();
+	      syncForumEditorState();
+	    });
+	    forumEditor.addEventListener('keyup', saveForumSelection);
+	    forumEditor.addEventListener('mouseup', saveForumSelection);
+	    forumEditor.addEventListener('paste', () => setTimeout(syncForumEditorState, 0));
+    editorToolbarButtons.forEach((button) => {
+      button.addEventListener('click', () => {
+        if (button.dataset.editorCommand) runEditorCommand(button.dataset.editorCommand);
+        else if (button.dataset.editorFormat) runEditorCommand('formatBlock', button.dataset.editorFormat);
+        else if (button.dataset.editorBlock) wrapEditorBlock(button.dataset.editorBlock);
+      });
+    });
+	    forumLinkInsert.addEventListener('click', openForumLinkPanel);
+	    forumLinkApply.addEventListener('click', insertForumLink);
+	    forumLinkCancel.addEventListener('click', closeForumLinkPanel);
+	    forumLinkUrl.addEventListener('keydown', (event) => {
+	      if (event.key === 'Enter') {
+	        event.preventDefault();
+	        insertForumLink();
+	      }
+	      if (event.key === 'Escape') closeForumLinkPanel();
+	    });
+    forumImageInsert.addEventListener('click', () => forumImageInput.click());
+    forumImageInput.addEventListener('change', () => {
+      const file = forumImageInput.files && forumImageInput.files[0];
+      if (!file) return;
+      if (!/^image\/(png|jpeg|gif|webp)$/.test(file.type)) {
+        showToast('仅支持 PNG、JPG、GIF、WebP 图片');
+        forumImageInput.value = '';
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        showToast('图片最大 5MB');
+        forumImageInput.value = '';
+        return;
+      }
+      if (forumEditorImageCount() >= 9) {
+        showToast('每个帖子最多 9 张图片');
+        forumImageInput.value = '';
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        forumEditorStatus.textContent = '正在上传图片...';
+        socket.emit('upload post image', { base64: reader.result });
+      };
+      reader.onerror = () => showToast('图片读取失败');
+      reader.readAsDataURL(file);
+    });
+    forumPreviewToggle.addEventListener('click', () => {
+      state.forumPreviewMode = !state.forumPreviewMode;
+      forumPreviewToggle.classList.toggle('is-active', state.forumPreviewMode);
+      forumEditorPreview.hidden = !state.forumPreviewMode;
+      forumEditor.hidden = state.forumPreviewMode;
+      syncForumEditorState();
+      forumEditorPreview.innerHTML = forumPostContent.value;
+    });
     forumCommentInput.addEventListener('input', updateForumCommentButton);
+    forumReplyCancel.addEventListener('click', () => setForumReplyTarget(null));
 
     // Chat controls
     backToLobby.addEventListener('click', returnFromChat);
@@ -7642,15 +8128,150 @@
       state.forumReturnView = 'home';
       setView('forum');
       forumError.textContent = '';
+      closeForumComposer();
       updateForumPostButton();
       updateForumCommentButton();
       socket.emit('get forum posts');
       if (state.selectedForumPost) socket.emit('get forum post', state.selectedForumPost.postId);
     }
 
+    function openForumComposer() {
+      if (!state.username) {
+        showToast('请先登录');
+        return;
+      }
+      if (state.profileUser && state.profileUser.isBanned) {
+        showToast('你的账号已被限制使用社区功能');
+        return;
+      }
+      forumComposerPage.hidden = false;
+      forumError.textContent = '';
+      forumEditorStatus.textContent = '正文最多 3000 字，图片最多 9 张。';
+      updateForumPostButton();
+      requestAnimationFrame(() => forumPostTitle.focus());
+    }
+
+    function closeForumComposer() {
+      if (!forumComposerPage || forumComposerPage.hidden) return;
+      forumComposerPage.hidden = true;
+      state.forumPreviewMode = false;
+      forumEditorPreview.hidden = true;
+      forumEditor.hidden = false;
+      forumPreviewToggle.classList.remove('is-active');
+    }
+
+    function clearForumComposer() {
+      forumPostTitle.value = '';
+      forumPostContent.value = '';
+      forumEditor.innerHTML = '';
+	      forumEditorPreview.innerHTML = '';
+	      forumImageInput.value = '';
+	      closeForumLinkPanel();
+	      forumSavedRange = null;
+	      state.forumPreviewMode = false;
+	      updateForumPostButton();
+	    }
+
+    function forumEditorText() {
+      return (forumEditor.textContent || '').replace(/\s+/g, ' ').trim();
+    }
+
+    function forumEditorImageCount() {
+      return forumEditor.querySelectorAll('img').length;
+    }
+
+    function sanitizeClientForumHtml(html) {
+      const template = document.createElement('template');
+      template.innerHTML = String(html || '');
+      const allowed = new Set(['P', 'BR', 'STRONG', 'B', 'EM', 'I', 'U', 'S', 'H2', 'H3', 'UL', 'OL', 'LI', 'BLOCKQUOTE', 'CODE', 'PRE', 'A', 'IMG']);
+      template.content.querySelectorAll('*').forEach((node) => {
+        if (!allowed.has(node.tagName)) {
+          node.replaceWith(...Array.from(node.childNodes));
+          return;
+        }
+        Array.from(node.attributes).forEach((attribute) => {
+          const name = attribute.name.toLowerCase();
+          const value = attribute.value || '';
+          const keepHref = node.tagName === 'A' && name === 'href' && /^(https?:\/\/|mailto:|\/)/i.test(value);
+          const keepImage = node.tagName === 'IMG' && ['src', 'alt', 'loading', 'decoding'].includes(name) && (name !== 'src' || /^\/uploads\/post-images\//.test(value));
+          if (!keepHref && !keepImage) node.removeAttribute(attribute.name);
+        });
+        if (node.tagName === 'A') {
+          node.setAttribute('target', '_blank');
+          node.setAttribute('rel', 'noopener noreferrer');
+        }
+        if (node.tagName === 'IMG') {
+          node.setAttribute('loading', 'lazy');
+          node.setAttribute('decoding', 'async');
+        }
+      });
+      return template.innerHTML;
+    }
+
+    function syncForumEditorState() {
+      forumPostContent.value = sanitizeClientForumHtml(forumEditor.innerHTML.trim());
+      const textLength = forumEditorText().length;
+      const imageCount = forumEditorImageCount();
+      forumEditorStatus.textContent = `${textLength}/3000 字 · 图片 ${imageCount}/9`;
+      updateForumPostButton();
+      if (!forumEditorPreview.hidden) forumEditorPreview.innerHTML = forumPostContent.value;
+    }
+
+    function runEditorCommand(command, value = null) {
+      forumEditor.focus();
+      document.execCommand(command, false, value);
+      syncForumEditorState();
+    }
+
+	    function wrapEditorBlock(tagName) {
+	      const tag = tagName === 'pre' ? 'pre' : tagName === 'blockquote' ? 'blockquote' : 'p';
+	      runEditorCommand('formatBlock', tag);
+	    }
+
+	    function saveForumSelection() {
+	      const selection = window.getSelection();
+	      if (!selection || selection.rangeCount === 0) return;
+	      const range = selection.getRangeAt(0);
+	      if (!forumEditor.contains(range.commonAncestorContainer)) return;
+	      forumSavedRange = range.cloneRange();
+	    }
+
+	    function restoreForumSelection() {
+	      if (!forumSavedRange) return;
+	      const selection = window.getSelection();
+	      selection.removeAllRanges();
+	      selection.addRange(forumSavedRange);
+	    }
+
+	    function openForumLinkPanel() {
+	      saveForumSelection();
+	      forumLinkPanel.hidden = false;
+	      forumLinkUrl.value = '';
+	      forumLinkUrl.focus();
+	    }
+
+	    function closeForumLinkPanel() {
+	      forumLinkPanel.hidden = true;
+	      forumLinkUrl.value = '';
+	    }
+
+	    function insertForumLink() {
+	      const href = forumLinkUrl.value.trim();
+	      if (!href) return closeForumLinkPanel();
+	      if (!/^https?:\/\//i.test(href)) {
+	        showToast('链接需要以 http:// 或 https:// 开头');
+	        return;
+	      }
+	      restoreForumSelection();
+	      runEditorCommand('createLink', href);
+	      closeForumLinkPanel();
+	    }
+
     function createForumPost() {
       const title = forumPostTitle.value.trim();
-      const content = forumPostContent.value.trim();
+      syncForumEditorState();
+      const contentHtml = forumPostContent.value.trim();
+      const content = forumEditorText();
       forumError.textContent = '';
       if (!state.username) {
         forumError.textContent = '请先登录';
@@ -7660,8 +8281,16 @@
         forumError.textContent = '标题和正文都需要填写';
         return;
       }
+      if (content.length > 3000) {
+        forumError.textContent = '正文最多 3000 字';
+        return;
+      }
+      if (forumEditorImageCount() > 9) {
+        forumError.textContent = '每个帖子最多 9 张图片';
+        return;
+      }
       forumPostSubmit.disabled = true;
-      socket.emit('create forum post', { title, content });
+      socket.emit('create forum post', { title, content, contentHtml });
     }
 
     function createForumComment() {
@@ -7670,16 +8299,27 @@
       forumCommentSubmit.disabled = true;
       socket.emit('create forum comment', {
         postId: state.selectedForumPost.postId,
+        parentCommentId: state.forumReplyParentId,
         content
       });
     }
 
     function updateForumPostButton() {
-      forumPostSubmit.disabled = !state.username || !forumPostTitle.value.trim() || !forumPostContent.value.trim();
+      forumPostSubmit.disabled = !state.username || !forumPostTitle.value.trim() || !forumEditorText();
     }
 
     function updateForumCommentButton() {
       forumCommentSubmit.disabled = !state.username || !state.selectedForumPost || !forumCommentInput.value.trim();
+    }
+
+    function setForumReplyTarget(comment = null) {
+      state.forumReplyParentId = comment ? comment.commentId : '';
+      forumReplyTarget.hidden = !comment;
+      forumReplyCancel.hidden = !comment;
+      forumReplyTarget.textContent = comment ? `回复 ${comment.floorLabel || ''} @${comment.username}` : '';
+      forumCommentInput.placeholder = comment ? `回复 @${comment.username}` : '写评论';
+      forumCommentInput.focus();
+      updateForumCommentButton();
     }
 
     function normalizeForumPost(post) {
@@ -7698,8 +8338,15 @@
         starCount: Number(post.starCount || 0),
         title,
         content,
+        contentHtml: typeof post.contentHtml === 'string' ? post.contentHtml : '',
+        contentText: typeof post.contentText === 'string' ? post.contentText : content,
+        contentFormat: post.contentFormat === 'html' ? 'html' : 'plain',
         createdAt: post.createdAt || new Date().toISOString(),
-        commentCount: Number(post.commentCount || 0)
+        commentCount: Number(post.commentCount || 0),
+        likeCount: Number(post.likeCount || 0),
+        favoriteCount: Number(post.favoriteCount || 0),
+        likedByMe: Boolean(post.likedByMe),
+        favoritedByMe: Boolean(post.favoritedByMe)
       };
     }
 
@@ -7718,6 +8365,12 @@
         avatar: typeof comment.avatar === 'string' ? comment.avatar : '',
         starCount: Number(comment.starCount || 0),
         content,
+        parentCommentId: typeof comment.parentCommentId === 'string' ? comment.parentCommentId : '',
+        floorNumber: Number(comment.floorNumber || 0),
+        replyNumber: Number(comment.replyNumber || 0),
+        floorLabel: typeof comment.floorLabel === 'string' ? comment.floorLabel : '',
+        likeCount: Number(comment.likeCount || 0),
+        likedByMe: Boolean(comment.likedByMe),
         createdAt: comment.createdAt || new Date().toISOString()
       };
     }
@@ -7748,10 +8401,10 @@
         title.textContent = post.title;
         const meta = document.createElement('div');
         meta.className = 'post-card-meta';
-        meta.textContent = `${post.username} · ${formatFullTime(post.createdAt)} · 评论 ${post.commentCount || 0}`;
+        meta.textContent = `${post.username} · ${formatFullTime(post.createdAt)} · 评论 ${post.commentCount || 0} · 赞 ${post.likeCount || 0} · 收藏 ${post.favoriteCount || 0}`;
         const summary = document.createElement('div');
         summary.className = 'post-summary';
-        summary.textContent = compactText(post.content, 130);
+        summary.textContent = compactText(post.contentText || post.content, 130);
         main.append(title, meta, summary);
         button.append(main);
         button.addEventListener('click', () => {
@@ -7810,7 +8463,30 @@
       title.textContent = post.title;
       const content = document.createElement('div');
       content.className = 'post-content-full';
-      content.textContent = post.content;
+      if (post.contentFormat === 'html' && post.contentHtml) {
+        content.classList.add('forum-rich-content');
+        content.innerHTML = post.contentHtml;
+        content.querySelectorAll('img').forEach((img) => {
+          img.loading = 'lazy';
+          img.decoding = 'async';
+        });
+      } else {
+        content.textContent = post.content;
+      }
+
+      const postActions = document.createElement('div');
+      postActions.className = 'post-actions';
+      const likeButton = document.createElement('button');
+      likeButton.type = 'button';
+      likeButton.className = `forum-action-pill${post.likedByMe ? ' is-active' : ''}`;
+      likeButton.textContent = `赞 ${post.likeCount || 0}`;
+      likeButton.addEventListener('click', () => socket.emit('toggle post like', post.postId));
+      const favoriteButton = document.createElement('button');
+      favoriteButton.type = 'button';
+      favoriteButton.className = `forum-action-pill${post.favoritedByMe ? ' is-active' : ''}`;
+      favoriteButton.textContent = `收藏 ${post.favoriteCount || 0}`;
+      favoriteButton.addEventListener('click', () => socket.emit('toggle post favorite', post.postId));
+      postActions.append(likeButton, favoriteButton);
 
       const commentsHeader = document.createElement('div');
       commentsHeader.className = 'comments-header';
@@ -7825,7 +8501,7 @@
       commentList.id = 'forumCommentList';
       commentList.className = 'comment-list';
 
-      forumPostDetail.append(author, title, content, commentsHeader, commentList);
+      forumPostDetail.append(author, title, content, postActions, commentsHeader, commentList);
       forumCommentForm.hidden = false;
       updateForumCommentButton();
       renderForumComments();
@@ -7846,9 +8522,17 @@
         return;
       }
 
-      comments.forEach((comment) => {
+      const roots = comments.filter((comment) => !comment.parentCommentId);
+      const repliesByParent = new Map();
+      comments.filter((comment) => comment.parentCommentId).forEach((reply) => {
+        const listForParent = repliesByParent.get(reply.parentCommentId) || [];
+        listForParent.push(reply);
+        repliesByParent.set(reply.parentCommentId, listForParent);
+      });
+
+      const renderCommentCard = (comment, isReply = false) => {
         const item = document.createElement('article');
-        item.className = 'comment-card';
+        item.className = `comment-card${isReply ? ' is-reply' : ''}`;
         const author = document.createElement('div');
         author.className = 'comment-author';
         author.append(attachProfileOpen(createAvatar(comment.avatar || comment.username, comment.username), comment));
@@ -7857,9 +8541,13 @@
         name.textContent = comment.username;
         const meta = document.createElement('div');
         meta.className = 'comment-meta';
+        const floor = document.createElement('span');
+        floor.className = 'floor-badge';
+        floor.textContent = comment.floorLabel || (isReply ? '回复' : '#');
         meta.textContent = formatFullTime(comment.createdAt);
         text.append(name, meta);
         author.append(text);
+        author.append(floor);
         if (comment.userId === state.userId || state.isAdmin) {
           const deleteButton = document.createElement('button');
           deleteButton.type = 'button';
@@ -7874,8 +8562,30 @@
         const content = document.createElement('div');
         content.className = 'comment-content';
         content.textContent = comment.content;
-        item.append(author, content);
-        list.append(item);
+        const actions = document.createElement('div');
+        actions.className = 'comment-actions';
+        const likeButton = document.createElement('button');
+        likeButton.type = 'button';
+        likeButton.className = `forum-action-pill${comment.likedByMe ? ' is-active' : ''}`;
+        likeButton.textContent = `赞 ${comment.likeCount || 0}`;
+        likeButton.addEventListener('click', () => socket.emit('toggle comment like', comment.commentId));
+        actions.append(likeButton);
+        if (!isReply) {
+          const replyButton = document.createElement('button');
+          replyButton.type = 'button';
+          replyButton.className = 'forum-action-pill';
+          replyButton.textContent = '回复';
+          replyButton.addEventListener('click', () => setForumReplyTarget(comment));
+          actions.append(replyButton);
+        }
+        item.append(author, content, actions);
+        return item;
+      };
+
+      roots.forEach((comment) => {
+        list.append(renderCommentCard(comment, false));
+        const replies = repliesByParent.get(comment.commentId) || [];
+        replies.forEach((reply) => list.append(renderCommentCard(reply, true)));
       });
     }
 
