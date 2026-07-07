@@ -2,7 +2,7 @@
 
 Uni 5 Sonoma is a lightweight realtime chat and community app with account login, group chat, private chat, forum posts, admin tools, message recall, image paste/upload, voice messages, and a glass-style responsive web UI.
 
-Current release: **Sonoma 5.5.1 Sticker Polish & Reliability Update**
+Current release: **Sonoma 5.5.3 App Foundation Update**
 
 ## Features
 
@@ -33,9 +33,35 @@ Current release: **Sonoma 5.5.1 Sticker Polish & Reliability Update**
 - Sonoma 5.4.6: community safety tools, forum reports, admin review actions, bans, and stability fixes
 - Sonoma 5.5.0: official/personal stickers, sticker messages, creator applications, and official sticker review
 - Sonoma 5.5.1: sticker panel polish, mobile layout reliability, upload/review feedback, and safer sticker history fallbacks
+- Sonoma 5.5.3: PWA foundation, mobile app-style layout, bottom navigation, and API / Socket documentation for Uni 6 planning
 - Uni 5.4.1: personalization controls, compact presence status, latency monitoring, forum persistence hardening, CORS configuration, and stability cleanup
 
+## PWA and Native App Preparation
+
+- The web app includes a lightweight PWA manifest at `/manifest.json` for standalone mobile launch experiments.
+- Uni intentionally does not register an aggressive service worker in 5.5.3, so private chat/community data and API responses are not cached offline.
+- Mobile layouts include safe-area aware spacing and a narrow-screen bottom navigation for Chat, Forum, Bulletins, and My.
+- Current integration notes for future Uni 6 Nordkapp native clients live in [docs/API.md](docs/API.md).
+- Authentication is still based on the current web Socket.IO/session flow; a dedicated token flow should be evaluated before a native production app.
+
 ## Release Notes
+
+### Sonoma 5.5.3 App Foundation Update
+
+Added:
+
+- Added PWA manifest metadata for Uni 5 Sonoma with standalone display and a local SVG app icon
+- Added mobile-only Sonoma glass bottom navigation for Chat, Forum, Bulletins, and My
+- Added a lightweight Sonoma launch state for mobile/PWA-style entry
+- Added `docs/API.md` with current Socket.IO/API notes for future Uni 6 Nordkapp native app planning
+
+Improved:
+
+- Improved mobile app-style layout spacing, safe-area handling, and touch-friendly navigation
+- Improved mobile chat spacing so the bottom nav does not cover the input composer
+- Improved mobile modal behavior with internal scrolling for settings, profiles, reports, bulletins, and avatar crop flows
+- Improved mobile forum, admin, sticker, and profile surfaces with safer overflow handling
+- Preserved the Sonoma liquid glass UI style without adding heavy offline caching or service worker behavior
 
 ### Sonoma 5.5.1 Sticker Polish & Reliability Update
 

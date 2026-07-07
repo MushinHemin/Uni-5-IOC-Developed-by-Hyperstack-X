@@ -1726,6 +1726,13 @@ function broadcastBulletinUpdates(targetUserId = '') {
 
 function ensureSystemAnnouncements() {
   createAnnouncement({
+    id: 'update:5.5.3',
+    type: 'update',
+    title: 'Sonoma 5.5.3 已上线',
+    content: '新增 PWA 基础配置、移动端底部导航雏形、App 化布局优化，并整理 API / Socket 文档，为 Uni 6 Nordkapp 做准备。',
+    priority: 'high'
+  });
+  createAnnouncement({
     id: 'update:5.5.1',
     type: 'update',
     title: 'Sonoma 5.5.1 已上线',

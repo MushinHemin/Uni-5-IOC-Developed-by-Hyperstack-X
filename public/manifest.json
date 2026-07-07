@@ -1,0 +1,19 @@
+{
+  "name": "Uni 5 Sonoma",
+  "short_name": "Uni",
+  "description": "Uni 5 Sonoma realtime chat and community app.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "theme_color": "#f5f7fb",
+  "background_color": "#f5f7fb",
+  "icons": [
+    {
+      "src": "/assets/icons/uni-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
