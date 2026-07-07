@@ -2,7 +2,7 @@
 
 Uni 5 Sonoma is a lightweight realtime chat and community app with account login, group chat, private chat, forum posts, admin tools, message recall, image paste/upload, voice messages, and a glass-style responsive web UI.
 
-Current release: **Sonoma 5.4.6 Community Safety & Stability Update**
+Current release: **Sonoma 5.5.0 Sticker System Update**
 
 ## Features
 
@@ -17,6 +17,7 @@ Current release: **Sonoma 5.4.6 Community Safety & Stability Update**
 - Bulletin mailbox with unread badges, version notices, admin announcements, and rename status messages
 - Sonoma user profiles with bio, profile banner, contact actions, and daily Stars
 - Forum report workflow, admin report review center, and basic community bans
+- Sonoma sticker system with official stickers, personal sticker uploads, sticker messages, creator applications, and admin review
 - Message recall within the configured recall window
 - Text, image, pasted image, and voice messages
 - Quote, read-aloud, and recall actions from a message context menu
@@ -30,9 +31,27 @@ Current release: **Sonoma 5.4.6 Community Safety & Stability Update**
 - Uni 5.4.3: display-name identity layer, rename approval workflow, bulletin mailbox, admin announcements, and forum polish
 - Sonoma 5.4.5: user profile pages, profile banners, bio editing, daily Stars, and user list sorting
 - Sonoma 5.4.6: community safety tools, forum reports, admin review actions, bans, and stability fixes
+- Sonoma 5.5.0: official/personal stickers, sticker messages, creator applications, and official sticker review
 - Uni 5.4.1: personalization controls, compact presence status, latency monitoring, forum persistence hardening, CORS configuration, and stability cleanup
 
 ## Release Notes
+
+### Sonoma 5.5.0 Sticker System Update
+
+Added:
+
+- Added official sticker packs visible to all users
+- Added personal sticker uploads, sending, and deletion
+- Added persistent sticker messages in chat with Sonoma-style image bubbles
+- Added sticker creator applications and creator status tracking
+- Added creator-submitted official sticker review workflow
+- Added admin review modules for sticker creators and official sticker submissions
+
+Improved:
+
+- Sticker panel uses Uni Sonoma liquid glass styling, rounded cards, soft shadows, and mobile-safe layout
+- Banned users are blocked server-side from uploading, sending, applying, or submitting stickers
+- Official, personal, and creator sticker data persists in SQLite and stays compatible with old text messages
 
 ### Sonoma 5.4.6 Community Safety & Stability Update
 

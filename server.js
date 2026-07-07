@@ -36,6 +36,7 @@ const DB_FILE = path.join(__dirname, 'beluga-chat.sqlite');
 const UPLOADS_DIR = path.join(__dirname, 'uploads');
 const AVATAR_UPLOAD_DIR = path.join(UPLOADS_DIR, 'avatars');
 const BANNER_UPLOAD_DIR = path.join(UPLOADS_DIR, 'banners');
+const STICKER_UPLOAD_DIR = path.join(UPLOADS_DIR, 'stickers');
 const JSON_FILE_MODE = 0o600;
 const MAX_MESSAGE_LENGTH = 1000;
 const MAX_POST_TITLE_LENGTH = 80;
@@ -51,6 +52,8 @@ const MIN_PASSWORD_LENGTH = 6;
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
 const MAX_BANNER_BYTES = 5 * 1024 * 1024;
+const MAX_STICKER_BYTES = 2 * 1024 * 1024;
+const MAX_PERSONAL_STICKERS = 50;
 const MAX_VOICE_BYTES = 3 * 1024 * 1024;
 const MAX_HISTORY_MESSAGES = 300;
 const MAX_FORUM_POSTS = 120;
@@ -71,6 +74,9 @@ const ANNOUNCEMENT_TYPES = new Set(['system', 'update', 'admin', 'rename', 'stat
 const ANNOUNCEMENT_PRIORITIES = new Set(['low', 'normal', 'high']);
 const REPORT_REASONS = new Set(['spam', 'abuse', 'sexual', 'danger', 'other']);
 const REPORT_STATUSES = new Set(['pending', 'dismissed', 'post_deleted', 'user_banned']);
+const STICKER_TYPES = new Set(['official', 'personal', 'creator_submission']);
+const STICKER_STATUSES = new Set(['active', 'pending', 'approved', 'rejected', 'removed']);
+const CREATOR_REQUEST_STATUSES = new Set(['pending', 'approved', 'rejected']);
 const IMAGE_EXTENSIONS = {
   'image/jpeg': 'jpg',
   'image/png': 'png',
@@ -285,6 +291,27 @@ function cleanAdminNote(value) {
   return cleanText(value, 240);
 }
 
+function cleanStickerTitle(value) {
+  return cleanText(value, 30).replace(/\s+/g, ' ');
+}
+
+function cleanStickerDescription(value) {
+  return cleanText(value, 120);
+}
+
+function cleanCreatorReason(value) {
+  return cleanText(value, 300);
+}
+
+function cleanCreatorPortfolio(value) {
+  return cleanText(value, 300);
+}
+
+function cleanStickerStatus(value, fallback = 'pending') {
+  const status = typeof value === 'string' ? value.trim().toLowerCase() : '';
+  return STICKER_STATUSES.has(status) ? status : fallback;
+}
+
 function makeAvatar(name) {
   return (cleanUsername(name) || '?').slice(0, 1).toUpperCase();
 }
@@ -321,6 +348,10 @@ function isUploadedProfileBanner(value) {
   return typeof value === 'string' && value.startsWith('/uploads/banners/');
 }
 
+function isUploadedSticker(value) {
+  return typeof value === 'string' && value.startsWith('/uploads/stickers/');
+}
+
 function avatarFilePath(avatarUrl) {
   if (!isUploadedAvatar(avatarUrl)) return '';
   const fileName = path.basename(avatarUrl);
@@ -331,6 +362,34 @@ function bannerFilePath(bannerUrl) {
   if (!isUploadedProfileBanner(bannerUrl)) return '';
   const fileName = path.basename(bannerUrl);
   return path.join(BANNER_UPLOAD_DIR, fileName);
+}
+
+function stickerFilePath(stickerUrl) {
+  if (!isUploadedSticker(stickerUrl)) return '';
+  const fileName = path.basename(stickerUrl);
+  return path.join(STICKER_UPLOAD_DIR, fileName);
+}
+
+function stickerSvgDataUri(label, fill, accent = '#ffffff') {
+  const text = String(label || 'U').slice(0, 2).toUpperCase();
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160"><defs><linearGradient id="g" x1="0" x2="1" y1="0" y2="1"><stop offset="0" stop-color="${fill}"/><stop offset="1" stop-color="#7dd3fc"/></linearGradient></defs><rect width="160" height="160" rx="42" fill="url(#g)"/><circle cx="116" cy="40" r="18" fill="${accent}" opacity=".36"/><text x="80" y="96" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="46" font-weight="800" fill="${accent}">${text}</text></svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+
+const DEFAULT_OFFICIAL_STICKERS = [
+  { id: 'official:sonoma-hi', title: 'Hi', description: 'Sonoma greeting', url: stickerSvgDataUri('Hi', '#3b82f6') },
+  { id: 'official:sonoma-ok', title: 'OK', description: 'All good', url: stickerSvgDataUri('OK', '#10b981') },
+  { id: 'official:sonoma-wow', title: 'Wow', description: 'Tiny sparkle', url: stickerSvgDataUri('✨', '#8b5cf6') },
+  { id: 'official:sonoma-love', title: 'Love', description: 'Warm reply', url: stickerSvgDataUri('♡', '#fb7185') },
+  { id: 'official:sonoma-lol', title: 'LOL', description: 'Light laugh', url: stickerSvgDataUri('哈', '#f59e0b') },
+  { id: 'official:sonoma-uni', title: 'Uni', description: 'Uni Sonoma', url: stickerSvgDataUri('U5', '#0ea5e9') }
+];
+
+function isPublicStickerUrl(value) {
+  if (typeof value !== 'string') return false;
+  const url = value.trim();
+  if (/^\/uploads\/stickers\/[a-zA-Z0-9_.-]+\.(jpg|jpeg|png|webp|gif)$/.test(url)) return true;
+  return url.startsWith('data:image/svg+xml;utf8,');
 }
 
 function normalizeUser(user) {
@@ -354,7 +413,11 @@ function normalizeUser(user) {
     lastLoginAt: Number.isNaN(Date.parse(user.lastLoginAt)) ? '' : user.lastLoginAt,
     isBanned: Boolean(user.isBanned || user.is_banned),
     bannedAt: Number.isNaN(Date.parse(user.bannedAt || user.banned_at)) ? '' : (user.bannedAt || user.banned_at),
-    bannedReason: cleanText(user.bannedReason || user.banned_reason, 240)
+    bannedReason: cleanText(user.bannedReason || user.banned_reason, 240),
+    isStickerCreator: Boolean(user.isStickerCreator || user.is_sticker_creator),
+    stickerCreatorStatus: CREATOR_REQUEST_STATUSES.has(String(user.stickerCreatorStatus || user.sticker_creator_status || '').toLowerCase())
+      ? String(user.stickerCreatorStatus || user.sticker_creator_status).toLowerCase()
+      : ''
   };
 }
 
@@ -367,7 +430,7 @@ function normalizeMessage(message) {
     : typeof message.message === 'string'
       ? message.message
       : '';
-  const type = ['image', 'voice', 'recalled'].includes(message.type) ? message.type : 'text';
+  const type = ['image', 'voice', 'sticker', 'recalled'].includes(message.type) ? message.type : 'text';
   const timestamp = Number.isNaN(Date.parse(message.timestamp))
     ? new Date().toISOString()
     : message.timestamp;
@@ -383,6 +446,7 @@ function normalizeMessage(message) {
       username,
       avatar: message.avatar || makeAvatar(username),
       content: '',
+      stickerId: '',
       timestamp,
       recalled: true
     };
@@ -398,6 +462,7 @@ function normalizeMessage(message) {
       username,
       avatar: message.avatar || makeAvatar(username),
       content,
+      stickerId: '',
       timestamp,
       recalled: false
     };
@@ -413,7 +478,27 @@ function normalizeMessage(message) {
       username,
       avatar: message.avatar || makeAvatar(username),
       content,
+      stickerId: '',
       duration: Number.isFinite(Number(message.duration)) ? Number(message.duration) : 0,
+      timestamp,
+      recalled: false
+    };
+  }
+
+  if (type === 'sticker') {
+    const stickerId = cleanForumId(message.stickerId || message.sticker_id || '');
+    const sticker = stickerId ? stickerById(stickerId) : null;
+    const stickerUrl = sticker ? sticker.url : content;
+    if (!stickerUrl || !isPublicStickerUrl(stickerUrl)) return null;
+    return {
+      id: message.id || crypto.randomUUID(),
+      roomId,
+      type,
+      userId: message.userId || null,
+      username,
+      avatar: message.avatar || makeAvatar(username),
+      content: stickerUrl,
+      stickerId,
       timestamp,
       recalled: false
     };
@@ -429,6 +514,7 @@ function normalizeMessage(message) {
     username,
     avatar: message.avatar || makeAvatar(username),
     content: text,
+    stickerId: '',
     timestamp,
     recalled: false
   };
@@ -474,7 +560,9 @@ function publicUser(user) {
     profileBanner: cleanProfileBanner(user.profileBanner),
     starCount: starCountForUser(user.id),
     isAdmin: isAdminUser(user),
-    isBanned: Boolean(user.isBanned)
+    isBanned: Boolean(user.isBanned),
+    isStickerCreator: Boolean(user.isStickerCreator),
+    stickerCreatorStatus: user.stickerCreatorStatus || ''
   };
 }
 
@@ -492,6 +580,8 @@ function privateUser(user) {
     createdAt: user.createdAt,
     lastIp: user.lastIp || '',
     lastLoginAt: user.lastLoginAt || '',
+    isStickerCreator: Boolean(user.isStickerCreator),
+    stickerCreatorStatus: user.stickerCreatorStatus || '',
     isBanned: Boolean(user.isBanned),
     bannedAt: user.bannedAt || '',
     bannedReason: user.bannedReason || ''
@@ -535,7 +625,9 @@ function initDatabase() {
       last_login_at TEXT NOT NULL DEFAULT '',
       is_banned INTEGER NOT NULL DEFAULT 0,
       banned_at TEXT NOT NULL DEFAULT '',
-      banned_reason TEXT NOT NULL DEFAULT ''
+      banned_reason TEXT NOT NULL DEFAULT '',
+      is_sticker_creator INTEGER NOT NULL DEFAULT 0,
+      sticker_creator_status TEXT NOT NULL DEFAULT ''
     );
 
     CREATE TABLE IF NOT EXISTS messages (
@@ -546,6 +638,7 @@ function initDatabase() {
       username TEXT NOT NULL,
       avatar TEXT NOT NULL,
       content TEXT NOT NULL DEFAULT '',
+      sticker_id TEXT NOT NULL DEFAULT '',
       duration REAL NOT NULL DEFAULT 0,
       recalled INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL
@@ -653,6 +746,36 @@ function initDatabase() {
       UNIQUE(post_id, reporter_user_id)
     );
 
+    CREATE TABLE IF NOT EXISTS stickers (
+      id TEXT PRIMARY KEY,
+      owner_user_id TEXT NOT NULL DEFAULT '',
+      filename TEXT NOT NULL DEFAULT '',
+      url TEXT NOT NULL,
+      original_name TEXT NOT NULL DEFAULT '',
+      mime_type TEXT NOT NULL DEFAULT '',
+      size_bytes INTEGER NOT NULL DEFAULT 0,
+      sticker_type TEXT NOT NULL,
+      status TEXT NOT NULL,
+      title TEXT NOT NULL DEFAULT '',
+      description TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL,
+      reviewed_at TEXT NOT NULL DEFAULT '',
+      reviewed_by TEXT NOT NULL DEFAULT '',
+      admin_note TEXT NOT NULL DEFAULT ''
+    );
+
+    CREATE TABLE IF NOT EXISTS sticker_creator_requests (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      reason TEXT NOT NULL,
+      portfolio_note TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'pending',
+      admin_user_id TEXT NOT NULL DEFAULT '',
+      admin_note TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL,
+      reviewed_at TEXT NOT NULL DEFAULT ''
+    );
+
     CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at);
     CREATE INDEX IF NOT EXISTS idx_messages_user_id ON messages(user_id);
     CREATE INDEX IF NOT EXISTS idx_room_members_user_id ON room_members(user_id);
@@ -671,6 +794,10 @@ function initDatabase() {
     CREATE INDEX IF NOT EXISTS idx_post_reports_status_created ON post_reports(status, created_at);
     CREATE INDEX IF NOT EXISTS idx_post_reports_post_id ON post_reports(post_id);
     CREATE INDEX IF NOT EXISTS idx_post_reports_reported_user_id ON post_reports(reported_user_id);
+    CREATE INDEX IF NOT EXISTS idx_stickers_owner_type_status ON stickers(owner_user_id, sticker_type, status);
+    CREATE INDEX IF NOT EXISTS idx_stickers_type_status_created ON stickers(sticker_type, status, created_at);
+    CREATE INDEX IF NOT EXISTS idx_sticker_creator_requests_user_created ON sticker_creator_requests(user_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_sticker_creator_requests_status_created ON sticker_creator_requests(status, created_at);
   `);
   migrateForumTables();
   ensureColumn('users', 'display_name', "TEXT NOT NULL DEFAULT ''");
@@ -682,8 +809,12 @@ function initDatabase() {
   ensureColumn('users', 'is_banned', "INTEGER NOT NULL DEFAULT 0");
   ensureColumn('users', 'banned_at', "TEXT NOT NULL DEFAULT ''");
   ensureColumn('users', 'banned_reason', "TEXT NOT NULL DEFAULT ''");
+  ensureColumn('users', 'is_sticker_creator', "INTEGER NOT NULL DEFAULT 0");
+  ensureColumn('users', 'sticker_creator_status', "TEXT NOT NULL DEFAULT ''");
   ensureColumn('messages', 'room_id', `TEXT NOT NULL DEFAULT '${DEFAULT_ROOM_ID}'`);
+  ensureColumn('messages', 'sticker_id', "TEXT NOT NULL DEFAULT ''");
   db.exec('CREATE INDEX IF NOT EXISTS idx_messages_room_id ON messages(room_id)');
+  ensureOfficialStickers();
   ensureDefaultRoom();
   ensureSystemAnnouncements();
 }
@@ -778,7 +909,9 @@ function rowToUser(row) {
     lastLoginAt: row.last_login_at,
     isBanned: Boolean(row.is_banned),
     bannedAt: row.banned_at,
-    bannedReason: row.banned_reason
+    bannedReason: row.banned_reason,
+    isStickerCreator: Boolean(row.is_sticker_creator),
+    stickerCreatorStatus: row.sticker_creator_status
   });
 }
 
@@ -807,6 +940,7 @@ function rowToMessage(row) {
     username: row.username,
     avatar: row.avatar,
     content: row.content,
+    stickerId: row.sticker_id,
     duration: row.duration,
     timestamp: row.created_at,
     recalled: Boolean(row.recalled)
@@ -850,10 +984,57 @@ function rowToComment(row) {
   };
 }
 
+function rowToSticker(row) {
+  if (!row) return null;
+  const id = cleanForumId(row.id);
+  const type = STICKER_TYPES.has(row.sticker_type) ? row.sticker_type : 'personal';
+  const status = cleanStickerStatus(row.status, type === 'personal' ? 'active' : 'pending');
+  const title = cleanStickerTitle(row.title) || (type === 'official' ? '官方表情' : '表情包');
+  const url = typeof row.url === 'string' ? row.url.trim() : '';
+  if (!id || !isPublicStickerUrl(url)) return null;
+  return {
+    id,
+    ownerUserId: row.owner_user_id || '',
+    filename: row.filename || '',
+    url,
+    originalName: row.original_name || '',
+    mimeType: row.mime_type || '',
+    sizeBytes: Number(row.size_bytes) || 0,
+    stickerType: type,
+    status,
+    title,
+    description: cleanStickerDescription(row.description),
+    createdAt: Number.isNaN(Date.parse(row.created_at)) ? new Date().toISOString() : row.created_at,
+    reviewedAt: Number.isNaN(Date.parse(row.reviewed_at)) ? '' : row.reviewed_at,
+    reviewedBy: row.reviewed_by || '',
+    adminNote: cleanAdminNote(row.admin_note)
+  };
+}
+
+function publicSticker(rowOrSticker) {
+  const sticker = rowOrSticker && rowOrSticker.stickerType ? rowOrSticker : rowToSticker(rowOrSticker);
+  if (!sticker) return null;
+  const owner = sticker.ownerUserId ? userById(sticker.ownerUserId) : null;
+  return {
+    id: sticker.id,
+    ownerUserId: sticker.ownerUserId,
+    ownerName: owner ? displayNameOf(owner) : sticker.stickerType === 'official' ? 'Uni 官方' : '',
+    url: sticker.url,
+    title: sticker.title,
+    description: sticker.description,
+    stickerType: sticker.stickerType,
+    source: sticker.stickerType === 'creator_submission' ? 'creator' : sticker.stickerType,
+    status: sticker.status,
+    createdAt: sticker.createdAt,
+    reviewedAt: sticker.reviewedAt,
+    adminNote: sticker.adminNote
+  };
+}
+
 function upsertUser(user) {
   db.prepare(`
-    INSERT INTO users (id, account, username, display_name, avatar, bio, profile_banner, password_hash, created_at, last_ip, last_login_at, is_banned, banned_at, banned_reason)
-    VALUES (@id, @account, @username, @displayName, @avatar, @bio, @profileBanner, @passwordHash, @createdAt, @lastIp, @lastLoginAt, @isBanned, @bannedAt, @bannedReason)
+    INSERT INTO users (id, account, username, display_name, avatar, bio, profile_banner, password_hash, created_at, last_ip, last_login_at, is_banned, banned_at, banned_reason, is_sticker_creator, sticker_creator_status)
+    VALUES (@id, @account, @username, @displayName, @avatar, @bio, @profileBanner, @passwordHash, @createdAt, @lastIp, @lastLoginAt, @isBanned, @bannedAt, @bannedReason, @isStickerCreator, @stickerCreatorStatus)
     ON CONFLICT(id) DO UPDATE SET
       account = excluded.account,
       username = excluded.username,
@@ -867,7 +1048,9 @@ function upsertUser(user) {
       last_login_at = excluded.last_login_at,
       is_banned = excluded.is_banned,
       banned_at = excluded.banned_at,
-      banned_reason = excluded.banned_reason
+      banned_reason = excluded.banned_reason,
+      is_sticker_creator = excluded.is_sticker_creator,
+      sticker_creator_status = excluded.sticker_creator_status
   `).run({
     id: user.id,
     account: user.account,
@@ -882,7 +1065,9 @@ function upsertUser(user) {
     lastLoginAt: user.lastLoginAt || '',
     isBanned: user.isBanned ? 1 : 0,
     bannedAt: user.bannedAt || '',
-    bannedReason: user.bannedReason || ''
+    bannedReason: user.bannedReason || '',
+    isStickerCreator: user.isStickerCreator ? 1 : 0,
+    stickerCreatorStatus: user.stickerCreatorStatus || ''
   });
 }
 
@@ -912,8 +1097,8 @@ function upsertMessage(message) {
   const payload = publicMessage(message);
   if (!payload) return;
   db.prepare(`
-    INSERT INTO messages (id, room_id, type, user_id, username, avatar, content, duration, recalled, created_at)
-    VALUES (@id, @roomId, @type, @userId, @username, @avatar, @content, @duration, @recalled, @timestamp)
+    INSERT INTO messages (id, room_id, type, user_id, username, avatar, content, sticker_id, duration, recalled, created_at)
+    VALUES (@id, @roomId, @type, @userId, @username, @avatar, @content, @stickerId, @duration, @recalled, @timestamp)
     ON CONFLICT(id) DO UPDATE SET
       room_id = excluded.room_id,
       type = excluded.type,
@@ -921,11 +1106,13 @@ function upsertMessage(message) {
       username = excluded.username,
       avatar = excluded.avatar,
       content = excluded.content,
+      sticker_id = excluded.sticker_id,
       duration = excluded.duration,
       recalled = excluded.recalled,
       created_at = excluded.created_at
   `).run({
     ...payload,
+    stickerId: payload.stickerId || '',
     recalled: payload.recalled ? 1 : 0
   });
 }
@@ -944,6 +1131,7 @@ function publicMessage(message) {
       displayName,
       avatar: message.avatar || makeAvatar(displayName),
       content: message.content,
+      stickerId: message.stickerId || '',
       duration: message.duration || 0,
       timestamp: message.timestamp,
       recalled: false
@@ -959,6 +1147,7 @@ function publicMessage(message) {
     displayName,
     avatar: message.avatar,
     content: '',
+    stickerId: '',
     duration: 0,
     timestamp: message.timestamp,
     recalled: true
@@ -1115,6 +1304,165 @@ function updateReportStatus(reportId, status, adminUserId, note = '', actionTake
     SET status = ?, admin_user_id = ?, admin_note = ?, action_taken = ?, reviewed_at = ?
     WHERE id = ?
   `).run(status, adminUserId, cleanAdminNote(note), actionTaken, new Date().toISOString(), reportId);
+}
+
+function ensureOfficialStickers() {
+  const createdAt = new Date().toISOString();
+  DEFAULT_OFFICIAL_STICKERS.forEach((sticker) => {
+    db.prepare(`
+      INSERT INTO stickers (id, owner_user_id, filename, url, original_name, mime_type, size_bytes, sticker_type, status, title, description, created_at, reviewed_at, reviewed_by, admin_note)
+      VALUES (@id, '', '', @url, @title, 'image/svg+xml', 0, 'official', 'active', @title, @description, @createdAt, '', '', '')
+      ON CONFLICT(id) DO UPDATE SET
+        url = excluded.url,
+        sticker_type = 'official',
+        status = CASE WHEN stickers.status = 'removed' THEN stickers.status ELSE 'active' END,
+        title = excluded.title,
+        description = excluded.description
+    `).run({ ...sticker, createdAt });
+  });
+}
+
+function stickerById(stickerIdValue) {
+  const stickerId = cleanForumId(stickerIdValue);
+  if (!stickerId) return null;
+  return rowToSticker(db.prepare('SELECT * FROM stickers WHERE id = ?').get(stickerId));
+}
+
+function isStickerSendable(sticker, userId) {
+  if (!sticker) return false;
+  if (sticker.stickerType === 'personal') return sticker.status === 'active' && sticker.ownerUserId === userId;
+  if (sticker.stickerType === 'official') return sticker.status === 'active';
+  return sticker.stickerType === 'creator_submission' && sticker.status === 'approved';
+}
+
+function personalStickerCount(userId) {
+  return Number(db.prepare(`
+    SELECT COUNT(*) AS count FROM stickers
+    WHERE owner_user_id = ? AND sticker_type = 'personal' AND status = 'active'
+  `).get(userId).count || 0);
+}
+
+function listStickersForUser(userId) {
+  const official = db.prepare(`
+    SELECT * FROM stickers
+    WHERE (sticker_type = 'official' AND status = 'active')
+       OR (sticker_type = 'creator_submission' AND status = 'approved')
+    ORDER BY created_at ASC
+  `).all().map(rowToSticker).filter(Boolean).map(publicSticker);
+  const personal = db.prepare(`
+    SELECT * FROM stickers
+    WHERE owner_user_id = ? AND sticker_type = 'personal' AND status = 'active'
+    ORDER BY created_at DESC
+  `).all(userId).map(rowToSticker).filter(Boolean).map(publicSticker);
+  const submissions = db.prepare(`
+    SELECT * FROM stickers
+    WHERE owner_user_id = ? AND sticker_type = 'creator_submission'
+    ORDER BY created_at DESC
+    LIMIT 40
+  `).all(userId).map(rowToSticker).filter(Boolean).map(publicSticker);
+  return {
+    official,
+    personal,
+    submissions,
+    creator: creatorStatusForUser(userId)
+  };
+}
+
+function latestCreatorRequest(userId) {
+  return db.prepare(`
+    SELECT * FROM sticker_creator_requests
+    WHERE user_id = ?
+    ORDER BY created_at DESC
+    LIMIT 1
+  `).get(userId) || null;
+}
+
+function publicCreatorRequest(row) {
+  if (!row) return null;
+  const user = userById(row.user_id);
+  return {
+    id: row.id,
+    userId: row.user_id,
+    displayName: user ? displayNameOf(user) : '未知用户',
+    username: user ? user.username : '',
+    avatar: user ? user.avatar : makeAvatar('U'),
+    reason: cleanCreatorReason(row.reason),
+    portfolioNote: cleanCreatorPortfolio(row.portfolio_note),
+    status: CREATOR_REQUEST_STATUSES.has(row.status) ? row.status : 'pending',
+    adminUserId: row.admin_user_id || '',
+    adminNote: cleanAdminNote(row.admin_note),
+    createdAt: row.created_at,
+    reviewedAt: row.reviewed_at || ''
+  };
+}
+
+function creatorStatusForUser(userId) {
+  const user = userById(userId);
+  const request = publicCreatorRequest(latestCreatorRequest(userId));
+  return {
+    isCreator: Boolean(user && user.isStickerCreator),
+    status: user && user.isStickerCreator ? 'approved' : request ? request.status : '',
+    request
+  };
+}
+
+function listCreatorRequests() {
+  return db.prepare(`
+    SELECT * FROM sticker_creator_requests
+    ORDER BY CASE status WHEN 'pending' THEN 0 ELSE 1 END, created_at DESC
+    LIMIT 120
+  `).all().map(publicCreatorRequest).filter(Boolean);
+}
+
+function listStickerSubmissions() {
+  return db.prepare(`
+    SELECT * FROM stickers
+    WHERE sticker_type = 'creator_submission'
+    ORDER BY CASE status WHEN 'pending' THEN 0 WHEN 'approved' THEN 1 ELSE 2 END, created_at DESC
+    LIMIT 120
+  `).all().map(rowToSticker).filter(Boolean).map(publicSticker);
+}
+
+function saveStickerUpload(user, dataUrl, { title = '', description = '', stickerType = 'personal', originalName = '' } = {}) {
+  const parsed = parseDataUrl(dataUrl, ALLOWED_IMAGE_TYPES, MAX_STICKER_BYTES);
+  if (!parsed) return { error: '表情包仅支持 JPG、PNG、GIF、WebP，最大 2MB' };
+  const cleanType = STICKER_TYPES.has(stickerType) ? stickerType : 'personal';
+  fs.mkdirSync(STICKER_UPLOAD_DIR, { recursive: true });
+  const ext = IMAGE_EXTENSIONS[parsed.mime] || 'png';
+  const id = `sticker:${crypto.randomUUID()}`;
+  const fileName = `${cleanType}_${crypto.randomUUID().replace(/-/g, '')}.${ext}`;
+  const filePath = path.join(STICKER_UPLOAD_DIR, fileName);
+  fs.writeFileSync(filePath, parsed.buffer, { mode: 0o600 });
+  const now = new Date().toISOString();
+  const sticker = {
+    id,
+    ownerUserId: user.id,
+    filename: fileName,
+    url: `/uploads/stickers/${fileName}`,
+    originalName: cleanText(originalName, 80),
+    mimeType: parsed.mime,
+    sizeBytes: parsed.buffer.length,
+    stickerType: cleanType,
+    status: cleanType === 'creator_submission' ? 'pending' : 'active',
+    title: cleanStickerTitle(title) || '我的表情',
+    description: cleanStickerDescription(description),
+    createdAt: now,
+    reviewedAt: '',
+    reviewedBy: '',
+    adminNote: ''
+  };
+  db.prepare(`
+    INSERT INTO stickers (id, owner_user_id, filename, url, original_name, mime_type, size_bytes, sticker_type, status, title, description, created_at, reviewed_at, reviewed_by, admin_note)
+    VALUES (@id, @ownerUserId, @filename, @url, @originalName, @mimeType, @sizeBytes, @stickerType, @status, @title, @description, @createdAt, @reviewedAt, @reviewedBy, @adminNote)
+  `).run(sticker);
+  return { sticker: publicSticker(sticker) };
+}
+
+function deleteStickerFile(sticker) {
+  if (!sticker || !isUploadedSticker(sticker.url)) return;
+  const filePath = stickerFilePath(sticker.url);
+  if (!filePath.startsWith(STICKER_UPLOAD_DIR)) return;
+  fs.promises.unlink(filePath).catch(() => {});
 }
 
 function deleteForumPostById(postId) {
@@ -1377,6 +1725,13 @@ function broadcastBulletinUpdates(targetUserId = '') {
 }
 
 function ensureSystemAnnouncements() {
+  createAnnouncement({
+    id: 'update:5.5.0',
+    type: 'update',
+    title: 'Sonoma 5.5.0 已上线',
+    content: '新增官方表情包、个人表情包上传与发送、表情包创作者申请，以及管理员官方表情包审核。',
+    priority: 'high'
+  });
   createAnnouncement({
     id: 'update:5.4.6',
     type: 'update',
@@ -1695,12 +2050,6 @@ function refreshOpenRooms() {
   });
 }
 
-function requireAdmin(socket) {
-  if (socket.user && isAdminUser(socket.user)) return true;
-  socket.emit('admin error', '没有管理员权限');
-  return false;
-}
-
 function ensureAdminUser() {
   const existing = findUserByAccount(ADMIN_ACCOUNT);
   if (existing) {
@@ -1730,7 +2079,9 @@ function ensureAdminUser() {
     passwordHash: hashPassword(ADMIN_PASSWORD),
     createdAt: new Date().toISOString(),
     lastIp: '',
-    lastLoginAt: ''
+    lastLoginAt: '',
+    isStickerCreator: false,
+    stickerCreatorStatus: ''
   };
   users.push(admin);
   saveUsers();
@@ -1758,6 +2109,8 @@ function requireCommunityAccess(socket, action = '使用社区功能') {
   const message = '你的账号已被限制使用社区功能';
   socket.emit('forum error', message);
   socket.emit('profileError', message);
+  socket.emit('sticker error', message);
+  socket.emit('messageError', message);
   return false;
 }
 
@@ -1786,6 +2139,8 @@ function adminUserPayload(user) {
     isBanned: Boolean(user.isBanned),
     bannedAt: user.bannedAt || '',
     bannedReason: user.bannedReason || '',
+    isStickerCreator: Boolean(user.isStickerCreator),
+    stickerCreatorStatus: user.stickerCreatorStatus || '',
     online: Array.from(onlineUsers.values()).some((onlineUser) => onlineUser.id === user.id),
     messageCount: userMessages.length,
     passwordStoredAs: 'scrypt hash + salt'
@@ -1810,7 +2165,9 @@ function buildAdminDashboard() {
     messageCount: messages.length,
     onlineCount: onlineUsers.size,
     renameRequests: listPendingRenameRequests(),
-    postReports: listPostReports()
+    postReports: listPostReports(),
+    stickerCreatorRequests: listCreatorRequests(),
+    stickerSubmissions: listStickerSubmissions()
   };
 }
 
@@ -1892,6 +2249,7 @@ const typingTimers = new Map();
 
 fs.mkdirSync(AVATAR_UPLOAD_DIR, { recursive: true });
 fs.mkdirSync(BANNER_UPLOAD_DIR, { recursive: true });
+fs.mkdirSync(STICKER_UPLOAD_DIR, { recursive: true });
 app.use('/uploads', express.static(UPLOADS_DIR));
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -1929,7 +2287,11 @@ io.on('connection', (socket) => {
       bio: '',
       profileBanner: '',
       passwordHash: hashPassword(input.password),
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      lastIp: '',
+      lastLoginAt: '',
+      isStickerCreator: false,
+      stickerCreatorStatus: ''
     };
     users.push(user);
     recordLogin(socket, user);
@@ -1975,6 +2337,100 @@ io.on('connection', (socket) => {
   socket.on('get lobby', () => {
     if (!requireAuth(socket, '查看聊天列表')) return;
     emitLobby(socket);
+  });
+
+  socket.on('get stickers', () => {
+    if (!requireAuth(socket, '查看表情包')) return;
+    socket.emit('stickers', listStickersForUser(socket.user.id));
+  });
+
+  socket.on('upload sticker', (payload) => {
+    if (!requireCommunityAccess(socket, '上传表情包')) return;
+    if (personalStickerCount(socket.user.id) >= MAX_PERSONAL_STICKERS) {
+      socket.emit('sticker error', `个人表情包最多保存 ${MAX_PERSONAL_STICKERS} 个`);
+      return;
+    }
+    const base64 = payload && typeof payload.base64 === 'string' ? payload.base64 : '';
+    const result = saveStickerUpload(socket.user, base64, {
+      stickerType: 'personal',
+      title: payload && payload.title,
+      originalName: payload && payload.name
+    });
+    if (result.error) {
+      socket.emit('sticker error', result.error);
+      return;
+    }
+    socket.emit('sticker notice', '表情包已上传');
+    socket.emit('stickers', listStickersForUser(socket.user.id));
+  });
+
+  socket.on('delete sticker', (stickerIdValue) => {
+    if (!requireCommunityAccess(socket, '删除表情包')) return;
+    const sticker = stickerById(stickerIdValue);
+    if (!sticker || sticker.stickerType !== 'personal' || sticker.ownerUserId !== socket.user.id || sticker.status !== 'active') {
+      socket.emit('sticker error', '只能删除自己的个人表情包');
+      return;
+    }
+    db.prepare("UPDATE stickers SET status = 'removed', reviewed_at = ? WHERE id = ?").run(new Date().toISOString(), sticker.id);
+    deleteStickerFile(sticker);
+    socket.emit('sticker notice', '表情包已删除');
+    socket.emit('stickers', listStickersForUser(socket.user.id));
+  });
+
+  socket.on('apply sticker creator', (payload) => {
+    if (!requireCommunityAccess(socket, '申请表情包创作者')) return;
+    const reason = cleanCreatorReason(payload && payload.reason);
+    const portfolioNote = cleanCreatorPortfolio(payload && payload.portfolioNote);
+    if (!reason) {
+      socket.emit('sticker error', '请填写申请理由');
+      return;
+    }
+    if (socket.user.isStickerCreator) {
+      socket.emit('sticker error', '你已经是表情包创作者');
+      return;
+    }
+    const latest = latestCreatorRequest(socket.user.id);
+    if (latest && latest.status === 'pending') {
+      socket.emit('sticker error', '申请正在审核中');
+      return;
+    }
+    const id = `creator-request:${crypto.randomUUID()}`;
+    db.prepare(`
+      INSERT INTO sticker_creator_requests (id, user_id, reason, portfolio_note, status, created_at)
+      VALUES (?, ?, ?, ?, 'pending', ?)
+    `).run(id, socket.user.id, reason, portfolioNote, new Date().toISOString());
+    socket.user.stickerCreatorStatus = 'pending';
+    saveUsers();
+    socket.emit('sticker notice', '创作者申请已提交');
+    socket.emit('stickers', listStickersForUser(socket.user.id));
+    broadcastAdminDashboards();
+  });
+
+  socket.on('submit official sticker', (payload) => {
+    if (!requireCommunityAccess(socket, '提交官方表情包')) return;
+    if (!socket.user.isStickerCreator) {
+      socket.emit('sticker error', '需要通过创作者审核后才能提交官方表情包');
+      return;
+    }
+    const title = cleanStickerTitle(payload && payload.title);
+    if (!title) {
+      socket.emit('sticker error', '请输入表情包名称');
+      return;
+    }
+    const base64 = payload && typeof payload.base64 === 'string' ? payload.base64 : '';
+    const result = saveStickerUpload(socket.user, base64, {
+      stickerType: 'creator_submission',
+      title,
+      description: payload && payload.description,
+      originalName: payload && payload.name
+    });
+    if (result.error) {
+      socket.emit('sticker error', result.error);
+      return;
+    }
+    socket.emit('sticker notice', '官方表情包已提交审核');
+    socket.emit('stickers', listStickersForUser(socket.user.id));
+    broadcastAdminDashboards();
   });
 
   socket.on('get forum posts', () => {
@@ -2519,6 +2975,37 @@ io.on('connection', (socket) => {
     broadcastAdminDashboards();
   });
 
+  socket.on('chat sticker', (payload) => {
+    if (!requireCommunityAccess(socket, '发送表情包')) return;
+    if (!socket.currentRoomId) {
+      socket.emit('messageError', '请先选择聊天组或私聊');
+      return;
+    }
+    const sticker = stickerById(payload && payload.stickerId);
+    if (!isStickerSendable(sticker, socket.user.id)) {
+      socket.emit('messageError', '这个表情包不可发送');
+      return;
+    }
+    clearTyping(socket);
+    const stickerData = {
+      id: crypto.randomUUID(),
+      roomId: socket.currentRoomId,
+      type: 'sticker',
+      userId: socket.user.id,
+      username: displayNameOf(socket.user),
+      avatar: socket.user.avatar || makeAvatar(displayNameOf(socket.user)),
+      content: sticker.url,
+      stickerId: sticker.id,
+      timestamp: new Date().toISOString(),
+      recalled: false
+    };
+    messages = trimHistory([...messages, stickerData]);
+    saveHistory(messages);
+    io.to(roomChannel(socket.currentRoomId)).emit('chat message', stickerData);
+    notifyPrivateRecipients(stickerData);
+    broadcastAdminDashboards();
+  });
+
   socket.on('recall message', (messageId) => {
     if (!requireAuth(socket, '撤回消息') || typeof messageId !== 'string') return;
     const message = messages.find((item) => item.id === messageId);
@@ -2674,6 +3161,90 @@ io.on('connection', (socket) => {
     }
 
     socket.emit('admin notice', '举报已处理');
+    broadcastAdminDashboards();
+  });
+
+  socket.on('admin decide sticker creator', (payload) => {
+    if (!requireAdmin(socket)) return;
+    const requestId = payload && typeof payload.requestId === 'string' ? payload.requestId : '';
+    const decision = payload && payload.status === 'rejected' ? 'rejected' : 'approved';
+    const note = cleanAdminNote(payload && payload.note);
+    const request = db.prepare('SELECT * FROM sticker_creator_requests WHERE id = ?').get(requestId);
+    if (!request) {
+      socket.emit('admin error', '创作者申请不存在');
+      return;
+    }
+    const user = userById(request.user_id);
+    if (!user) {
+      socket.emit('admin error', '申请用户不存在');
+      return;
+    }
+    const reviewedAt = new Date().toISOString();
+    db.prepare(`
+      UPDATE sticker_creator_requests
+      SET status = ?, admin_user_id = ?, admin_note = ?, reviewed_at = ?
+      WHERE id = ?
+    `).run(decision, socket.user.id, note, reviewedAt, requestId);
+    user.isStickerCreator = decision === 'approved';
+    user.stickerCreatorStatus = decision;
+    saveUsers();
+    createAnnouncement({
+      type: 'admin',
+      title: decision === 'approved' ? '表情包创作者申请已通过' : '表情包创作者申请未通过',
+      content: decision === 'approved'
+        ? `你现在可以提交官方表情包审核了。${note ? `管理员备注：${note}` : ''}`
+        : `你的表情包创作者申请未通过。${note ? `管理员备注：${note}` : ''}`,
+      targetUserId: user.id,
+      createdBy: socket.user.id,
+      priority: decision === 'approved' ? 'high' : 'normal'
+    });
+    socketsForUser(user.id).forEach((connectedSocket) => {
+      connectedSocket.user = user;
+      connectedSocket.emit('profile updated', { user: publicUser(user) });
+      connectedSocket.emit('stickers', listStickersForUser(user.id));
+      emitBulletins(connectedSocket);
+    });
+    socket.emit('admin notice', decision === 'approved' ? '已通过创作者申请' : '已拒绝创作者申请');
+    broadcastOnlineUsers();
+    broadcastAdminDashboards();
+  });
+
+  socket.on('admin decide sticker submission', (payload) => {
+    if (!requireAdmin(socket)) return;
+    const stickerId = payload && typeof payload.stickerId === 'string' ? payload.stickerId : '';
+    const action = payload && typeof payload.action === 'string' ? payload.action : '';
+    const note = cleanAdminNote(payload && payload.note);
+    const sticker = stickerById(stickerId);
+    if (!sticker || sticker.stickerType !== 'creator_submission') {
+      socket.emit('admin error', '表情包提交不存在');
+      return;
+    }
+    const status = action === 'approve' ? 'approved' : action === 'remove' ? 'removed' : 'rejected';
+    db.prepare(`
+      UPDATE stickers
+      SET status = ?, reviewed_at = ?, reviewed_by = ?, admin_note = ?
+      WHERE id = ?
+    `).run(status, new Date().toISOString(), socket.user.id, note, sticker.id);
+    if (status === 'removed') deleteStickerFile(sticker);
+    const owner = userById(sticker.ownerUserId);
+    if (owner) {
+      createAnnouncement({
+        type: 'admin',
+        title: status === 'approved' ? '官方表情包已通过审核' : status === 'removed' ? '官方表情包已下架' : '官方表情包未通过审核',
+        content: `「${sticker.title}」${status === 'approved' ? '已进入官方表情包库。' : status === 'removed' ? '已被管理员下架。' : '未通过审核。'}${note ? `管理员备注：${note}` : ''}`,
+        targetUserId: owner.id,
+        createdBy: socket.user.id,
+        priority: status === 'approved' ? 'high' : 'normal'
+      });
+      socketsForUser(owner.id).forEach((connectedSocket) => {
+        connectedSocket.emit('stickers', listStickersForUser(owner.id));
+        emitBulletins(connectedSocket);
+      });
+    }
+    io.sockets.sockets.forEach((connectedSocket) => {
+      if (connectedSocket.user) connectedSocket.emit('stickers', listStickersForUser(connectedSocket.user.id));
+    });
+    socket.emit('admin notice', status === 'approved' ? '已通过官方表情包' : status === 'removed' ? '已下架官方表情包' : '已拒绝官方表情包');
     broadcastAdminDashboards();
   });
 

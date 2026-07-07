@@ -1051,6 +1051,7 @@
     }
 
     .composer {
+      position: relative;
       min-height: 76px;
       display: grid;
       grid-template-columns: auto minmax(0, 1fr) auto;
@@ -3460,6 +3461,233 @@
         font-size: 22px;
       }
     }
+
+    .sticker-panel {
+      position: absolute;
+      left: clamp(12px, 2vw, 24px);
+      bottom: calc(100% + 12px);
+      z-index: 35;
+      width: min(440px, calc(100vw - 32px));
+      max-height: min(560px, 70vh);
+      overflow: auto;
+      padding: 14px;
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--glass-border);
+      background: var(--glass-bg-light);
+      box-shadow: var(--glass-shadow);
+      backdrop-filter: blur(var(--glass-blur-lg)) saturate(145%);
+      animation: modalIn var(--duration-normal) var(--ease-pop) both;
+    }
+
+    .sticker-panel-head,
+    .sticker-manage-card,
+    .sticker-status-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .sticker-panel-head strong {
+      display: block;
+      font-size: 1.05rem;
+    }
+
+    .sticker-panel-head span,
+    .sticker-empty,
+    .sticker-note {
+      color: var(--text-secondary);
+      font-size: .82rem;
+    }
+
+    .sticker-tabs {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+      padding: 5px;
+      margin: 12px 0;
+      border-radius: var(--radius-md);
+      background: var(--glass-bg-soft);
+      border: 1px solid var(--glass-border);
+    }
+
+    .sticker-tab {
+      border: 0;
+      min-height: 34px;
+      border-radius: calc(var(--radius-md) - 5px);
+      background: transparent;
+      color: var(--text-secondary);
+      font-weight: 800;
+      cursor: pointer;
+      transition: transform var(--duration-fast) var(--ease-smooth), background var(--duration-fast) var(--ease-smooth), color var(--duration-fast) var(--ease-smooth);
+    }
+
+    .sticker-tab:hover,
+    .sticker-tab.is-active {
+      transform: translateY(-1px);
+      color: var(--text-primary);
+      background: rgba(255, 255, 255, .44);
+      box-shadow: 0 10px 24px rgba(37, 99, 235, .12);
+    }
+
+    [data-theme="dark"] .sticker-tab:hover,
+    [data-theme="dark"] .sticker-tab.is-active {
+      background: rgba(255, 255, 255, .1);
+    }
+
+    .sticker-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+      gap: 10px;
+    }
+
+    .sticker-item {
+      position: relative;
+      min-height: 90px;
+      padding: 8px;
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-md);
+      background: var(--glass-bg-soft);
+      color: var(--text-primary);
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+      gap: 5px;
+      transition: transform var(--duration-fast) var(--ease-pop), box-shadow var(--duration-fast) var(--ease-smooth), border-color var(--duration-fast) var(--ease-smooth);
+    }
+
+    .sticker-item:hover {
+      transform: translateY(-3px) scale(1.015);
+      border-color: rgba(59, 130, 246, .34);
+      box-shadow: 0 14px 32px rgba(37, 99, 235, .16);
+    }
+
+    .sticker-item img,
+    .sticker-message-img {
+      display: block;
+      width: 64px;
+      height: 64px;
+      object-fit: contain;
+      border-radius: 18px;
+    }
+
+    .sticker-item span {
+      width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      text-align: center;
+      font-size: .72rem;
+      font-weight: 800;
+      color: var(--text-secondary);
+    }
+
+    .sticker-delete {
+      position: absolute;
+      top: 5px;
+      right: 5px;
+      width: 24px;
+      height: 24px;
+      border-radius: 999px;
+      border: 1px solid var(--glass-border);
+      background: rgba(239, 68, 68, .9);
+      color: #fff;
+      cursor: pointer;
+      box-shadow: 0 8px 18px rgba(239, 68, 68, .25);
+    }
+
+    .sticker-manage {
+      margin-top: 12px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .sticker-manage-card {
+      align-items: flex-start;
+      padding: 12px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--glass-border);
+      background: var(--glass-bg-soft);
+    }
+
+    .sticker-manage-card h4 {
+      margin: 0 0 5px;
+      font-size: .95rem;
+    }
+
+    .sticker-form {
+      display: grid;
+      gap: 9px;
+    }
+
+    .sticker-form input,
+    .sticker-form textarea {
+      width: 100%;
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-md);
+      padding: 10px 12px;
+      color: var(--text-primary);
+      background: var(--input-bg);
+      outline: none;
+      font: inherit;
+      transition: border-color var(--duration-fast) var(--ease-smooth), box-shadow var(--duration-fast) var(--ease-smooth);
+    }
+
+    .sticker-form textarea {
+      min-height: 72px;
+      resize: vertical;
+    }
+
+    .sticker-form input:focus,
+    .sticker-form textarea:focus {
+      border-color: rgba(59, 130, 246, .46);
+      box-shadow: 0 0 0 4px rgba(59, 130, 246, .12);
+    }
+
+    .sticker-preview {
+      width: 70px;
+      height: 70px;
+      border-radius: var(--radius-md);
+      object-fit: contain;
+      background: var(--glass-bg-soft);
+      border: 1px solid var(--glass-border);
+    }
+
+    .sticker-message {
+      padding: 4px 0 2px;
+    }
+
+    .sticker-message-img {
+      width: min(148px, 36vw);
+      height: min(148px, 36vw);
+      background: rgba(255, 255, 255, .24);
+      border: 1px solid var(--glass-border);
+      box-shadow: 0 12px 28px rgba(15, 23, 42, .08);
+      cursor: zoom-in;
+    }
+
+    .admin-sticker-preview {
+      width: 72px;
+      height: 72px;
+      border-radius: var(--radius-md);
+      object-fit: contain;
+      border: 1px solid var(--glass-border);
+      background: var(--glass-bg-soft);
+    }
+
+    @media (max-width: 720px) {
+      .sticker-panel {
+        left: 8px;
+        right: 8px;
+        bottom: calc(100% + 8px);
+        width: auto;
+        max-height: 58vh;
+      }
+
+      .sticker-grid {
+        grid-template-columns: repeat(auto-fill, minmax(68px, 1fr));
+      }
+    }
   </style>
 </head>
 <body class="view-auth">
@@ -3562,12 +3790,34 @@
             <button id="voiceBtn" class="icon-btn" type="button" title="语音消息" aria-label="语音消息">
               <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3"/><path d="M8 21h8"/></svg>
             </button>
+            <button id="stickerBtn" class="icon-btn" type="button" title="表情包" aria-label="表情包">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="5"/><path d="M9 10h.01"/><path d="M15 10h.01"/><path d="M8.5 14.5c1.7 1.5 5.3 1.5 7 0"/></svg>
+            </button>
             <input id="imageInput" class="sr-only" type="file" accept="image/*">
+            <input id="stickerUploadInput" class="sr-only" type="file" accept="image/png,image/jpeg,image/gif,image/webp">
+            <input id="stickerOfficialInput" class="sr-only" type="file" accept="image/png,image/jpeg,image/gif,image/webp">
           </div>
 
           <div class="input-wrap">
             <div id="mentionMenu" class="mention-menu" hidden></div>
             <textarea id="input" placeholder="输入消息，Enter 发送，Shift+Enter 换行" autocomplete="off" disabled></textarea>
+          </div>
+
+          <div id="stickerPanel" class="sticker-panel" hidden>
+            <div class="sticker-panel-head">
+              <div>
+                <strong>表情包</strong>
+                <span id="stickerPanelStatus">官方、个人和创作者表情。</span>
+              </div>
+              <button id="stickerPanelClose" class="admin-btn" type="button">关闭</button>
+            </div>
+            <div class="sticker-tabs" role="tablist" aria-label="表情包分类">
+              <button class="sticker-tab is-active" data-sticker-tab="official" type="button">官方</button>
+              <button class="sticker-tab" data-sticker-tab="mine" type="button">我的</button>
+              <button class="sticker-tab" data-sticker-tab="creator" type="button">创作者</button>
+            </div>
+            <div id="stickerGrid" class="sticker-grid"></div>
+            <div id="stickerManage" class="sticker-manage"></div>
           </div>
 
           <button id="send" class="send-btn" type="submit" disabled aria-label="发送">
@@ -3883,6 +4133,14 @@
           <div class="admin-card">
             <h3>举报中心</h3>
             <div id="adminReports" class="rename-request-list"></div>
+          </div>
+          <div class="admin-card">
+            <h3>表情包创作者审核</h3>
+            <div id="adminStickerCreators" class="rename-request-list"></div>
+          </div>
+          <div class="admin-card">
+            <h3>官方表情包审核</h3>
+            <div id="adminStickerSubmissions" class="rename-request-list"></div>
           </div>
           <div class="admin-card">
             <h3>发布公告</h3>
@@ -4210,7 +4468,16 @@
       userSort: 'name',
       profileUser: null,
       pendingBanner: null,
-      reportingPost: null
+      reportingPost: null,
+      stickerTab: 'official',
+      stickers: {
+        official: [],
+        personal: [],
+        submissions: [],
+        creator: { isCreator: false, status: '', request: null }
+      },
+      pendingStickerFile: null,
+      pendingOfficialStickerFile: null
     };
 
     // DOM refs
@@ -4241,6 +4508,15 @@
     const voiceBtn = document.getElementById('voiceBtn');
     const mentionBtn = document.getElementById('mentionBtn');
     const mentionMenu = document.getElementById('mentionMenu');
+    const stickerBtn = document.getElementById('stickerBtn');
+    const stickerPanel = document.getElementById('stickerPanel');
+    const stickerPanelClose = document.getElementById('stickerPanelClose');
+    const stickerPanelStatus = document.getElementById('stickerPanelStatus');
+    const stickerGrid = document.getElementById('stickerGrid');
+    const stickerManage = document.getElementById('stickerManage');
+    const stickerUploadInput = document.getElementById('stickerUploadInput');
+    const stickerOfficialInput = document.getElementById('stickerOfficialInput');
+    const stickerTabs = Array.from(document.querySelectorAll('[data-sticker-tab]'));
     const login = document.getElementById('login');
     const loginForm = document.getElementById('loginForm');
     const loginTab = document.getElementById('loginTab');
@@ -4310,6 +4586,8 @@
     const adminRooms = document.getElementById('adminRooms');
     const adminRenameRequests = document.getElementById('adminRenameRequests');
     const adminReports = document.getElementById('adminReports');
+    const adminStickerCreators = document.getElementById('adminStickerCreators');
+    const adminStickerSubmissions = document.getElementById('adminStickerSubmissions');
     const adminBulletinForm = document.getElementById('adminBulletinForm');
     const adminBulletinTitle = document.getElementById('adminBulletinTitle');
     const adminBulletinType = document.getElementById('adminBulletinType');
@@ -4995,6 +5273,9 @@
       state.profileUser = null;
       state.pendingBanner = null;
       state.reportingPost = null;
+      state.stickers = { official: [], personal: [], submissions: [], creator: { isCreator: false, status: '', request: null } };
+      state.pendingStickerFile = null;
+      state.pendingOfficialStickerFile = null;
       state.privateUnread = {};
       state.quotedMessage = null;
       state.pendingAvatar = null;
@@ -5011,6 +5292,7 @@
       clearQuote();
       clearPendingImage();
       closeMessageMenu();
+      closeStickerPanel();
       closeBulletinModal();
       setChatEnabled(false);
       backToLobby.hidden = true;
@@ -5083,6 +5365,11 @@
       state.bio = user.bio || '';
       state.profileBanner = user.profileBanner || '';
       state.isAdmin = Boolean(user.isAdmin);
+      state.stickers.creator = {
+        isCreator: Boolean(user.isStickerCreator),
+        status: user.stickerCreatorStatus || '',
+        request: null
+      };
       state.privateUnread = {};
       state.pendingAvatar = null;
       state.pendingBanner = null;
@@ -5100,6 +5387,7 @@
       socket.emit('get forum posts');
       socket.emit('get rename status');
       socket.emit('get bulletins');
+      socket.emit('get stickers');
       if (state.isAdmin) socket.emit('admin get dashboard');
     });
 
@@ -5111,6 +5399,10 @@
       state.bio = user.bio || '';
       state.profileBanner = user.profileBanner || '';
       state.isAdmin = Boolean(user.isAdmin);
+      if (typeof user.isStickerCreator !== 'undefined') {
+        state.stickers.creator.isCreator = Boolean(user.isStickerCreator);
+        state.stickers.creator.status = user.stickerCreatorStatus || state.stickers.creator.status || '';
+      }
       state.pendingAvatar = null;
       state.pendingBanner = null;
       renderProfileChip();
@@ -5281,6 +5573,31 @@
       updateForumPostButton();
       updateForumCommentButton();
       showToast(message);
+    });
+
+    socket.on('stickers', (payload) => {
+      state.stickers = {
+        official: Array.isArray(payload && payload.official) ? payload.official : [],
+        personal: Array.isArray(payload && payload.personal) ? payload.personal : [],
+        submissions: Array.isArray(payload && payload.submissions) ? payload.submissions : [],
+        creator: payload && payload.creator ? payload.creator : { isCreator: false, status: '', request: null }
+      };
+      renderStickerPanel();
+      if (state.adminData) renderAdminDashboard();
+    });
+
+    socket.on('sticker notice', (msg) => {
+      state.pendingStickerFile = null;
+      state.pendingOfficialStickerFile = null;
+      if (stickerUploadInput) stickerUploadInput.value = '';
+      if (stickerOfficialInput) stickerOfficialInput.value = '';
+      renderStickerPanel();
+      showToast(msg || '表情包操作完成');
+    });
+
+    socket.on('sticker error', (msg) => {
+      if (stickerPanelStatus) stickerPanelStatus.textContent = msg || '表情包操作失败';
+      showToast(msg || '表情包操作失败');
     });
 
     socket.on('room joined', (payload) => {
@@ -5756,6 +6073,7 @@
     messagesDiv.addEventListener('scroll', () => {
       if (isNearBottom()) newMessageBtn.hidden = true;
       closeMessageMenu();
+      closeStickerPanel();
     });
 
     newMessageBtn.addEventListener('click', () => {
@@ -5765,12 +6083,27 @@
 
     mentionBtn.addEventListener('click', () => {
       mentionMenu.hidden = !mentionMenu.hidden;
+      closeStickerPanel();
       renderMentionMenu();
+    });
+
+    stickerBtn.addEventListener('click', (event) => {
+      event.stopPropagation();
+      openStickerPanel();
+    });
+
+    stickerPanelClose.addEventListener('click', closeStickerPanel);
+
+    stickerTabs.forEach((button) => {
+      button.addEventListener('click', () => setStickerTab(button.dataset.stickerTab));
     });
 
     document.addEventListener('click', (event) => {
       if (!mentionBtn.contains(event.target) && !mentionMenu.contains(event.target)) {
         mentionMenu.hidden = true;
+      }
+      if (!stickerBtn.contains(event.target) && !stickerPanel.contains(event.target)) {
+        closeStickerPanel();
       }
       if (!messageMenu.contains(event.target)) {
         closeMessageMenu();
@@ -5781,10 +6114,14 @@
       if (event.key === 'Escape') {
         mentionMenu.hidden = true;
         closeMessageMenu();
+        closeStickerPanel();
       }
     });
 
-    window.addEventListener('resize', closeMessageMenu);
+    window.addEventListener('resize', () => {
+      closeMessageMenu();
+      closeStickerPanel();
+    });
 
     imageBtn.addEventListener('click', () => {
       if (!state.username || !state.isConnected || !state.currentRoom || state.imageCooldown > 0) return;
@@ -5802,6 +6139,18 @@
       if (!file || state.imageCooldown > 0) return;
       await prepareImageFile(file);
       imageInput.value = '';
+    });
+
+    stickerUploadInput.addEventListener('change', async (event) => {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+      await prepareStickerFile(file, 'personal');
+    });
+
+    stickerOfficialInput.addEventListener('change', async (event) => {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+      await prepareStickerFile(file, 'official');
     });
 
     function appendMessage(data, options = {}) {
@@ -5865,6 +6214,21 @@
         });
         img.addEventListener('click', () => window.open(message.content, '_blank', 'noopener'));
         bubble.append(img);
+      } else if (message.type === 'sticker') {
+        const wrap = document.createElement('div');
+        wrap.className = 'sticker-message';
+        const img = document.createElement('img');
+        img.className = 'sticker-message-img';
+        img.src = message.content;
+        img.alt = `${message.username} 发送的表情包`;
+        img.addEventListener('load', () => {
+          if (message.username === state.username || isNearBottom()) {
+            settleAtBottom();
+          }
+        });
+        img.addEventListener('click', () => window.open(message.content, '_blank', 'noopener'));
+        wrap.append(img);
+        bubble.append(wrap);
       } else if (message.type === 'voice') {
         const voice = document.createElement('div');
         voice.className = 'voice-message';
@@ -5912,7 +6276,7 @@
 
     function normalizeMessage(data) {
       if (!data || typeof data !== 'object') return null;
-      const type = ['image', 'voice', 'recalled'].includes(data.type) ? data.type : 'text';
+      const type = ['image', 'voice', 'sticker', 'recalled'].includes(data.type) ? data.type : 'text';
       const username = typeof data.username === 'string' && data.username.trim() ? data.username.trim() : '匿名';
       const content = typeof data.content === 'string'
         ? data.content
@@ -5928,6 +6292,7 @@
         username,
         avatar: typeof data.avatar === 'string' ? data.avatar : username.slice(0, 1).toUpperCase(),
         content,
+        stickerId: typeof data.stickerId === 'string' ? data.stickerId : '',
         duration: Number.isFinite(Number(data.duration)) ? Number(data.duration) : 0,
         timestamp: data.timestamp || new Date().toISOString(),
         recalled: Boolean(data.recalled)
@@ -6582,6 +6947,245 @@
       });
     }
 
+    function openStickerPanel() {
+      if (!state.username || !state.currentRoom) {
+        showToast('进入聊天后可以发送表情包');
+        return;
+      }
+      closeMessageMenu();
+      mentionMenu.hidden = true;
+      stickerPanel.hidden = !stickerPanel.hidden;
+      if (!stickerPanel.hidden) {
+        socket.emit('get stickers');
+        renderStickerPanel();
+      }
+    }
+
+    function closeStickerPanel() {
+      if (stickerPanel) stickerPanel.hidden = true;
+    }
+
+    function setStickerTab(tab) {
+      state.stickerTab = ['official', 'mine', 'creator'].includes(tab) ? tab : 'official';
+      renderStickerPanel();
+    }
+
+    function renderStickerPanel() {
+      if (!stickerGrid || !stickerManage) return;
+      stickerTabs.forEach((button) => {
+        button.classList.toggle('is-active', button.dataset.stickerTab === state.stickerTab);
+      });
+      stickerGrid.textContent = '';
+      stickerManage.textContent = '';
+      const list = state.stickerTab === 'mine'
+        ? state.stickers.personal
+        : state.stickerTab === 'creator'
+          ? []
+          : state.stickers.official;
+      stickerPanelStatus.textContent = state.stickerTab === 'official'
+        ? '所有用户都可以发送官方表情。'
+        : state.stickerTab === 'mine'
+          ? '上传、发送或删除你的个人表情包。'
+          : '申请创作者，提交作品到官方库。';
+
+      if (state.stickerTab === 'creator') {
+        renderCreatorStickerPanel();
+        return;
+      }
+
+      if (!list.length) {
+        const empty = document.createElement('div');
+        empty.className = 'sticker-empty';
+        empty.textContent = state.stickerTab === 'mine' ? '还没有表情包，上传一个吧。' : '官方表情包正在准备中。';
+        stickerGrid.append(empty);
+      }
+
+      list.forEach((sticker) => {
+        const item = document.createElement('div');
+        item.className = 'sticker-item';
+        item.tabIndex = 0;
+        item.setAttribute('role', 'button');
+        item.title = sticker.title || '表情包';
+        const img = document.createElement('img');
+        img.src = sticker.url;
+        img.alt = sticker.title || '表情包';
+        const label = document.createElement('span');
+        label.textContent = sticker.title || '表情包';
+        item.append(img, label);
+        item.addEventListener('click', () => sendSticker(sticker.id));
+        item.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            sendSticker(sticker.id);
+          }
+        });
+        if (state.stickerTab === 'mine') {
+          const del = document.createElement('button');
+          del.type = 'button';
+          del.className = 'sticker-delete';
+          del.textContent = '×';
+          del.title = '删除表情包';
+          del.addEventListener('click', (event) => {
+            event.stopPropagation();
+            if (window.confirm('确定删除这个表情包吗？')) {
+              socket.emit('delete sticker', sticker.id);
+            }
+          });
+          item.append(del);
+        }
+        stickerGrid.append(item);
+      });
+
+      if (state.stickerTab === 'mine') renderPersonalStickerTools();
+    }
+
+    function renderPersonalStickerTools() {
+      const card = document.createElement('div');
+      card.className = 'sticker-manage-card';
+      const info = document.createElement('div');
+      const title = document.createElement('h4');
+      title.textContent = '上传个人表情包';
+      const note = document.createElement('div');
+      note.className = 'sticker-note';
+      note.textContent = state.pendingStickerFile
+        ? `${state.pendingStickerFile.name} · ${formatFileSize(state.pendingStickerFile.size)}`
+        : '支持 JPG、PNG、GIF、WebP，最大 2MB，最多 50 个。';
+      info.append(title, note);
+      const actions = document.createElement('div');
+      actions.className = 'settings-actions';
+      const choose = document.createElement('button');
+      choose.type = 'button';
+      choose.className = 'admin-btn';
+      choose.textContent = '选择图片';
+      choose.addEventListener('click', () => stickerUploadInput.click());
+      const upload = document.createElement('button');
+      upload.type = 'button';
+      upload.className = 'admin-btn primary';
+      upload.textContent = '上传';
+      upload.disabled = !state.pendingStickerFile;
+      upload.addEventListener('click', () => {
+        if (!state.pendingStickerFile) return;
+        socket.emit('upload sticker', {
+          base64: state.pendingStickerFile.base64,
+          name: state.pendingStickerFile.name,
+          title: cleanStickerTitle(state.pendingStickerFile.name)
+        });
+      });
+      actions.append(choose, upload);
+      card.append(info, actions);
+      stickerManage.append(card);
+    }
+
+    function renderCreatorStickerPanel() {
+      const creator = state.stickers.creator || {};
+      stickerGrid.innerHTML = '';
+      const card = document.createElement('div');
+      card.className = 'sticker-manage-card';
+      card.style.gridColumn = '1 / -1';
+      const content = document.createElement('div');
+      if (creator.isCreator) {
+        content.innerHTML = '<h4>创作者中心</h4><div class="sticker-note">你可以提交表情包到官方库，审核通过后所有用户可用。</div>';
+        const form = createCreatorSubmissionForm();
+        card.append(content, form);
+      } else if (creator.status === 'pending') {
+        content.innerHTML = '<h4>审核中</h4><div class="sticker-note">你的创作者申请正在审核中。</div>';
+        card.append(content);
+      } else {
+        const rejected = creator.status === 'rejected' && creator.request && creator.request.adminNote
+          ? `上次备注：${creator.request.adminNote}`
+          : '成为表情包创作者后，可以提交作品到官方表情包库。';
+        content.innerHTML = `<h4>申请成为创作者</h4><div class="sticker-note">${escapeHtml(rejected)}</div>`;
+        const form = document.createElement('div');
+        form.className = 'sticker-form';
+        const reason = document.createElement('textarea');
+        reason.maxLength = 300;
+        reason.placeholder = '申请理由（必填，最多 300 字）';
+        const portfolio = document.createElement('textarea');
+        portfolio.maxLength = 300;
+        portfolio.placeholder = '作品说明或风格说明（可选）';
+        const submit = document.createElement('button');
+        submit.className = 'admin-btn primary';
+        submit.type = 'button';
+        submit.textContent = '提交申请';
+        form.append(reason, portfolio, submit);
+        submit.addEventListener('click', () => {
+          socket.emit('apply sticker creator', {
+            reason: reason.value,
+            portfolioNote: portfolio.value
+          });
+        });
+        card.append(content, form);
+      }
+      stickerGrid.append(card);
+      renderCreatorSubmissions();
+    }
+
+    function createCreatorSubmissionForm() {
+      const form = document.createElement('div');
+      form.className = 'sticker-form';
+      const title = document.createElement('input');
+      title.maxLength = 30;
+      title.placeholder = '表情包名称';
+      const description = document.createElement('textarea');
+      description.maxLength = 120;
+      description.placeholder = '简短说明（可选，最多 120 字）';
+      const row = document.createElement('div');
+      row.className = 'settings-actions';
+      const choose = document.createElement('button');
+      choose.type = 'button';
+      choose.className = 'admin-btn';
+      choose.textContent = state.pendingOfficialStickerFile ? state.pendingOfficialStickerFile.name : '选择图片';
+      choose.addEventListener('click', () => stickerOfficialInput.click());
+      const submit = document.createElement('button');
+      submit.className = 'admin-btn primary';
+      submit.type = 'button';
+      submit.textContent = '提交审核';
+      row.append(choose, submit);
+      form.append(title, description, row);
+      submit.addEventListener('click', () => {
+        if (!state.pendingOfficialStickerFile) {
+          showToast('请先选择表情包图片');
+          return;
+        }
+        socket.emit('submit official sticker', {
+          base64: state.pendingOfficialStickerFile.base64,
+          name: state.pendingOfficialStickerFile.name,
+          title: title.value,
+          description: description.value
+        });
+      });
+      return form;
+    }
+
+    function renderCreatorSubmissions() {
+      const submissions = state.stickers.submissions || [];
+      if (!submissions.length) return;
+      const wrap = document.createElement('div');
+      wrap.className = 'sticker-manage';
+      submissions.forEach((item) => {
+        const card = document.createElement('div');
+        card.className = 'sticker-manage-card';
+        const img = document.createElement('img');
+        img.className = 'sticker-preview';
+        img.src = item.url;
+        img.alt = item.title;
+        const info = document.createElement('div');
+        info.innerHTML = `<h4>${escapeHtml(item.title || '表情包')}</h4><div class="sticker-note">${stickerStatusLabel(item.status)}${item.adminNote ? ` · ${escapeHtml(item.adminNote)}` : ''}</div>`;
+        card.append(info, img);
+        wrap.append(card);
+      });
+      stickerManage.append(wrap);
+    }
+
+    function sendSticker(stickerId) {
+      if (!state.currentRoom) {
+        showToast('请先选择聊天');
+        return;
+      }
+      socket.emit('chat sticker', { stickerId });
+      closeStickerPanel();
+    }
+
     function insertMention(user) {
       input.value = `${input.value}${input.value && !input.value.endsWith(' ') ? ' ' : ''}@${user} `;
       input.dispatchEvent(new Event('input'));
@@ -6688,6 +7292,48 @@
         bannerStatus.textContent = '主页背景读取失败';
         showToast('主页背景读取失败');
       }
+    }
+
+    async function prepareStickerFile(file, target = 'personal') {
+      if (!state.userId) {
+        showToast('请先登录后再使用表情包');
+        return;
+      }
+      if (!file) return;
+      if (!['image/jpeg', 'image/png', 'image/gif', 'image/webp'].includes(file.type)) {
+        stickerPanelStatus.textContent = '表情包仅支持 JPG、PNG、GIF、WebP';
+        showToast('表情包格式不支持');
+        return;
+      }
+      if (file.size > 2 * 1024 * 1024) {
+        stickerPanelStatus.textContent = '表情包最大 2MB';
+        showToast('表情包最大 2MB');
+        return;
+      }
+      try {
+        const base64 = await readFileAsDataUrl(file);
+        const payload = {
+          base64,
+          name: file.name || 'sticker',
+          size: file.size,
+          type: file.type,
+          title: cleanStickerTitle(file.name || '我的表情')
+        };
+        if (target === 'official') state.pendingOfficialStickerFile = payload;
+        else state.pendingStickerFile = payload;
+        renderStickerPanel();
+      } catch (error) {
+        stickerPanelStatus.textContent = '表情包读取失败';
+        showToast('表情包读取失败');
+      }
+    }
+
+    function cleanStickerTitle(value) {
+      return String(value || '')
+        .replace(/\.[a-z0-9]+$/i, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 30) || '我的表情';
     }
 
     function openAvatarCropModal(base64, name) {
@@ -6845,6 +7491,25 @@
       return `${(value / 1024 / 1024).toFixed(1)} MB`;
     }
 
+    function escapeHtml(value) {
+      return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function stickerStatusLabel(status) {
+      return {
+        active: '可用',
+        pending: '审核中',
+        approved: '已通过',
+        rejected: '已拒绝',
+        removed: '已下架'
+      }[status] || '未知状态';
+    }
+
     function renderMessageCount() {
       messageCount.textContent = String(state.messageCount);
     }
@@ -6864,12 +7529,16 @@
 
       const pendingRenameCount = Array.isArray(data.renameRequests) ? data.renameRequests.length : 0;
       const pendingReportCount = Array.isArray(data.postReports) ? data.postReports.filter((report) => report.status === 'pending').length : 0;
-      adminSummary.textContent = `用户 ${users.length} · 在线 ${data.onlineCount || 0} · 消息 ${data.messageCount || messages.length} · 改名待审 ${pendingRenameCount} · 举报待处理 ${pendingReportCount}`;
+      const pendingCreatorCount = Array.isArray(data.stickerCreatorRequests) ? data.stickerCreatorRequests.filter((item) => item.status === 'pending').length : 0;
+      const pendingStickerCount = Array.isArray(data.stickerSubmissions) ? data.stickerSubmissions.filter((item) => item.status === 'pending').length : 0;
+      adminSummary.textContent = `用户 ${users.length} · 在线 ${data.onlineCount || 0} · 消息 ${data.messageCount || messages.length} · 改名待审 ${pendingRenameCount} · 举报待处理 ${pendingReportCount} · 表情待审 ${pendingCreatorCount + pendingStickerCount}`;
       adminGroupCode.textContent = `当前建组码：${groupCode.code || '------'} · 有效期至 ${formatFullTime(groupCode.expiresAt)}`;
       adminUsers.textContent = '';
       renderAdminRooms(Array.isArray(data.rooms) ? data.rooms : []);
       renderAdminRenameRequests(Array.isArray(data.renameRequests) ? data.renameRequests : []);
       renderAdminReports(Array.isArray(data.postReports) ? data.postReports : []);
+      renderAdminStickerCreators(Array.isArray(data.stickerCreatorRequests) ? data.stickerCreatorRequests : []);
+      renderAdminStickerSubmissions(Array.isArray(data.stickerSubmissions) ? data.stickerSubmissions : []);
 
       if (users.length === 0) {
         const empty = document.createElement('div');
@@ -6986,6 +7655,131 @@
       button.addEventListener('click', () => {
         socket.emit('admin handle report', {
           reportId: report.id,
+          action,
+          note: note.value
+        });
+      });
+      return button;
+    }
+
+    function renderAdminStickerCreators(requests) {
+      adminStickerCreators.textContent = '';
+      if (!requests.length) {
+        const empty = document.createElement('div');
+        empty.className = 'admin-muted';
+        empty.textContent = '暂无创作者申请';
+        adminStickerCreators.append(empty);
+        return;
+      }
+
+      requests.forEach((request) => {
+        const item = document.createElement('div');
+        item.className = `rename-request-item${request.status === 'pending' ? ' is-pending' : ''}`;
+        const head = document.createElement('div');
+        head.className = 'rename-request-head';
+        const title = document.createElement('strong');
+        title.textContent = `${request.displayName || request.username || '未知用户'} · ${stickerStatusLabel(request.status)}`;
+        const meta = document.createElement('span');
+        meta.className = 'settings-status';
+        meta.textContent = formatFullTime(request.createdAt);
+        head.append(title, meta);
+        const reason = document.createElement('div');
+        reason.className = 'admin-muted';
+        reason.textContent = `理由：${request.reason || '未填写'}`;
+        const portfolio = document.createElement('div');
+        portfolio.className = 'admin-muted';
+        portfolio.textContent = request.portfolioNote ? `风格：${request.portfolioNote}` : '没有作品说明';
+        const note = document.createElement('textarea');
+        note.className = 'rename-request-note';
+        note.maxLength = 240;
+        note.placeholder = '管理员备注';
+        note.value = request.adminNote || '';
+        note.disabled = request.status !== 'pending';
+        const actions = document.createElement('div');
+        actions.className = 'rename-request-actions';
+        const approve = createCreatorActionButton('通过', request, note, 'approved');
+        const reject = createCreatorActionButton('拒绝', request, note, 'rejected', 'danger');
+        actions.append(approve, reject);
+        item.append(head, reason, portfolio, note, actions);
+        adminStickerCreators.append(item);
+      });
+    }
+
+    function createCreatorActionButton(label, request, note, status, tone = '') {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = `admin-btn${tone ? ` ${tone}` : ''}`;
+      button.textContent = label;
+      button.disabled = request.status !== 'pending';
+      button.addEventListener('click', () => {
+        socket.emit('admin decide sticker creator', {
+          requestId: request.id,
+          status,
+          note: note.value
+        });
+      });
+      return button;
+    }
+
+    function renderAdminStickerSubmissions(submissions) {
+      adminStickerSubmissions.textContent = '';
+      if (!submissions.length) {
+        const empty = document.createElement('div');
+        empty.className = 'admin-muted';
+        empty.textContent = '暂无官方表情包提交';
+        adminStickerSubmissions.append(empty);
+        return;
+      }
+
+      submissions.forEach((sticker) => {
+        const item = document.createElement('div');
+        item.className = `rename-request-item${sticker.status === 'pending' ? ' is-pending' : ''}`;
+        const head = document.createElement('div');
+        head.className = 'rename-request-head';
+        const title = document.createElement('strong');
+        title.textContent = `${sticker.title || '表情包'} · ${stickerStatusLabel(sticker.status)}`;
+        const meta = document.createElement('span');
+        meta.className = 'settings-status';
+        meta.textContent = `${sticker.ownerName || '未知创作者'} · ${formatFullTime(sticker.createdAt)}`;
+        head.append(title, meta);
+        const body = document.createElement('div');
+        body.className = 'sticker-manage-card';
+        const info = document.createElement('div');
+        const desc = document.createElement('div');
+        desc.className = 'admin-muted';
+        desc.textContent = sticker.description || '没有说明';
+        info.append(desc);
+        const img = document.createElement('img');
+        img.className = 'admin-sticker-preview';
+        img.src = sticker.url;
+        img.alt = sticker.title || '表情包';
+        body.append(info, img);
+        const note = document.createElement('textarea');
+        note.className = 'rename-request-note';
+        note.maxLength = 240;
+        note.placeholder = '管理员备注';
+        note.value = sticker.adminNote || '';
+        const actions = document.createElement('div');
+        actions.className = 'rename-request-actions';
+        actions.append(
+          createSubmissionActionButton('通过', sticker, note, 'approve'),
+          createSubmissionActionButton('拒绝', sticker, note, 'reject', 'danger'),
+          createSubmissionActionButton('下架', sticker, note, 'remove', 'danger')
+        );
+        item.append(head, body, note, actions);
+        adminStickerSubmissions.append(item);
+      });
+    }
+
+    function createSubmissionActionButton(label, sticker, note, action, tone = '') {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = `admin-btn${tone ? ` ${tone}` : ''}`;
+      button.textContent = label;
+      button.disabled = action !== 'remove' && sticker.status !== 'pending';
+      button.addEventListener('click', () => {
+        socket.emit('admin decide sticker submission', {
+          stickerId: sticker.id,
           action,
           note: note.value
         });
