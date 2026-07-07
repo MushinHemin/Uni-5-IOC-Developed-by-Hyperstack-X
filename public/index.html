@@ -3479,6 +3479,10 @@
       animation: modalIn var(--duration-normal) var(--ease-pop) both;
     }
 
+    .sticker-panel.is-busy {
+      cursor: progress;
+    }
+
     .sticker-panel-head,
     .sticker-manage-card,
     .sticker-status-row {
@@ -3514,6 +3518,7 @@
     .sticker-tab {
       border: 0;
       min-height: 34px;
+      min-width: 0;
       border-radius: calc(var(--radius-md) - 5px);
       background: transparent;
       color: var(--text-secondary);
@@ -3571,6 +3576,21 @@
       border-radius: 18px;
     }
 
+    .sticker-unavailable {
+      display: grid;
+      place-items: center;
+      min-width: 140px;
+      min-height: 96px;
+      padding: 16px;
+      border: 1px dashed var(--glass-border);
+      border-radius: var(--radius-md);
+      color: var(--text-secondary);
+      background: var(--glass-bg-soft);
+      text-align: center;
+      font-size: .82rem;
+      font-weight: 800;
+    }
+
     .sticker-item span {
       width: 100%;
       overflow: hidden;
@@ -3594,6 +3614,12 @@
       color: #fff;
       cursor: pointer;
       box-shadow: 0 8px 18px rgba(239, 68, 68, .25);
+    }
+
+    .sticker-delete:focus-visible,
+    .sticker-item:focus-visible {
+      outline: 3px solid rgba(59, 130, 246, .28);
+      outline-offset: 2px;
     }
 
     .sticker-manage {
@@ -3681,11 +3707,36 @@
         right: 8px;
         bottom: calc(100% + 8px);
         width: auto;
-        max-height: 58vh;
+        max-height: min(52dvh, 460px);
+        padding: 12px;
       }
 
       .sticker-grid {
-        grid-template-columns: repeat(auto-fill, minmax(68px, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+        gap: 8px;
+      }
+
+      .sticker-item {
+        min-height: 78px;
+      }
+
+      .sticker-item img {
+        width: 54px;
+        height: 54px;
+      }
+
+      .sticker-message-img {
+        width: min(128px, 42vw);
+        height: min(128px, 42vw);
+      }
+
+      .sticker-tabs {
+        gap: 4px;
+      }
+
+      .sticker-tab {
+        font-size: .82rem;
+        padding-inline: 4px;
       }
     }
   </style>
@@ -4477,7 +4528,8 @@
         creator: { isCreator: false, status: '', request: null }
       },
       pendingStickerFile: null,
-      pendingOfficialStickerFile: null
+      pendingOfficialStickerFile: null,
+      stickerBusy: false
     };
 
     // DOM refs
@@ -5276,6 +5328,7 @@
       state.stickers = { official: [], personal: [], submissions: [], creator: { isCreator: false, status: '', request: null } };
       state.pendingStickerFile = null;
       state.pendingOfficialStickerFile = null;
+      state.stickerBusy = false;
       state.privateUnread = {};
       state.quotedMessage = null;
       state.pendingAvatar = null;
@@ -5587,6 +5640,7 @@
     });
 
     socket.on('sticker notice', (msg) => {
+      state.stickerBusy = false;
       state.pendingStickerFile = null;
       state.pendingOfficialStickerFile = null;
       if (stickerUploadInput) stickerUploadInput.value = '';
@@ -5596,6 +5650,8 @@
     });
 
     socket.on('sticker error', (msg) => {
+      state.stickerBusy = false;
+      renderStickerPanel();
       if (stickerPanelStatus) stickerPanelStatus.textContent = msg || '表情包操作失败';
       showToast(msg || '表情包操作失败');
     });
@@ -6212,6 +6268,7 @@
             settleAtBottom();
           }
         });
+        img.addEventListener('error', () => replaceBrokenStickerImage(img, '图片加载失败'));
         img.addEventListener('click', () => window.open(message.content, '_blank', 'noopener'));
         bubble.append(img);
       } else if (message.type === 'sticker') {
@@ -6226,6 +6283,7 @@
             settleAtBottom();
           }
         });
+        img.addEventListener('error', () => replaceBrokenStickerImage(img));
         img.addEventListener('click', () => window.open(message.content, '_blank', 'noopener'));
         wrap.append(img);
         bubble.append(wrap);
@@ -6972,8 +7030,10 @@
 
     function renderStickerPanel() {
       if (!stickerGrid || !stickerManage) return;
+      stickerPanel.classList.toggle('is-busy', state.stickerBusy);
       stickerTabs.forEach((button) => {
         button.classList.toggle('is-active', button.dataset.stickerTab === state.stickerTab);
+        button.disabled = state.stickerBusy;
       });
       stickerGrid.textContent = '';
       stickerManage.textContent = '';
@@ -7009,6 +7069,7 @@
         const img = document.createElement('img');
         img.src = sticker.url;
         img.alt = sticker.title || '表情包';
+        img.addEventListener('error', () => replaceBrokenStickerImage(img));
         const label = document.createElement('span');
         label.textContent = sticker.title || '表情包';
         item.append(img, label);
@@ -7025,9 +7086,13 @@
           del.className = 'sticker-delete';
           del.textContent = '×';
           del.title = '删除表情包';
+          del.disabled = state.stickerBusy;
           del.addEventListener('click', (event) => {
             event.stopPropagation();
+            if (state.stickerBusy) return;
             if (window.confirm('确定删除这个表情包吗？')) {
+              state.stickerBusy = true;
+              renderStickerPanel();
               socket.emit('delete sticker', sticker.id);
             }
           });
@@ -7057,14 +7122,17 @@
       choose.type = 'button';
       choose.className = 'admin-btn';
       choose.textContent = '选择图片';
+      choose.disabled = state.stickerBusy;
       choose.addEventListener('click', () => stickerUploadInput.click());
       const upload = document.createElement('button');
       upload.type = 'button';
       upload.className = 'admin-btn primary';
-      upload.textContent = '上传';
-      upload.disabled = !state.pendingStickerFile;
+      upload.textContent = state.stickerBusy ? '上传中' : '上传';
+      upload.disabled = !state.pendingStickerFile || state.stickerBusy;
       upload.addEventListener('click', () => {
-        if (!state.pendingStickerFile) return;
+        if (!state.pendingStickerFile || state.stickerBusy) return;
+        state.stickerBusy = true;
+        renderStickerPanel();
         socket.emit('upload sticker', {
           base64: state.pendingStickerFile.base64,
           name: state.pendingStickerFile.name,
@@ -7106,9 +7174,13 @@
         const submit = document.createElement('button');
         submit.className = 'admin-btn primary';
         submit.type = 'button';
-        submit.textContent = '提交申请';
+        submit.textContent = state.stickerBusy ? '提交中' : '提交申请';
+        submit.disabled = state.stickerBusy;
         form.append(reason, portfolio, submit);
         submit.addEventListener('click', () => {
+          if (state.stickerBusy) return;
+          state.stickerBusy = true;
+          renderStickerPanel();
           socket.emit('apply sticker creator', {
             reason: reason.value,
             portfolioNote: portfolio.value
@@ -7135,18 +7207,23 @@
       choose.type = 'button';
       choose.className = 'admin-btn';
       choose.textContent = state.pendingOfficialStickerFile ? state.pendingOfficialStickerFile.name : '选择图片';
+      choose.disabled = state.stickerBusy;
       choose.addEventListener('click', () => stickerOfficialInput.click());
       const submit = document.createElement('button');
       submit.className = 'admin-btn primary';
       submit.type = 'button';
-      submit.textContent = '提交审核';
+      submit.textContent = state.stickerBusy ? '提交中' : '提交审核';
+      submit.disabled = state.stickerBusy;
       row.append(choose, submit);
       form.append(title, description, row);
       submit.addEventListener('click', () => {
+        if (state.stickerBusy) return;
         if (!state.pendingOfficialStickerFile) {
           showToast('请先选择表情包图片');
           return;
         }
+        state.stickerBusy = true;
+        renderStickerPanel();
         socket.emit('submit official sticker', {
           base64: state.pendingOfficialStickerFile.base64,
           name: state.pendingOfficialStickerFile.name,
@@ -7169,6 +7246,7 @@
         img.className = 'sticker-preview';
         img.src = item.url;
         img.alt = item.title;
+        img.addEventListener('error', () => replaceBrokenStickerImage(img));
         const info = document.createElement('div');
         info.innerHTML = `<h4>${escapeHtml(item.title || '表情包')}</h4><div class="sticker-note">${stickerStatusLabel(item.status)}${item.adminNote ? ` · ${escapeHtml(item.adminNote)}` : ''}</div>`;
         card.append(info, img);
@@ -7184,6 +7262,14 @@
       }
       socket.emit('chat sticker', { stickerId });
       closeStickerPanel();
+    }
+
+    function replaceBrokenStickerImage(img, text = '该表情包已不可用') {
+      if (!img || !img.parentNode) return;
+      const placeholder = document.createElement('div');
+      placeholder.className = 'sticker-unavailable';
+      placeholder.textContent = text;
+      img.replaceWith(placeholder);
     }
 
     function insertMention(user) {
@@ -7712,6 +7798,7 @@
       button.textContent = label;
       button.disabled = request.status !== 'pending';
       button.addEventListener('click', () => {
+        if (!window.confirm(`确定${label}这个创作者申请吗？`)) return;
         socket.emit('admin decide sticker creator', {
           requestId: request.id,
           status,
@@ -7753,6 +7840,7 @@
         img.className = 'admin-sticker-preview';
         img.src = sticker.url;
         img.alt = sticker.title || '表情包';
+        img.addEventListener('error', () => replaceBrokenStickerImage(img));
         body.append(info, img);
         const note = document.createElement('textarea');
         note.className = 'rename-request-note';
@@ -7776,8 +7864,10 @@
       button.type = 'button';
       button.className = `admin-btn${tone ? ` ${tone}` : ''}`;
       button.textContent = label;
-      button.disabled = action !== 'remove' && sticker.status !== 'pending';
+      button.disabled = action === 'remove' ? sticker.status !== 'approved' : sticker.status !== 'pending';
       button.addEventListener('click', () => {
+        const verb = action === 'approve' ? '通过' : action === 'remove' ? '下架' : '拒绝';
+        if (!window.confirm(`确定${verb}「${sticker.title || '这个表情包'}」吗？`)) return;
         socket.emit('admin decide sticker submission', {
           stickerId: sticker.id,
           action,

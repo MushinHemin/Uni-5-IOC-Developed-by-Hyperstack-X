@@ -2,7 +2,7 @@
 
 Uni 5 Sonoma is a lightweight realtime chat and community app with account login, group chat, private chat, forum posts, admin tools, message recall, image paste/upload, voice messages, and a glass-style responsive web UI.
 
-Current release: **Sonoma 5.5.0 Sticker System Update**
+Current release: **Sonoma 5.5.1 Sticker Polish & Reliability Update**
 
 ## Features
 
@@ -32,9 +32,27 @@ Current release: **Sonoma 5.5.0 Sticker System Update**
 - Sonoma 5.4.5: user profile pages, profile banners, bio editing, daily Stars, and user list sorting
 - Sonoma 5.4.6: community safety tools, forum reports, admin review actions, bans, and stability fixes
 - Sonoma 5.5.0: official/personal stickers, sticker messages, creator applications, and official sticker review
+- Sonoma 5.5.1: sticker panel polish, mobile layout reliability, upload/review feedback, and safer sticker history fallbacks
 - Uni 5.4.1: personalization controls, compact presence status, latency monitoring, forum persistence hardening, CORS configuration, and stability cleanup
 
 ## Release Notes
+
+### Sonoma 5.5.1 Sticker Polish & Reliability Update
+
+Improved:
+
+- Optimized the sticker panel open/close behavior, tab highlighting, empty states, and Sonoma glass styling
+- Improved mobile sticker layout so the panel, grid, tabs, upload area, and sticker messages stay readable on small screens
+- Added clearer upload, delete, creator application, and official submission feedback states
+- Improved admin review confirmations for sticker creator applications and official sticker submissions
+- Tightened admin-side status checks for approving, rejecting, and removing official sticker submissions
+
+Fixed:
+
+- Added safe placeholder UI when historical sticker images are missing or unavailable
+- Hardened sticker message rendering so old text messages and missing sticker references do not break chat history
+- Kept banned-user sticker restrictions and admin permission checks enforced on the server
+- Preserved the Sonoma liquid glass UI style across sticker panel, sticker messages, and admin review surfaces
 
 ### Sonoma 5.5.0 Sticker System Update
 

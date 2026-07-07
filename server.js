@@ -1726,6 +1726,13 @@ function broadcastBulletinUpdates(targetUserId = '') {
 
 function ensureSystemAnnouncements() {
   createAnnouncement({
+    id: 'update:5.5.1',
+    type: 'update',
+    title: 'Sonoma 5.5.1 已上线',
+    content: '优化表情包面板、移动端布局、上传与审核反馈，并增强历史表情包消息的可靠显示。',
+    priority: 'high'
+  });
+  createAnnouncement({
     id: 'update:5.5.0',
     type: 'update',
     title: 'Sonoma 5.5.0 已上线',
@@ -3174,6 +3181,10 @@ io.on('connection', (socket) => {
       socket.emit('admin error', '创作者申请不存在');
       return;
     }
+    if (request.status !== 'pending') {
+      socket.emit('admin error', '这个创作者申请已经处理过');
+      return;
+    }
     const user = userById(request.user_id);
     if (!user) {
       socket.emit('admin error', '申请用户不存在');
@@ -3217,6 +3228,14 @@ io.on('connection', (socket) => {
     const sticker = stickerById(stickerId);
     if (!sticker || sticker.stickerType !== 'creator_submission') {
       socket.emit('admin error', '表情包提交不存在');
+      return;
+    }
+    if ((action === 'approve' || action === 'reject') && sticker.status !== 'pending') {
+      socket.emit('admin error', '这个表情包提交已经处理过');
+      return;
+    }
+    if (action === 'remove' && sticker.status !== 'approved') {
+      socket.emit('admin error', '只能下架已通过的官方表情包');
       return;
     }
     const status = action === 'approve' ? 'approved' : action === 'remove' ? 'removed' : 'rejected';
