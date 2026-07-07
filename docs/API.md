@@ -6,8 +6,10 @@ These notes document the current Web implementation for future Uni 6 Nordkapp na
 
 - `login`: Socket event with `account` and `password`. Returns login success/error through existing auth events.
 - `register`: Socket event with `account`, `password`, and `username`. Creates a user and returns auth state.
+- `authSuccess`: returns the public user object and a short-lived `apiToken` for the current web session.
 - `switch user` / local client reset: the web client clears in-memory user state and returns to the auth view.
-- Current session is Socket.IO-user state, not a native token contract. Future native clients should evaluate a dedicated token flow.
+- HTTP helper endpoints that require login accept `Authorization: Bearer <apiToken>`.
+- Current session is still primarily Socket.IO-user state; future native clients should evaluate a dedicated long-lived token flow.
 
 ## Users and Profiles
 
@@ -26,8 +28,29 @@ These notes document the current Web implementation for future Uni 6 Nordkapp na
 - `chat voice`: sends voice messages.
 - `chat sticker`: sends sticker messages.
 - `recall message`: recalls a message when allowed by server rules.
+- `message reaction`: toggles one allowed Reaction for a visible message.
+- `reaction:update` / `reaction:updated`: server responses containing `messageId` and viewer-aware Reaction summaries.
+- `mark room read`: records read state for the current room and updates unread counters.
 - `typing`: emits typing state.
 - `latency:ping` / `latency:pong`: lightweight round-trip latency probe.
+- `unread:update`: emits notification and chat unread counts.
+
+## Notifications and Discovery
+
+- `get notifications`: loads notification-center items for the current user.
+- `notifications`: returns notification items and unread count.
+- `notification:new`: live notification pushed to connected user sockets.
+- `mark notification read`: marks one notification as read.
+- `mark all notifications read`: marks all current-user notifications as read.
+- `search`: searches allowed Uni surfaces using `q`, `scope`, `limit`, and `offset`.
+- `search results`: returns grouped discovery results.
+- `GET /api/notifications`: HTTP helper for notification-center data.
+- `GET /api/notifications/unread-count`: HTTP helper for notification and chat unread counts.
+- `POST /api/notifications/:id/read`: marks one notification read.
+- `POST /api/notifications/read-all`: marks all notifications read.
+- `GET /api/search?q=&scope=`: HTTP helper for global search.
+- `GET /api/messages/:messageId/reactions`: HTTP helper for Reaction summaries.
+- `POST /api/messages/:messageId/reaction`: HTTP helper to toggle a Reaction.
 
 ## Forum
 
@@ -44,6 +67,7 @@ These notes document the current Web implementation for future Uni 6 Nordkapp na
 - `mark bulletin read`: marks one bulletin as read.
 - `mark all bulletins read`: marks all mailbox items as read.
 - `admin publish bulletin`: admin-only bulletin publishing.
+- System announcements are also mirrored into the notification center.
 
 ## Stickers
 

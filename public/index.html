@@ -721,6 +721,7 @@
     .switch-user-btn .icon,
     .theme-toggle-btn .icon,
     .bulletin-btn .icon,
+    .engagement-btn .icon,
     .settings-toggle-btn .icon {
       width: 17px;
       height: 17px;
@@ -754,6 +755,68 @@
       background: var(--danger);
       font-size: 11px;
       font-weight: 900;
+      box-shadow: 0 8px 18px rgba(255, 59, 48, 0.24);
+    }
+
+    .engagement-tools {
+      position: fixed;
+      top: max(16px, env(safe-area-inset-top));
+      right: max(16px, env(safe-area-inset-right));
+      z-index: 83;
+      display: inline-flex;
+      gap: 8px;
+      padding: 6px;
+      border: 1px solid var(--glass-border);
+      border-radius: 22px;
+      background: var(--glass-bg-light);
+      box-shadow: var(--glass-shadow);
+      backdrop-filter: blur(var(--glass-blur-lg)) saturate(145%);
+      transition: opacity var(--duration-normal) var(--ease-smooth), transform var(--duration-normal) var(--ease-smooth);
+    }
+
+    body.view-auth .engagement-tools {
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(-8px) scale(.98);
+    }
+
+    .engagement-btn {
+      position: relative;
+      width: 42px;
+      height: 42px;
+      border-radius: 17px;
+      color: var(--ink);
+      background: var(--glass-bg-soft);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--glass-border);
+      box-shadow: inset 0 1px 0 var(--glass-highlight);
+      transition: transform var(--duration-fast) var(--ease-pop), background var(--duration-fast) var(--ease-smooth);
+    }
+
+    .engagement-btn:hover {
+      transform: translateY(-1px) scale(1.03);
+      background: var(--glass-bg-light);
+    }
+
+    .notification-badge,
+    .chat-unread-badge {
+      position: absolute;
+      top: -5px;
+      right: -5px;
+      min-width: 18px;
+      height: 18px;
+      padding: 0 5px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 2px solid var(--panel);
+      border-radius: 999px;
+      color: #fff;
+      background: linear-gradient(145deg, #ff453a, #ff7a6f);
+      font-size: 11px;
+      font-weight: 950;
       box-shadow: 0 8px 18px rgba(255, 59, 48, 0.24);
     }
 
@@ -3613,6 +3676,222 @@
       }
     }
 
+    .reaction-trigger {
+      margin-top: 8px;
+      width: 30px;
+      height: 26px;
+      border-radius: 999px;
+      color: var(--muted);
+      background: var(--glass-bg-soft);
+      border: 1px solid var(--glass-border);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      opacity: .72;
+      transition: transform var(--duration-fast) var(--ease-pop), opacity var(--duration-fast) var(--ease-smooth), background var(--duration-fast) var(--ease-smooth);
+    }
+
+    .bubble:hover .reaction-trigger,
+    .reaction-trigger:focus-visible {
+      opacity: 1;
+      transform: translateY(-1px);
+      background: var(--glass-bg-light);
+    }
+
+    .message-reactions {
+      margin-top: 8px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .reaction-pill {
+      min-height: 26px;
+      padding: 3px 8px;
+      border: 1px solid var(--glass-border);
+      border-radius: 999px;
+      color: var(--ink);
+      background: var(--glass-bg-soft);
+      font-weight: 850;
+      box-shadow: inset 0 1px 0 var(--glass-highlight);
+    }
+
+    .reaction-pill.is-mine {
+      color: #fff;
+      border-color: rgba(0, 122, 255, .28);
+      background: linear-gradient(145deg, var(--brand), #69a9ff);
+    }
+
+    .reaction-picker {
+      position: fixed;
+      z-index: 82;
+      display: flex;
+      gap: 5px;
+      padding: 7px;
+      border: 1px solid var(--glass-border);
+      border-radius: 999px;
+      background: var(--glass-bg-light);
+      box-shadow: var(--glass-shadow);
+      backdrop-filter: blur(var(--glass-blur-lg)) saturate(145%);
+      animation: menuIn var(--duration-fast) var(--ease-pop);
+    }
+
+    .reaction-picker[hidden] {
+      display: none;
+    }
+
+    .reaction-picker button {
+      width: 34px;
+      height: 34px;
+      border-radius: 999px;
+      background: transparent;
+      font-size: 19px;
+      transition: transform var(--duration-fast) var(--ease-pop), background var(--duration-fast) var(--ease-smooth);
+    }
+
+    .reaction-picker button:hover {
+      transform: translateY(-2px) scale(1.08);
+      background: var(--glass-bg-soft);
+    }
+
+    .engagement-modal-card {
+      width: min(720px, calc(100vw - 32px));
+      max-height: min(760px, calc(100dvh - 40px));
+      display: grid;
+      grid-template-rows: auto auto minmax(0, 1fr);
+      gap: 14px;
+    }
+
+    .engagement-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 14px;
+    }
+
+    .engagement-header h3 {
+      margin: 0 0 4px;
+    }
+
+    .engagement-header p {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .notification-filters,
+    .search-scopes {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .filter-pill,
+    .search-scope {
+      min-height: 34px;
+      padding: 0 12px;
+      border: 1px solid var(--glass-border);
+      border-radius: 999px;
+      color: var(--muted);
+      background: var(--glass-bg-soft);
+      font-weight: 850;
+    }
+
+    .filter-pill.is-active,
+    .search-scope.is-active {
+      color: #fff;
+      border-color: rgba(0, 122, 255, .26);
+      background: linear-gradient(145deg, var(--brand), #69a9ff);
+    }
+
+    .notification-list,
+    .search-results {
+      min-height: 240px;
+      overflow: auto;
+      display: grid;
+      align-content: start;
+      gap: 10px;
+      padding-right: 3px;
+    }
+
+    .notification-item,
+    .search-result-item {
+      width: 100%;
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      gap: 10px;
+      padding: 12px;
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-lg);
+      color: var(--ink);
+      background: var(--glass-bg-soft);
+      text-align: left;
+      box-shadow: inset 0 1px 0 var(--glass-highlight);
+      transition: transform var(--duration-fast) var(--ease-pop), background var(--duration-fast) var(--ease-smooth);
+    }
+
+    .notification-item:hover,
+    .search-result-item:hover {
+      transform: translateY(-1px);
+      background: var(--glass-bg-light);
+    }
+
+    .notification-item.is-unread {
+      border-color: rgba(0, 122, 255, .28);
+    }
+
+    .result-icon,
+    .notification-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: var(--radius-icon);
+      display: grid;
+      place-items: center;
+      color: #fff;
+      background: linear-gradient(145deg, var(--brand), #69a9ff);
+      font-weight: 950;
+    }
+
+    .notification-main,
+    .search-result-main {
+      min-width: 0;
+      display: grid;
+      gap: 4px;
+    }
+
+    .notification-main strong,
+    .search-result-main strong {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .notification-main p,
+    .search-result-main p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .search-box {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-lg);
+      background: var(--field-bg);
+      box-shadow: inset 0 1px 0 var(--glass-highlight);
+    }
+
+    .search-box input {
+      width: 100%;
+      border: 0;
+      outline: 0;
+      color: var(--ink);
+      background: transparent;
+    }
+
     .sticker-panel {
       position: absolute;
       left: clamp(12px, 2vw, 24px);
@@ -3913,6 +4192,15 @@
       <strong>Uni 5 Sonoma</strong>
       <small>Preparing your space</small>
     </div>
+  </div>
+  <div id="engagementTools" class="engagement-tools" aria-label="通知与搜索">
+    <button id="globalSearchOpen" class="engagement-btn" type="button" aria-label="全局搜索" title="搜索">
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+    </button>
+    <button id="notificationOpen" class="engagement-btn" type="button" aria-label="通知中心" title="通知">
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></svg>
+      <span id="notificationBadge" class="notification-badge" hidden>0</span>
+    </button>
   </div>
   <main class="app page-layer" data-view="chat">
     <section class="shell" aria-label="Uni 5 Sonoma">
@@ -4415,6 +4703,50 @@
 
   <div id="toast" class="toast" role="status" hidden></div>
   <div id="messageMenu" class="message-menu" hidden></div>
+  <div id="reactionPicker" class="reaction-picker" hidden></div>
+  <div id="notificationModal" class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="notificationTitle" hidden>
+    <div class="confirm-card engagement-modal-card">
+      <div class="engagement-header">
+        <div>
+          <h3 id="notificationTitle">通知</h3>
+          <p id="notificationSubtitle">所有消息都看完啦。</p>
+        </div>
+        <div class="confirm-actions">
+          <button id="notificationReadAll" class="admin-btn" type="button">全部已读</button>
+          <button id="notificationClose" class="admin-btn primary" type="button">关闭</button>
+        </div>
+      </div>
+      <div class="notification-filters" role="group" aria-label="通知筛选">
+        <button class="filter-pill is-active" data-notification-filter="all" type="button">全部</button>
+        <button class="filter-pill" data-notification-filter="unread" type="button">未读</button>
+      </div>
+      <div id="notificationList" class="notification-list"></div>
+    </div>
+  </div>
+  <div id="searchModal" class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="searchTitle" hidden>
+    <div class="confirm-card engagement-modal-card">
+      <div class="engagement-header">
+        <div>
+          <h3 id="searchTitle">搜索 Uni</h3>
+          <p>搜索用户、论坛、聊天、公告和表情包。</p>
+        </div>
+        <button id="searchClose" class="admin-btn primary" type="button">关闭</button>
+      </div>
+      <label class="search-box" for="searchInput">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+        <input id="searchInput" maxlength="100" placeholder="输入关键词，搜索 Uni。" autocomplete="off">
+      </label>
+      <div class="search-scopes" role="group" aria-label="搜索范围">
+        <button class="search-scope is-active" data-search-scope="all" type="button">全部</button>
+        <button class="search-scope" data-search-scope="users" type="button">用户</button>
+        <button class="search-scope" data-search-scope="posts" type="button">论坛</button>
+        <button class="search-scope" data-search-scope="messages" type="button">聊天</button>
+        <button class="search-scope" data-search-scope="announcements" type="button">公告</button>
+        <button class="search-scope" data-search-scope="stickers" type="button">表情包</button>
+      </div>
+      <div id="searchResults" class="search-results"></div>
+    </div>
+  </div>
   <div id="bulletinModal" class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="bulletinTitle" hidden>
     <div class="confirm-card bulletin-card">
       <div class="bulletin-header-row">
@@ -4641,15 +4973,17 @@
   <nav id="mobileNav" class="mobile-nav" aria-label="移动端导航">
     <button type="button" data-mobile-nav="chat" aria-label="聊天">
       <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14v10H8l-3 3V6z"/><path d="M9 10h6"/><path d="M9 13h4"/></svg>
+      <span id="mobileChatBadge" class="chat-unread-badge" hidden>0</span>
       <span>聊天</span>
     </button>
     <button type="button" data-mobile-nav="forum" aria-label="论坛">
       <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v12H7l-3 3V5z"/><path d="M8 9h8"/><path d="M8 12h5"/></svg>
       <span>论坛</span>
     </button>
-    <button type="button" data-mobile-nav="bulletins" aria-label="公告">
-      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v12H4z"/><path d="M4 7l8 6 8-6"/></svg>
-      <span>公告</span>
+    <button type="button" data-mobile-nav="notifications" aria-label="通知">
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></svg>
+      <span id="mobileNotificationBadge" class="notification-badge" hidden>0</span>
+      <span>通知</span>
     </button>
     <button type="button" data-mobile-nav="settings" aria-label="我的">
       <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="8" r="3.5"/><path d="M4.5 19c1.3-3.8 9.7-3.8 11 0"/><path d="M18.2 11.4a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z"/><path d="M18.2 4.8v1"/><path d="M18.2 11.4v1"/><path d="M14.9 6.8l.8.5"/><path d="M20.7 10.5l.8.5"/></svg>
@@ -4704,6 +5038,16 @@
       renameStatus: null,
       bulletins: [],
       bulletinUnread: 0,
+      notifications: [],
+      notificationUnread: 0,
+      notificationFilter: 'all',
+      chatUnread: 0,
+      readReceiptTimer: null,
+      apiToken: '',
+      searchScope: 'all',
+      searchQuery: '',
+      searchTimer: null,
+      reactionMessage: null,
       viewTransitionTimer: null,
       latencyMs: null,
       latencyTimer: null,
@@ -4762,6 +5106,23 @@
     const stickerTabs = Array.from(document.querySelectorAll('[data-sticker-tab]'));
     const appLaunch = document.getElementById('appLaunch');
     const mobileNavButtons = Array.from(document.querySelectorAll('[data-mobile-nav]'));
+    const notificationOpen = document.getElementById('notificationOpen');
+    const notificationBadge = document.getElementById('notificationBadge');
+    const mobileNotificationBadge = document.getElementById('mobileNotificationBadge');
+    const mobileChatBadge = document.getElementById('mobileChatBadge');
+    const notificationModal = document.getElementById('notificationModal');
+    const notificationClose = document.getElementById('notificationClose');
+    const notificationReadAll = document.getElementById('notificationReadAll');
+    const notificationSubtitle = document.getElementById('notificationSubtitle');
+    const notificationList = document.getElementById('notificationList');
+    const notificationFilterButtons = Array.from(document.querySelectorAll('[data-notification-filter]'));
+    const globalSearchOpen = document.getElementById('globalSearchOpen');
+    const searchModal = document.getElementById('searchModal');
+    const searchClose = document.getElementById('searchClose');
+    const searchInput = document.getElementById('searchInput');
+    const searchResults = document.getElementById('searchResults');
+    const searchScopeButtons = Array.from(document.querySelectorAll('[data-search-scope]'));
+    const reactionPicker = document.getElementById('reactionPicker');
     const login = document.getElementById('login');
     const loginForm = document.getElementById('loginForm');
     const loginTab = document.getElementById('loginTab');
@@ -5110,6 +5471,7 @@
       renderHome();
       renderSettingsProfile();
       renderBulletinBadges();
+      renderNotificationBadges();
     }
 
     function renderHome() {
@@ -5269,6 +5631,24 @@
       });
     }
 
+    function badgeText(count) {
+      return count > 99 ? '99+' : String(Math.max(0, Number(count) || 0));
+    }
+
+    function renderNotificationBadges() {
+      const notificationCount = Math.max(0, Number(state.notificationUnread) || 0);
+      const chatCount = Math.max(0, Number(state.chatUnread) || 0);
+      [notificationBadge, mobileNotificationBadge].forEach((badge) => {
+        if (!badge) return;
+        badge.hidden = !state.userId || notificationCount <= 0;
+        badge.textContent = badgeText(notificationCount);
+      });
+      if (mobileChatBadge) {
+        mobileChatBadge.hidden = !state.userId || chatCount <= 0;
+        mobileChatBadge.textContent = badgeText(chatCount);
+      }
+    }
+
     function renderBulletins() {
       bulletinList.textContent = '';
       const list = Array.isArray(state.bulletins) ? state.bulletins : [];
@@ -5307,6 +5687,229 @@
         }
         bulletinList.append(card);
       });
+    }
+
+    function notificationTypeIcon(type) {
+      return {
+        chat_message: '聊',
+        forum_comment: '评',
+        star_received: '★',
+        report_resolved: '盾',
+        creator_request_result: '创',
+        sticker_submission_result: '贴',
+        announcement: '告',
+        account_restricted: '禁',
+        reaction_received: '♡'
+      }[type] || '通';
+    }
+
+    function renderNotifications() {
+      notificationList.textContent = '';
+      const unreadOnly = state.notificationFilter === 'unread';
+      const list = (Array.isArray(state.notifications) ? state.notifications : [])
+        .filter((item) => !unreadOnly || !item.isRead);
+      notificationSubtitle.textContent = state.notificationUnread > 0
+        ? `${state.notificationUnread} 条未读通知`
+        : '所有消息都看完啦。';
+      notificationFilterButtons.forEach((button) => {
+        button.classList.toggle('is-active', button.dataset.notificationFilter === state.notificationFilter);
+      });
+      if (list.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'admin-muted';
+        empty.textContent = unreadOnly ? '所有消息都看完啦。' : '暂时没有通知。';
+        notificationList.append(empty);
+        return;
+      }
+      list.forEach((item) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = `notification-item${item.isRead ? '' : ' is-unread'}`;
+        const icon = document.createElement('span');
+        icon.className = 'notification-icon';
+        icon.textContent = notificationTypeIcon(item.type);
+        const main = document.createElement('span');
+        main.className = 'notification-main';
+        const title = document.createElement('strong');
+        title.textContent = item.title || '通知';
+        const body = document.createElement('p');
+        body.textContent = item.body || '点击查看相关内容';
+        const meta = document.createElement('span');
+        meta.className = 'settings-status';
+        meta.textContent = `${formatFullTime(item.createdAt)}${item.isRead ? ' · 已读' : ' · 未读'}`;
+        main.append(title, body, meta);
+        button.append(icon, main);
+        button.addEventListener('click', () => openNotificationTarget(item));
+        notificationList.append(button);
+      });
+    }
+
+    function openNotificationModal() {
+      if (!state.userId) {
+        showToast('登录后可以查看通知');
+        return;
+      }
+      notificationModal.classList.remove('is-closing');
+      notificationModal.hidden = false;
+      renderNotifications();
+      socket.emit('get notifications', { unreadOnly: state.notificationFilter === 'unread' });
+    }
+
+    function closeNotificationModal() {
+      if (notificationModal.hidden) return;
+      notificationModal.classList.add('is-closing');
+      const delay = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 20 : 220;
+      window.setTimeout(() => {
+        notificationModal.hidden = true;
+        notificationModal.classList.remove('is-closing');
+      }, delay);
+    }
+
+    function openNotificationTarget(item) {
+      if (!item || !item.id) return;
+      socket.emit('mark notification read', item.id);
+      if (item.targetType === 'post' && item.targetId) {
+        closeNotificationModal();
+        openForumPage();
+        socket.emit('get forum post', item.targetId);
+        return;
+      }
+      if (item.targetType === 'chat' && item.targetId) {
+        closeNotificationModal();
+        if (item.targetId.startsWith('dm:')) {
+          showToast('请从聊天列表进入对应私聊');
+        } else {
+          socket.emit('join room', item.targetId);
+        }
+        return;
+      }
+      if (item.targetType === 'user' && item.targetId) {
+        openUserProfile(item.targetId);
+        return;
+      }
+      if (item.targetType === 'announcement') {
+        closeNotificationModal();
+        openBulletinModal();
+        return;
+      }
+      showToast('相关内容已不可用');
+    }
+
+    function renderSearchResults(payload = {}) {
+      searchResults.textContent = '';
+      const results = Array.isArray(payload.results) ? payload.results : [];
+      searchScopeButtons.forEach((button) => {
+        button.classList.toggle('is-active', button.dataset.searchScope === state.searchScope);
+      });
+      if (!state.searchQuery.trim()) {
+        const empty = document.createElement('div');
+        empty.className = 'admin-muted';
+        empty.textContent = '输入关键词，搜索 Uni。';
+        searchResults.append(empty);
+        return;
+      }
+      if (results.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'admin-muted';
+        empty.textContent = '没有找到相关内容。';
+        searchResults.append(empty);
+        return;
+      }
+      results.forEach((item) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'search-result-item';
+        const icon = document.createElement('span');
+        icon.className = 'result-icon';
+        icon.textContent = searchTypeLabel(item.type).slice(0, 1);
+        const main = document.createElement('span');
+        main.className = 'search-result-main';
+        const title = document.createElement('strong');
+        title.textContent = item.title || '搜索结果';
+        const summary = document.createElement('p');
+        summary.textContent = item.summary || searchTypeLabel(item.type);
+        const meta = document.createElement('span');
+        meta.className = 'settings-status';
+        meta.textContent = `${searchTypeLabel(item.type)}${item.createdAt ? ` · ${formatFullTime(item.createdAt)}` : ''}`;
+        main.append(title, summary, meta);
+        button.append(icon, main);
+        button.addEventListener('click', () => openSearchTarget(item));
+        searchResults.append(button);
+      });
+    }
+
+    function searchTypeLabel(type) {
+      return {
+        user: '用户',
+        post: '论坛',
+        comment: '评论',
+        message: '聊天',
+        announcement: '公告',
+        sticker: '表情包'
+      }[type] || '结果';
+    }
+
+    function openSearchModal() {
+      if (!state.userId) {
+        showToast('登录后可以搜索');
+        return;
+      }
+      searchModal.classList.remove('is-closing');
+      searchModal.hidden = false;
+      renderSearchResults({ results: [] });
+      requestAnimationFrame(() => searchInput.focus());
+    }
+
+    function closeSearchModal() {
+      if (searchModal.hidden) return;
+      searchModal.classList.add('is-closing');
+      const delay = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 20 : 220;
+      window.setTimeout(() => {
+        searchModal.hidden = true;
+        searchModal.classList.remove('is-closing');
+      }, delay);
+    }
+
+    function scheduleSearch() {
+      window.clearTimeout(state.searchTimer);
+      state.searchQuery = searchInput.value.trim();
+      if (!state.searchQuery) {
+        renderSearchResults({ results: [] });
+        return;
+      }
+      searchResults.textContent = '';
+      const loading = document.createElement('div');
+      loading.className = 'admin-muted';
+      loading.textContent = '正在搜索...';
+      searchResults.append(loading);
+      state.searchTimer = window.setTimeout(() => {
+        socket.emit('search', { q: state.searchQuery, scope: state.searchScope, limit: 30 });
+      }, 180);
+    }
+
+    function markCurrentRoomRead() {
+      if (!state.currentRoom || !state.currentRoom.id || !state.userId) return;
+      window.clearTimeout(state.readReceiptTimer);
+      state.readReceiptTimer = window.setTimeout(() => {
+        socket.emit('mark room read', state.currentRoom.id);
+      }, 600);
+    }
+
+    function openSearchTarget(item) {
+      closeSearchModal();
+      if (item.targetType === 'user' && item.targetId) {
+        openUserProfile(item.targetId);
+      } else if (item.targetType === 'post' && item.targetId) {
+        openForumPage();
+        socket.emit('get forum post', item.targetId);
+      } else if (item.targetType === 'chat' && item.targetId) {
+        if (item.targetId.startsWith('dm:')) showToast('请从聊天列表进入对应私聊');
+        else socket.emit('join room', item.targetId);
+      } else if (item.targetType === 'announcement') {
+        openBulletinModal();
+      } else {
+        showToast('相关内容已不可用');
+      }
     }
 
     function bulletinTypeLabel(type) {
@@ -5467,8 +6070,8 @@
         openForumPage();
         return;
       }
-      if (target === 'bulletins') {
-        openBulletinModal();
+      if (target === 'notifications') {
+        openNotificationModal();
         return;
       }
       if (target === 'settings') {
@@ -5566,6 +6169,13 @@
       state.renameStatus = null;
       state.bulletins = [];
       state.bulletinUnread = 0;
+      state.notifications = [];
+      state.notificationUnread = 0;
+      state.chatUnread = 0;
+      window.clearTimeout(state.readReceiptTimer);
+      state.readReceiptTimer = null;
+      state.apiToken = '';
+      state.searchQuery = '';
       state.profileUser = null;
       state.pendingBanner = null;
       state.reportingPost = null;
@@ -5589,6 +6199,9 @@
       clearQuote();
       clearPendingImage();
       closeMessageMenu();
+      closeReactionPicker();
+      closeNotificationModal();
+      closeSearchModal();
       closeStickerPanel();
       closeBulletinModal();
       setChatEnabled(false);
@@ -5662,6 +6275,7 @@
       state.bio = user.bio || '';
       state.profileBanner = user.profileBanner || '';
       state.isAdmin = Boolean(user.isAdmin);
+      state.apiToken = data && data.apiToken ? String(data.apiToken) : '';
       state.stickers.creator = {
         isCreator: Boolean(user.isStickerCreator),
         status: user.stickerCreatorStatus || '',
@@ -5684,6 +6298,7 @@
       socket.emit('get forum posts');
       socket.emit('get rename status');
       socket.emit('get bulletins');
+      socket.emit('get notifications');
       socket.emit('get stickers');
       if (state.isAdmin) socket.emit('admin get dashboard');
     });
@@ -5765,6 +6380,67 @@
       if (!bulletinModal.hidden) socket.emit('get bulletins');
     });
 
+    socket.on('notifications', (payload) => {
+      state.notifications = payload && Array.isArray(payload.items) ? payload.items : [];
+      state.notificationUnread = Number(payload && payload.unreadCount) || 0;
+      renderNotificationBadges();
+      renderNotifications();
+    });
+
+    socket.on('notification:new', (payload) => {
+      const item = payload && payload.notification ? payload.notification : payload;
+      if (item && !state.notifications.some((existing) => existing.id === item.id)) {
+        state.notifications = [item, ...state.notifications].slice(0, 80);
+      }
+      state.notificationUnread = Number(payload && payload.unreadCount) || state.notificationUnread + (item && !item.isRead ? 1 : 0);
+      renderNotificationBadges();
+      renderNotifications();
+      if (item && item.title) showToast(item.title);
+      if (state.soundEnabled) playMessageSound();
+    });
+
+    socket.on('notification:read', (payload) => {
+      const id = payload && payload.id ? payload.id : '';
+      state.notifications = state.notifications.map((item) => (
+        item.id === id ? { ...item, isRead: true, readAt: payload.readAt || new Date().toISOString() } : item
+      ));
+      state.notificationUnread = state.notifications.filter((item) => !item.isRead).length;
+      renderNotificationBadges();
+      renderNotifications();
+    });
+
+    socket.on('notification:read_all', (payload) => {
+      state.notifications = state.notifications.map((item) => ({ ...item, isRead: true, readAt: item.readAt || new Date().toISOString() }));
+      state.notificationUnread = Number(payload && payload.unreadCount) || 0;
+      renderNotificationBadges();
+      renderNotifications();
+    });
+
+    socket.on('unread:update', (payload) => {
+      if (payload && (typeof payload.notificationUnread !== 'undefined' || typeof payload.notifications !== 'undefined')) {
+        state.notificationUnread = Number(payload.notificationUnread ?? payload.notifications) || 0;
+      }
+      if (payload && (typeof payload.chatUnread !== 'undefined' || typeof payload.chat !== 'undefined')) {
+        state.chatUnread = Number(payload.chatUnread ?? payload.chat) || 0;
+      }
+      renderNotificationBadges();
+      renderHome();
+    });
+
+    socket.on('search results', (payload) => {
+      renderSearchResults(payload || {});
+    });
+
+    socket.on('reaction:update', (payload) => {
+      if (!payload || !payload.messageId) return;
+      updateMessageReactions(payload.messageId, payload.reactions || []);
+    });
+
+    socket.on('reaction:updated', (payload) => {
+      if (!payload || !payload.messageId) return;
+      updateMessageReactions(payload.messageId, payload.reactions || []);
+    });
+
     socket.on('history', (messages) => {
       messagesDiv.textContent = '';
       const list = Array.isArray(messages) ? messages : [];
@@ -5778,8 +6454,10 @@
     socket.on('lobby', (payload) => {
       state.lobbyRooms = payload && Array.isArray(payload.rooms) ? payload.rooms : [];
       state.lobbyUsers = payload && Array.isArray(payload.users) ? payload.users : [];
+      state.chatUnread = Number(payload && payload.chatUnreadCount) || 0;
       renderLobby();
       renderHome();
+      renderNotificationBadges();
     });
 
     socket.on('forum posts', (payload) => {
@@ -5919,6 +6597,7 @@
       renderMessageCount();
       renderEmptyState();
       settleAtBottom();
+      socket.emit('mark room read', room.id);
       input.focus();
     });
 
@@ -5953,7 +6632,10 @@
       renderMessageCount();
       renderEmptyState();
       renderTyping();
-      if (shouldScroll) settleAtBottom();
+      if (shouldScroll) {
+        settleAtBottom();
+        if (state.currentRoom && state.currentRoom.id) socket.emit('mark room read', state.currentRoom.id);
+      }
       else newMessageBtn.hidden = false;
       if (data.userId !== state.userId && !data.recalled && data.type !== 'recalled') playMessageSound();
     });
@@ -6130,6 +6812,31 @@
     bulletinOpenButtons.forEach((button) => {
       button.addEventListener('click', openBulletinModal);
     });
+    notificationOpen.addEventListener('click', openNotificationModal);
+    notificationClose.addEventListener('click', closeNotificationModal);
+    notificationModal.addEventListener('click', (event) => {
+      if (event.target === notificationModal) closeNotificationModal();
+    });
+    notificationReadAll.addEventListener('click', () => socket.emit('mark all notifications read'));
+    notificationFilterButtons.forEach((button) => {
+      button.addEventListener('click', () => {
+        state.notificationFilter = button.dataset.notificationFilter || 'all';
+        renderNotifications();
+        socket.emit('get notifications', { unreadOnly: state.notificationFilter === 'unread' });
+      });
+    });
+    globalSearchOpen.addEventListener('click', openSearchModal);
+    searchClose.addEventListener('click', closeSearchModal);
+    searchModal.addEventListener('click', (event) => {
+      if (event.target === searchModal) closeSearchModal();
+    });
+    searchInput.addEventListener('input', scheduleSearch);
+    searchScopeButtons.forEach((button) => {
+      button.addEventListener('click', () => {
+        state.searchScope = button.dataset.searchScope || 'all';
+        scheduleSearch();
+      });
+    });
     themeToggleButtons.forEach((button) => {
       button.addEventListener('click', () => {
         const nextMode = (document.documentElement.dataset.theme || 'light') === 'dark' ? 'light' : 'dark';
@@ -6179,7 +6886,13 @@
       if (event.key === 'Escape' && !userProfileModal.hidden) closeUserProfile();
       if (event.key === 'Escape' && !reportModal.hidden) closeReportModal();
       if (event.key === 'Escape' && !bulletinModal.hidden) closeBulletinModal();
+      if (event.key === 'Escape' && !notificationModal.hidden) closeNotificationModal();
+      if (event.key === 'Escape' && !searchModal.hidden) closeSearchModal();
       if (event.key === 'Escape' && !avatarCropModal.hidden) closeAvatarCropModal();
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        openSearchModal();
+      }
     });
 
     settingsClose.addEventListener('click', closeSettingsModal);
@@ -6374,7 +7087,10 @@
     });
 
     messagesDiv.addEventListener('scroll', () => {
-      if (isNearBottom()) newMessageBtn.hidden = true;
+      if (isNearBottom()) {
+        newMessageBtn.hidden = true;
+        markCurrentRoomRead();
+      }
       closeMessageMenu();
       closeStickerPanel();
     });
@@ -6382,6 +7098,7 @@
     newMessageBtn.addEventListener('click', () => {
       scrollToBottom();
       newMessageBtn.hidden = true;
+      markCurrentRoomRead();
     });
 
     mentionBtn.addEventListener('click', () => {
@@ -6411,18 +7128,23 @@
       if (!messageMenu.contains(event.target)) {
         closeMessageMenu();
       }
+      if (!reactionPicker.contains(event.target)) {
+        closeReactionPicker();
+      }
     });
 
     document.addEventListener('keydown', (event) => {
       if (event.key === 'Escape') {
         mentionMenu.hidden = true;
         closeMessageMenu();
+        closeReactionPicker();
         closeStickerPanel();
       }
     });
 
     window.addEventListener('resize', () => {
       closeMessageMenu();
+      closeReactionPicker();
       closeStickerPanel();
     });
 
@@ -6455,6 +7177,67 @@
       if (!file) return;
       await prepareStickerFile(file, 'official');
     });
+
+    function renderMessageReactions(message) {
+      const wrap = document.createElement('div');
+      wrap.className = 'message-reactions';
+      const list = Array.isArray(message.reactions) ? message.reactions : [];
+      if (list.length === 0) wrap.hidden = true;
+      list.forEach((item) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = `reaction-pill${item.mine ? ' is-mine' : ''}`;
+        button.textContent = `${item.reaction} ${item.count}`;
+        button.addEventListener('click', (event) => {
+          event.stopPropagation();
+          socket.emit('message reaction', { messageId: message.id, reaction: item.reaction });
+        });
+        wrap.append(button);
+      });
+      return wrap;
+    }
+
+    function openReactionPicker(x, y, message) {
+      if (!state.userId || !message || !message.id) return;
+      closeMessageMenu();
+      state.reactionMessage = message;
+      reactionPicker.textContent = '';
+      ['👍', '❤️', '😂', '😭', '⭐', '🎉'].forEach((reaction) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = reaction;
+        button.addEventListener('click', () => {
+          socket.emit('message reaction', { messageId: message.id, reaction });
+          closeReactionPicker();
+        });
+        reactionPicker.append(button);
+      });
+      reactionPicker.hidden = false;
+      const rect = reactionPicker.getBoundingClientRect();
+      const left = Math.min(Math.max(8, x - rect.width / 2), window.innerWidth - rect.width - 8);
+      const top = Math.min(Math.max(8, y - rect.height - 12), window.innerHeight - rect.height - 8);
+      reactionPicker.style.left = `${left}px`;
+      reactionPicker.style.top = `${top}px`;
+    }
+
+    function closeReactionPicker() {
+      reactionPicker.hidden = true;
+      state.reactionMessage = null;
+    }
+
+    function updateMessageReactions(messageId, reactions) {
+      const row = messagesDiv.querySelector(`[data-message-id="${CSS.escape(messageId)}"]`);
+      if (!row) return;
+      const bubble = row.querySelector('.bubble');
+      if (!bubble) return;
+      const old = bubble.querySelector('.message-reactions');
+      if (old) old.remove();
+      const message = {
+        id: messageId,
+        reactions: Array.isArray(reactions) ? reactions : []
+      };
+      bubble.append(renderMessageReactions(message));
+    }
 
     function appendMessage(data, options = {}) {
       const message = normalizeMessage(data);
@@ -6556,6 +7339,20 @@
         bubble.append(content);
       }
 
+      if (!message.recalled && message.type !== 'recalled') {
+        const reactionTrigger = document.createElement('button');
+        reactionTrigger.className = 'reaction-trigger';
+        reactionTrigger.type = 'button';
+        reactionTrigger.title = '添加 Reaction';
+        reactionTrigger.textContent = '＋';
+        reactionTrigger.addEventListener('click', (event) => {
+          event.stopPropagation();
+          openReactionPicker(event.clientX, event.clientY, message);
+        });
+        bubble.append(reactionTrigger);
+        bubble.append(renderMessageReactions(message));
+      }
+
       if (isMe) row.append(bubble, avatar);
       else row.append(avatar, bubble);
       messagesDiv.append(row);
@@ -6600,7 +7397,8 @@
         stickerId: typeof data.stickerId === 'string' ? data.stickerId : '',
         duration: Number.isFinite(Number(data.duration)) ? Number(data.duration) : 0,
         timestamp: data.timestamp || new Date().toISOString(),
-        recalled: Boolean(data.recalled)
+        recalled: Boolean(data.recalled),
+        reactions: Array.isArray(data.reactions) ? data.reactions : []
       };
     }
 

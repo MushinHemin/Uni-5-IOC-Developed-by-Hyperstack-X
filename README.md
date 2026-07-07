@@ -2,7 +2,7 @@
 
 Uni 5 Sonoma is a lightweight realtime chat and community app with account login, group chat, private chat, forum posts, admin tools, message recall, image paste/upload, voice messages, and a glass-style responsive web UI.
 
-Current release: **Sonoma 5.5.3 App Foundation Update**
+Current release: **Sonoma 5.5.5 Engagement & Discovery Update**
 
 ## Features
 
@@ -15,6 +15,10 @@ Current release: **Sonoma 5.5.3 App Foundation Update**
 - Forum MVP with posts, post detail pages, and realtime comments
 - Display-name personalization with weekly rename limits and admin approval
 - Bulletin mailbox with unread badges, version notices, admin announcements, and rename status messages
+- Unified notification center for chat, forum, profile, Star, report, sticker, and announcement activity
+- Global search across users, forum content, accessible chat history, announcements, and stickers
+- Chat unread counters and per-room read state
+- Message Reactions with server-side visibility and banned-user checks
 - Sonoma user profiles with bio, profile banner, contact actions, and daily Stars
 - Forum report workflow, admin report review center, and basic community bans
 - Sonoma sticker system with official stickers, personal sticker uploads, sticker messages, creator applications, and admin review
@@ -34,17 +38,35 @@ Current release: **Sonoma 5.5.3 App Foundation Update**
 - Sonoma 5.5.0: official/personal stickers, sticker messages, creator applications, and official sticker review
 - Sonoma 5.5.1: sticker panel polish, mobile layout reliability, upload/review feedback, and safer sticker history fallbacks
 - Sonoma 5.5.3: PWA foundation, mobile app-style layout, bottom navigation, and API / Socket documentation for Uni 6 planning
+- Sonoma 5.5.5: notification center, chat unread state, global discovery search, and message Reactions
 - Uni 5.4.1: personalization controls, compact presence status, latency monitoring, forum persistence hardening, CORS configuration, and stability cleanup
 
 ## PWA and Native App Preparation
 
 - The web app includes a lightweight PWA manifest at `/manifest.json` for standalone mobile launch experiments.
 - Uni intentionally does not register an aggressive service worker in 5.5.3, so private chat/community data and API responses are not cached offline.
-- Mobile layouts include safe-area aware spacing and a narrow-screen bottom navigation for Chat, Forum, Bulletins, and My.
+- Mobile layouts include safe-area aware spacing and a narrow-screen bottom navigation for Chat, Forum, Notifications, and My.
 - Current integration notes for future Uni 6 Nordkapp native clients live in [docs/API.md](docs/API.md).
 - Authentication is still based on the current web Socket.IO/session flow; a dedicated token flow should be evaluated before a native production app.
 
 ## Release Notes
+
+### Sonoma 5.5.5 Engagement & Discovery Update
+
+Added:
+
+- Added a Sonoma-style notification center for chat messages, forum comments, Stars, report decisions, account restrictions, sticker review updates, and system announcements
+- Added persistent unread state for chats with mobile and desktop unread badges
+- Added global search across users, forum posts/comments, accessible chat messages, announcements, and stickers
+- Added lightweight message Reactions with emoji summary pills and server-side permission checks
+- Added a 5.5.5 system announcement for the bulletin mailbox
+
+Improved:
+
+- Connected notification badges to live Socket.IO updates and read-all/read-one actions
+- Improved room read-state sync when entering chats, receiving messages, scrolling to the bottom, or opening the new-message button
+- Updated API / Socket documentation for notification, unread, search, and Reaction events
+- Preserved the Sonoma liquid glass UI style across discovery, notification, and engagement surfaces
 
 ### Sonoma 5.5.3 App Foundation Update
 

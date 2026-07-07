@@ -29,6 +29,7 @@ const io = new Server(server, {
     }
   }
 });
+app.use(express.json({ limit: '1mb' }));
 
 const DATA_FILE = path.join(__dirname, 'chat-history.json');
 const USERS_FILE = path.join(__dirname, 'users.json');
@@ -77,6 +78,19 @@ const REPORT_STATUSES = new Set(['pending', 'dismissed', 'post_deleted', 'user_b
 const STICKER_TYPES = new Set(['official', 'personal', 'creator_submission']);
 const STICKER_STATUSES = new Set(['active', 'pending', 'approved', 'rejected', 'removed']);
 const CREATOR_REQUEST_STATUSES = new Set(['pending', 'approved', 'rejected']);
+const NOTIFICATION_TYPES = new Set([
+  'chat_message',
+  'forum_comment',
+  'star_received',
+  'report_resolved',
+  'creator_request_result',
+  'sticker_submission_result',
+  'announcement',
+  'account_restricted',
+  'reaction_received'
+]);
+const SEARCH_SCOPES = new Set(['all', 'users', 'posts', 'messages', 'announcements', 'stickers']);
+const ALLOWED_REACTIONS = new Set(['👍', '❤️', '😂', '😭', '⭐', '🎉']);
 const IMAGE_EXTENSIONS = {
   'image/jpeg': 'jpg',
   'image/png': 'png',
@@ -84,6 +98,8 @@ const IMAGE_EXTENSIONS = {
   'image/gif': 'gif'
 };
 let db;
+const apiSessions = new Map();
+let notificationsReady = false;
 
 warnIfDefaultAdminPassword();
 
@@ -297,6 +313,46 @@ function cleanStickerTitle(value) {
 
 function cleanStickerDescription(value) {
   return cleanText(value, 120);
+}
+
+function cleanSearchQuery(value) {
+  return cleanText(value, 100).replace(/\s+/g, ' ');
+}
+
+function cleanSearchScope(value) {
+  const scope = typeof value === 'string' ? value.trim().toLowerCase() : 'all';
+  return SEARCH_SCOPES.has(scope) ? scope : 'all';
+}
+
+function cleanNotificationType(value) {
+  const type = typeof value === 'string' ? value.trim().toLowerCase() : '';
+  return NOTIFICATION_TYPES.has(type) ? type : 'announcement';
+}
+
+function cleanTargetType(value) {
+  return cleanText(value, 40).replace(/[^a-zA-Z0-9:_-]/g, '');
+}
+
+function cleanReaction(value) {
+  return ALLOWED_REACTIONS.has(value) ? value : '';
+}
+
+function safeJsonParse(value, fallback = {}) {
+  if (!value || typeof value !== 'string') return fallback;
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === 'object' ? parsed : fallback;
+  } catch (error) {
+    return fallback;
+  }
+}
+
+function safeJsonStringify(value) {
+  try {
+    return JSON.stringify(value && typeof value === 'object' ? value : {});
+  } catch (error) {
+    return '{}';
+  }
 }
 
 function cleanCreatorReason(value) {
@@ -776,6 +832,44 @@ function initDatabase() {
       reviewed_at TEXT NOT NULL DEFAULT ''
     );
 
+    CREATE TABLE IF NOT EXISTS notifications (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      actor_user_id TEXT NOT NULL DEFAULT '',
+      type TEXT NOT NULL,
+      title TEXT NOT NULL,
+      body TEXT NOT NULL DEFAULT '',
+      target_type TEXT NOT NULL DEFAULT '',
+      target_id TEXT NOT NULL DEFAULT '',
+      target_url TEXT NOT NULL DEFAULT '',
+      metadata_json TEXT NOT NULL DEFAULT '{}',
+      is_read INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      read_at TEXT NOT NULL DEFAULT '',
+      dedupe_key TEXT NOT NULL DEFAULT ''
+    );
+
+    CREATE TABLE IF NOT EXISTS chat_read_states (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      scope TEXT NOT NULL,
+      conversation_id TEXT NOT NULL,
+      last_read_message_id TEXT NOT NULL DEFAULT '',
+      last_read_at TEXT NOT NULL DEFAULT '',
+      updated_at TEXT NOT NULL,
+      UNIQUE(user_id, scope, conversation_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS message_reactions (
+      id TEXT PRIMARY KEY,
+      message_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      reaction TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE(message_id, user_id)
+    );
+
     CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at);
     CREATE INDEX IF NOT EXISTS idx_messages_user_id ON messages(user_id);
     CREATE INDEX IF NOT EXISTS idx_room_members_user_id ON room_members(user_id);
@@ -798,6 +892,12 @@ function initDatabase() {
     CREATE INDEX IF NOT EXISTS idx_stickers_type_status_created ON stickers(sticker_type, status, created_at);
     CREATE INDEX IF NOT EXISTS idx_sticker_creator_requests_user_created ON sticker_creator_requests(user_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_sticker_creator_requests_status_created ON sticker_creator_requests(status, created_at);
+    CREATE INDEX IF NOT EXISTS idx_notifications_user_read_created ON notifications(user_id, is_read, created_at);
+    CREATE INDEX IF NOT EXISTS idx_notifications_user_created ON notifications(user_id, created_at);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_notifications_user_dedupe ON notifications(user_id, dedupe_key) WHERE dedupe_key != '';
+    CREATE INDEX IF NOT EXISTS idx_chat_read_states_user_scope ON chat_read_states(user_id, scope, conversation_id);
+    CREATE INDEX IF NOT EXISTS idx_message_reactions_message ON message_reactions(message_id);
+    CREATE INDEX IF NOT EXISTS idx_message_reactions_user ON message_reactions(user_id);
   `);
   migrateForumTables();
   ensureColumn('users', 'display_name', "TEXT NOT NULL DEFAULT ''");
@@ -814,6 +914,7 @@ function initDatabase() {
   ensureColumn('messages', 'room_id', `TEXT NOT NULL DEFAULT '${DEFAULT_ROOM_ID}'`);
   ensureColumn('messages', 'sticker_id', "TEXT NOT NULL DEFAULT ''");
   db.exec('CREATE INDEX IF NOT EXISTS idx_messages_room_id ON messages(room_id)');
+  ensureColumn('notifications', 'dedupe_key', "TEXT NOT NULL DEFAULT ''");
   ensureOfficialStickers();
   ensureDefaultRoom();
   ensureSystemAnnouncements();
@@ -1117,7 +1218,7 @@ function upsertMessage(message) {
   });
 }
 
-function publicMessage(message) {
+function publicMessage(message, viewerUserId = '') {
   if (!message) return null;
   const currentUser = userById(message.userId);
   const displayName = currentUser ? displayNameOf(currentUser) : displayNameOf(message.username);
@@ -1134,7 +1235,8 @@ function publicMessage(message) {
       stickerId: message.stickerId || '',
       duration: message.duration || 0,
       timestamp: message.timestamp,
-      recalled: false
+      recalled: false,
+      reactions: reactionSummaryForMessage(message.id, viewerUserId)
     };
   }
 
@@ -1150,7 +1252,8 @@ function publicMessage(message) {
     stickerId: '',
     duration: 0,
     timestamp: message.timestamp,
-    recalled: true
+    recalled: true,
+    reactions: []
   };
 }
 
@@ -1483,6 +1586,15 @@ function banUser(user, reason = '') {
   user.bannedAt = new Date().toISOString();
   user.bannedReason = cleanAdminNote(reason) || '违反社区规则';
   saveUsers();
+  createNotification({
+    userId: user.id,
+    type: 'account_restricted',
+    title: '你的账号已被限制使用社区功能',
+    body: user.bannedReason,
+    targetType: 'account',
+    targetId: user.id,
+    dedupeKey: `ban:${user.id}:${user.bannedAt}`
+  });
   socketsForUser(user.id).forEach((connectedSocket) => {
     connectedSocket.user = user;
     connectedSocket.emit('profile updated', { user: publicUser(user) });
@@ -1664,6 +1776,7 @@ function createAnnouncement({ type = 'admin', title, content, targetUserId = '',
     VALUES (@id, @type, @title, @content, @targetUserId, @createdBy, @createdAt, @priority)
   `).run(announcement);
   broadcastBulletinUpdates(announcement.targetUserId);
+  if (notificationsReady) notifyAnnouncement(announcement);
   return announcement;
 }
 
@@ -1724,7 +1837,533 @@ function broadcastBulletinUpdates(targetUserId = '') {
   });
 }
 
+function rowToNotification(row) {
+  if (!row) return null;
+  const actor = row.actor_user_id ? userById(row.actor_user_id) : null;
+  return {
+    id: row.id,
+    userId: row.user_id,
+    actorUserId: row.actor_user_id || '',
+    actor: actor ? publicUser(actor) : null,
+    type: cleanNotificationType(row.type),
+    title: row.title,
+    body: row.body || '',
+    targetType: row.target_type || '',
+    targetId: row.target_id || '',
+    targetUrl: row.target_url || '',
+    metadata: safeJsonParse(row.metadata_json),
+    isRead: Boolean(row.is_read),
+    createdAt: row.created_at,
+    readAt: row.read_at || ''
+  };
+}
+
+function unreadNotificationCount(userId) {
+  if (!userId) return 0;
+  return Number(db.prepare(`
+    SELECT COUNT(*) AS count FROM notifications
+    WHERE user_id = ? AND is_read = 0
+  `).get(userId).count || 0);
+}
+
+function listNotificationsForUser(userId, { unreadOnly = false, limit = 50, offset = 0 } = {}) {
+  const safeLimit = Math.min(Math.max(Number(limit) || 50, 1), 80);
+  const safeOffset = Math.max(Number(offset) || 0, 0);
+  const sql = `
+    SELECT * FROM notifications
+    WHERE user_id = ? ${unreadOnly ? 'AND is_read = 0' : ''}
+    ORDER BY created_at DESC
+    LIMIT ? OFFSET ?
+  `;
+  return db.prepare(sql).all(userId, safeLimit, safeOffset).map(rowToNotification).filter(Boolean);
+}
+
+function emitUnreadUpdate(userId) {
+  const notificationCount = unreadNotificationCount(userId);
+  const chatCount = totalChatUnreadForUser(userId);
+  socketsForUser(userId).forEach((connectedSocket) => {
+    connectedSocket.emit('unread:update', {
+      notifications: notificationCount,
+      notificationUnread: notificationCount,
+      chat: chatCount,
+      chatUnread: chatCount
+    });
+  });
+}
+
+function emitNotifications(socket) {
+  if (!socket.user) return;
+  socket.emit('notifications', {
+    items: listNotificationsForUser(socket.user.id),
+    unreadCount: unreadNotificationCount(socket.user.id)
+  });
+  emitUnreadUpdate(socket.user.id);
+}
+
+function createNotification({
+  userId,
+  actorUserId = '',
+  type = 'announcement',
+  title,
+  body = '',
+  targetType = '',
+  targetId = '',
+  targetUrl = '',
+  metadata = {},
+  dedupeKey = ''
+}) {
+  const targetUser = userById(userId);
+  const cleanTitle = cleanText(title, 120).replace(/\s+/g, ' ');
+  const cleanBody = cleanText(body, 600);
+  if (!targetUser || !cleanTitle) return null;
+  if (actorUserId && actorUserId === userId && type !== 'announcement' && type !== 'account_restricted') return null;
+  const notification = {
+    id: `notification:${crypto.randomUUID()}`,
+    userId,
+    actorUserId: actorUserId || '',
+    type: cleanNotificationType(type),
+    title: cleanTitle,
+    body: cleanBody,
+    targetType: cleanTargetType(targetType),
+    targetId: cleanText(targetId, 100),
+    targetUrl: cleanText(targetUrl, 240),
+    metadataJson: safeJsonStringify(metadata),
+    createdAt: new Date().toISOString(),
+    dedupeKey: cleanText(dedupeKey, 160)
+  };
+
+  if (notification.dedupeKey) {
+    const existing = db.prepare('SELECT * FROM notifications WHERE user_id = ? AND dedupe_key = ?').get(userId, notification.dedupeKey);
+    if (existing) {
+      db.prepare(`
+        UPDATE notifications
+        SET actor_user_id = ?, type = ?, title = ?, body = ?, target_type = ?, target_id = ?, target_url = ?, metadata_json = ?, is_read = 0, created_at = ?, read_at = ''
+        WHERE id = ?
+      `).run(
+        notification.actorUserId,
+        notification.type,
+        notification.title,
+        notification.body,
+        notification.targetType,
+        notification.targetId,
+        notification.targetUrl,
+        notification.metadataJson,
+        notification.createdAt,
+        existing.id
+      );
+      const updated = rowToNotification(db.prepare('SELECT * FROM notifications WHERE id = ?').get(existing.id));
+      socketsForUser(userId).forEach((connectedSocket) => connectedSocket.emit('notification:new', updated));
+      emitUnreadUpdate(userId);
+      return updated;
+    }
+  }
+
+  db.prepare(`
+    INSERT INTO notifications (id, user_id, actor_user_id, type, title, body, target_type, target_id, target_url, metadata_json, is_read, created_at, read_at, dedupe_key)
+    VALUES (@id, @userId, @actorUserId, @type, @title, @body, @targetType, @targetId, @targetUrl, @metadataJson, 0, @createdAt, '', @dedupeKey)
+  `).run(notification);
+  const publicNotification = rowToNotification(db.prepare('SELECT * FROM notifications WHERE id = ?').get(notification.id));
+  socketsForUser(userId).forEach((connectedSocket) => connectedSocket.emit('notification:new', publicNotification));
+  emitUnreadUpdate(userId);
+  return publicNotification;
+}
+
+function notifyAnnouncement(announcement) {
+  if (!announcement) return;
+  const targets = announcement.targetUserId
+    ? users.filter((user) => user.id === announcement.targetUserId)
+    : users;
+  targets.forEach((user) => {
+    createNotification({
+      userId: user.id,
+      actorUserId: announcement.createdBy || '',
+      type: 'announcement',
+      title: announcement.title,
+      body: announcement.content,
+      targetType: 'announcement',
+      targetId: announcement.id,
+      metadata: { priority: announcement.priority, announcementType: announcement.type },
+      dedupeKey: `announcement:${announcement.id}`
+    });
+  });
+}
+
+function markNotificationRead(userId, notificationId) {
+  const id = cleanForumId(notificationId);
+  if (!id) return null;
+  const row = db.prepare('SELECT * FROM notifications WHERE id = ? AND user_id = ?').get(id, userId);
+  if (!row) return null;
+  db.prepare(`
+    UPDATE notifications SET is_read = 1, read_at = ?
+    WHERE id = ? AND user_id = ?
+  `).run(new Date().toISOString(), id, userId);
+  emitUnreadUpdate(userId);
+  return rowToNotification(db.prepare('SELECT * FROM notifications WHERE id = ?').get(id));
+}
+
+function markAllNotificationsRead(userId) {
+  db.prepare(`
+    UPDATE notifications SET is_read = 1, read_at = ?
+    WHERE user_id = ? AND is_read = 0
+  `).run(new Date().toISOString(), userId);
+  socketsForUser(userId).forEach((connectedSocket) => connectedSocket.emit('notification:read_all'));
+  emitUnreadUpdate(userId);
+}
+
+function roomScope(roomId) {
+  return typeof roomId === 'string' && roomId.startsWith('dm:') ? 'private' : 'room';
+}
+
+function lastMessageForRoom(roomId) {
+  return db.prepare(`
+    SELECT id, created_at FROM messages
+    WHERE room_id = ?
+    ORDER BY created_at DESC
+    LIMIT 1
+  `).get(roomId) || null;
+}
+
+function markRoomRead(userId, roomId) {
+  if (!userId || !roomId) return;
+  const last = lastMessageForRoom(roomId);
+  const now = new Date().toISOString();
+  db.prepare(`
+    INSERT INTO chat_read_states (id, user_id, scope, conversation_id, last_read_message_id, last_read_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(user_id, scope, conversation_id) DO UPDATE SET
+      last_read_message_id = excluded.last_read_message_id,
+      last_read_at = excluded.last_read_at,
+      updated_at = excluded.updated_at
+  `).run(`read:${crypto.randomUUID()}`, userId, roomScope(roomId), roomId, last ? last.id : '', last ? last.created_at : now, now);
+  emitUnreadUpdate(userId);
+}
+
+function readStateForRoom(userId, roomId) {
+  return db.prepare(`
+    SELECT * FROM chat_read_states
+    WHERE user_id = ? AND scope = ? AND conversation_id = ?
+    LIMIT 1
+  `).get(userId, roomScope(roomId), roomId) || null;
+}
+
+function unreadCountForRoom(userId, roomId) {
+  if (!userId || !roomId) return 0;
+  const state = readStateForRoom(userId, roomId);
+  const lastReadAt = state && state.last_read_at ? state.last_read_at : '1970-01-01T00:00:00.000Z';
+  return Number(db.prepare(`
+    SELECT COUNT(*) AS count FROM messages
+    WHERE room_id = ? AND created_at > ? AND COALESCE(user_id, '') != ? AND recalled = 0
+  `).get(roomId, lastReadAt, userId).count || 0);
+}
+
+function roomsVisibleToUser(userId) {
+  const groupRows = db.prepare(`
+    SELECT rooms.id
+    FROM rooms
+    WHERE rooms.id = ?
+      OR EXISTS (
+        SELECT 1 FROM room_members
+        WHERE room_members.room_id = rooms.id AND room_members.user_id = ?
+      )
+  `).all(DEFAULT_ROOM_ID, userId).map((row) => row.id);
+  const privateRows = db.prepare(`
+    SELECT DISTINCT room_id AS id FROM messages
+    WHERE room_id LIKE 'dm:%' AND room_id LIKE ?
+  `).all(`%${userId}%`).map((row) => row.id);
+  return Array.from(new Set([...groupRows, ...privateRows]));
+}
+
+function totalChatUnreadForUser(userId) {
+  return roomsVisibleToUser(userId).reduce((total, roomId) => total + unreadCountForRoom(userId, roomId), 0);
+}
+
+function chatRecipientIds(message) {
+  if (!message || !message.roomId) return [];
+  if (message.roomId.startsWith('dm:')) {
+    return privateRoomUsers(message.roomId).filter((id) => id && id !== message.userId);
+  }
+  return db.prepare('SELECT user_id FROM room_members WHERE room_id = ? AND user_id != ?')
+    .all(message.roomId, message.userId || '')
+    .map((row) => row.user_id)
+    .filter(Boolean);
+}
+
+function notifyChatRecipients(message) {
+  chatRecipientIds(message).forEach((userId) => {
+    const activeSocket = socketsForUser(userId).find((connectedSocket) => connectedSocket.currentRoomId === message.roomId);
+    if (activeSocket) {
+      markRoomRead(userId, message.roomId);
+      return;
+    }
+    createNotification({
+      userId,
+      actorUserId: message.userId || '',
+      type: 'chat_message',
+      title: `${displayNameOf(messageUser(message))} 发来新消息`,
+      body: message.type === 'sticker' ? '发送了一个表情包' : message.type === 'image' ? '发送了一张图片' : message.type === 'voice' ? '发送了一条语音' : cleanText(message.content, 80),
+      targetType: 'chat',
+      targetId: message.roomId,
+      metadata: { messageId: message.id, roomId: message.roomId },
+      dedupeKey: `chat:${message.roomId}:${message.id}:${userId}`
+    });
+    emitUnreadUpdate(userId);
+  });
+  broadcastLobby();
+}
+
+function reactionSummaryForMessage(messageId, viewerUserId = '') {
+  const id = typeof messageId === 'string' ? messageId : '';
+  if (!id) return [];
+  const rows = db.prepare(`
+    SELECT reaction, COUNT(*) AS count
+    FROM message_reactions
+    WHERE message_id = ?
+    GROUP BY reaction
+    ORDER BY MIN(created_at) ASC
+  `).all(id);
+  const mine = viewerUserId
+    ? db.prepare('SELECT reaction FROM message_reactions WHERE message_id = ? AND user_id = ?').get(id, viewerUserId)
+    : null;
+  return rows.map((row) => ({
+    reaction: row.reaction,
+    count: Number(row.count || 0),
+    mine: Boolean(mine && mine.reaction === row.reaction)
+  }));
+}
+
+function messageById(messageId) {
+  const id = typeof messageId === 'string' ? messageId : '';
+  return messages.find((message) => message.id === id) || rowToMessage(db.prepare('SELECT * FROM messages WHERE id = ?').get(id));
+}
+
+function canUserViewMessage(user, message) {
+  if (!user || !message || message.recalled) return false;
+  if (message.roomId && message.roomId.startsWith('dm:')) return privateRoomUsers(message.roomId).includes(user.id);
+  const room = rooms.find((item) => item.id === message.roomId);
+  if (!room) return false;
+  if (message.roomId === DEFAULT_ROOM_ID) return true;
+  return Boolean(db.prepare('SELECT 1 FROM room_members WHERE room_id = ? AND user_id = ?').get(message.roomId, user.id));
+}
+
+function canUserAccessRoom(user, roomId) {
+  if (!user || !roomId) return false;
+  if (roomId.startsWith('dm:')) return privateRoomUsers(roomId).includes(user.id);
+  if (roomId === DEFAULT_ROOM_ID) return true;
+  return Boolean(db.prepare('SELECT 1 FROM room_members WHERE room_id = ? AND user_id = ?').get(roomId, user.id));
+}
+
+function emitReactionUpdate(message) {
+  if (!message) return;
+  io.sockets.sockets.forEach((connectedSocket) => {
+    if (!connectedSocket.user || connectedSocket.currentRoomId !== message.roomId) return;
+    connectedSocket.emit('reaction:update', {
+      messageId: message.id,
+      reactions: reactionSummaryForMessage(message.id, connectedSocket.user.id)
+    });
+  });
+}
+
+function toggleMessageReaction(user, messageIdValue, reactionValue) {
+  if (!user) return { error: '请先登录', status: 401 };
+  if (user.isBanned) return { error: '你的账号已被限制使用社区功能', status: 403 };
+  const reaction = cleanReaction(reactionValue);
+  if (!reaction) return { error: '这个 Reaction 不可用', status: 400 };
+  const message = messageById(messageIdValue);
+  if (!canUserViewMessage(user, message)) return { error: '消息不存在或不可见', status: 404 };
+
+  const existing = db.prepare('SELECT * FROM message_reactions WHERE message_id = ? AND user_id = ?').get(message.id, user.id);
+  const now = new Date().toISOString();
+  let removed = false;
+  if (existing && existing.reaction === reaction) {
+    db.prepare('DELETE FROM message_reactions WHERE message_id = ? AND user_id = ?').run(message.id, user.id);
+    removed = true;
+  } else if (existing) {
+    db.prepare(`
+      UPDATE message_reactions SET reaction = ?, updated_at = ?
+      WHERE message_id = ? AND user_id = ?
+    `).run(reaction, now, message.id, user.id);
+  } else {
+    db.prepare(`
+      INSERT INTO message_reactions (id, message_id, user_id, reaction, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(`reaction:${crypto.randomUUID()}`, message.id, user.id, reaction, now, now);
+  }
+
+  if (!removed && message.userId && message.userId !== user.id) {
+    createNotification({
+      userId: message.userId,
+      actorUserId: user.id,
+      type: 'reaction_received',
+      title: `${displayNameOf(user)} 对你的消息添加了 Reaction`,
+      body: `${reaction} ${message.type === 'sticker' ? '表情包消息' : cleanText(message.content, 80)}`,
+      targetType: 'chat',
+      targetId: message.roomId,
+      metadata: { messageId: message.id, reaction },
+      dedupeKey: `reaction:${message.id}:${user.id}:${message.userId}`
+    });
+  }
+
+  emitReactionUpdate(message);
+  const reactions = reactionSummaryForMessage(message.id, user.id);
+  return { messageId: message.id, reactions, removed };
+}
+
+function likePattern(query) {
+  return `%${query.replace(/[\\%_]/g, (match) => `\\${match}`)}%`;
+}
+
+function searchUni(user, { q, scope = 'all', limit = 30, offset = 0 } = {}) {
+  const query = cleanSearchQuery(q);
+  if (!user || !query) return { query, scope, results: [] };
+  const safeScope = cleanSearchScope(scope);
+  const safeLimit = Math.min(Math.max(Number(limit) || 30, 1), 50);
+  const safeOffset = Math.max(Number(offset) || 0, 0);
+  const pattern = likePattern(query);
+  const results = [];
+  const include = (name) => safeScope === 'all' || safeScope === name;
+
+  if (include('users')) {
+    db.prepare(`
+      SELECT * FROM users
+      WHERE display_name LIKE ? ESCAPE '\\' OR username LIKE ? ESCAPE '\\' OR bio LIKE ? ESCAPE '\\'
+      ORDER BY display_name COLLATE NOCASE ASC
+      LIMIT ? OFFSET ?
+    `).all(pattern, pattern, pattern, safeLimit, safeOffset).map(rowToUser).filter(Boolean).forEach((item) => {
+      results.push({
+        type: 'user',
+        id: item.id,
+        title: displayNameOf(item),
+        summary: item.bio || `@${item.username}`,
+        avatar: item.avatar || makeAvatar(displayNameOf(item)),
+        createdAt: item.createdAt || '',
+        targetType: 'user',
+        targetId: item.id
+      });
+    });
+  }
+
+  if (include('posts')) {
+    db.prepare(`
+      SELECT posts.*, COUNT(comments.id) AS comment_count
+      FROM posts
+      LEFT JOIN comments ON comments.post_id = posts.id
+      WHERE posts.title LIKE ? ESCAPE '\\' OR posts.content LIKE ? ESCAPE '\\'
+      GROUP BY posts.id
+      ORDER BY posts.created_at DESC
+      LIMIT ? OFFSET ?
+    `).all(pattern, pattern, safeLimit, safeOffset).map(rowToPost).filter(Boolean).forEach((post) => {
+      results.push({
+        type: 'post',
+        id: post.postId,
+        title: post.title,
+        summary: cleanText(post.content, 160),
+        avatar: post.avatar,
+        createdAt: post.createdAt,
+        targetType: 'post',
+        targetId: post.postId
+      });
+    });
+
+    db.prepare(`
+      SELECT comments.*, posts.title AS post_title
+      FROM comments
+      JOIN posts ON posts.id = comments.post_id
+      WHERE comments.content LIKE ? ESCAPE '\\'
+      ORDER BY comments.created_at DESC
+      LIMIT ? OFFSET ?
+    `).all(pattern, safeLimit, safeOffset).map(rowToComment).filter(Boolean).forEach((comment) => {
+      results.push({
+        type: 'comment',
+        id: comment.commentId,
+        title: `评论：${cleanText(comment.content, 48)}`,
+        summary: comment.content,
+        avatar: comment.avatar,
+        createdAt: comment.createdAt,
+        targetType: 'post',
+        targetId: comment.postId
+      });
+    });
+  }
+
+  if (include('messages')) {
+    const visibleRooms = roomsVisibleToUser(user.id);
+    if (visibleRooms.length) {
+      const placeholders = visibleRooms.map(() => '?').join(',');
+      db.prepare(`
+        SELECT * FROM messages
+        WHERE room_id IN (${placeholders})
+          AND type IN ('text', 'sticker')
+          AND recalled = 0
+          AND content LIKE ? ESCAPE '\\'
+        ORDER BY created_at DESC
+        LIMIT ? OFFSET ?
+      `).all(...visibleRooms, pattern, safeLimit, safeOffset).map(rowToMessage).filter(Boolean).forEach((message) => {
+        results.push({
+          type: 'message',
+          id: message.id,
+          title: `${message.username} 的聊天消息`,
+          summary: message.type === 'sticker' ? '表情包消息' : cleanText(message.content, 160),
+          avatar: message.avatar,
+          createdAt: message.timestamp,
+          targetType: 'chat',
+          targetId: message.roomId
+        });
+      });
+    }
+  }
+
+  if (include('announcements')) {
+    listAnnouncementsForUser(user.id)
+      .filter((announcement) => `${announcement.title} ${announcement.content}`.toLowerCase().includes(query.toLowerCase()))
+      .slice(0, safeLimit)
+      .forEach((announcement) => {
+        results.push({
+          type: 'announcement',
+          id: announcement.id,
+          title: announcement.title,
+          summary: cleanText(announcement.content, 160),
+          createdAt: announcement.createdAt,
+          targetType: 'announcement',
+          targetId: announcement.id
+        });
+      });
+  }
+
+  if (include('stickers')) {
+    const stickerRows = db.prepare(`
+      SELECT * FROM stickers
+      WHERE ((sticker_type = 'official' AND status = 'active')
+          OR (sticker_type = 'creator_submission' AND status = 'approved')
+          OR (owner_user_id = ? AND status != 'removed'))
+        AND (title LIKE ? ESCAPE '\\' OR description LIKE ? ESCAPE '\\')
+      ORDER BY created_at DESC
+      LIMIT ? OFFSET ?
+    `).all(user.id, pattern, pattern, safeLimit, safeOffset);
+    stickerRows.map(rowToSticker).filter(Boolean).map(publicSticker).forEach((sticker) => {
+      results.push({
+        type: 'sticker',
+        id: sticker.id,
+        title: sticker.title,
+        summary: sticker.description || '表情包',
+        avatar: sticker.url,
+        createdAt: sticker.createdAt,
+        targetType: 'sticker',
+        targetId: sticker.id
+      });
+    });
+  }
+
+  return { query, scope: safeScope, results: results.slice(0, safeLimit) };
+}
+
 function ensureSystemAnnouncements() {
+  createAnnouncement({
+    id: 'update:5.5.5',
+    type: 'update',
+    title: 'Sonoma 5.5.5 已上线',
+    content: '新增统一通知中心、聊天未读状态、全局搜索和消息 Reaction，让聊天、论坛、公告、表情包与社区互动更容易被发现。',
+    priority: 'high'
+  });
   createAnnouncement({
     id: 'update:5.5.3',
     type: 'update',
@@ -2014,11 +2653,11 @@ function groupOnlineCount(roomId) {
   return onlineIds.size;
 }
 
-function messagesForRoom(roomId) {
+function messagesForRoom(roomId, viewerUserId = '') {
   return messages
     .filter((message) => message.roomId === roomId)
     .slice(-MAX_HISTORY_MESSAGES)
-    .map(publicMessage)
+    .map((message) => publicMessage(message, viewerUserId))
     .filter(Boolean);
 }
 
@@ -2041,25 +2680,31 @@ function publicOnlineUsers() {
   return Array.from(seen.values());
 }
 
-function buildLobbyPayload() {
+function buildLobbyPayload(viewer = null) {
   return {
-    rooms: rooms.filter((room) => room.type === 'group').map(publicRoom),
-    users: publicOnlineUsers()
+    rooms: rooms.filter((room) => room.type === 'group').map((room) => ({
+      ...publicRoom(room),
+      unreadCount: viewer && canUserAccessRoom(viewer, room.id) ? unreadCountForRoom(viewer.id, room.id) : 0
+    })),
+    users: publicOnlineUsers(),
+    chatUnreadCount: viewer ? totalChatUnreadForUser(viewer.id) : 0
   };
 }
 
 function emitLobby(socket) {
-  socket.emit('lobby', buildLobbyPayload());
+  socket.emit('lobby', buildLobbyPayload(socket.user || null));
 }
 
 function broadcastLobby() {
-  io.emit('lobby', buildLobbyPayload());
+  io.sockets.sockets.forEach((connectedSocket) => {
+    connectedSocket.emit('lobby', buildLobbyPayload(connectedSocket.user || null));
+  });
 }
 
 function refreshOpenRooms() {
   io.sockets.sockets.forEach((connectedSocket) => {
     if (connectedSocket.currentRoomId) {
-      connectedSocket.emit('history', messagesForRoom(connectedSocket.currentRoomId));
+      connectedSocket.emit('history', messagesForRoom(connectedSocket.currentRoomId, connectedSocket.user ? connectedSocket.user.id : ''));
     }
   });
 }
@@ -2133,6 +2778,36 @@ function requireAdmin(socket, action = '管理后台') {
   if (isAdminUser(socket.user)) return true;
   socket.emit('admin error', '没有管理员权限');
   return false;
+}
+
+function createApiToken(socket, user) {
+  if (socket.apiToken) apiSessions.delete(socket.apiToken);
+  const token = crypto.randomBytes(32).toString('hex');
+  socket.apiToken = token;
+  apiSessions.set(token, { userId: user.id, socketId: socket.id, createdAt: Date.now() });
+  return token;
+}
+
+function clearApiToken(socket) {
+  if (!socket.apiToken) return;
+  apiSessions.delete(socket.apiToken);
+  socket.apiToken = '';
+}
+
+function userFromRequest(req) {
+  const header = req.headers.authorization || '';
+  const token = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
+  const session = token ? apiSessions.get(token) : null;
+  return session ? userById(session.userId) : null;
+}
+
+function requireApiUser(req, res) {
+  const user = userFromRequest(req);
+  if (!user) {
+    res.status(401).json({ error: '请先登录' });
+    return null;
+  }
+  return user;
 }
 
 function adminUserPayload(user) {
@@ -2256,6 +2931,7 @@ function isValidVoiceData(value) {
 initDatabase();
 let messages = loadHistory();
 let users = loadUsers();
+notificationsReady = true;
 ensureAdminUser();
 let rooms = loadRooms();
 const onlineUsers = new Map();
@@ -2265,6 +2941,80 @@ fs.mkdirSync(AVATAR_UPLOAD_DIR, { recursive: true });
 fs.mkdirSync(BANNER_UPLOAD_DIR, { recursive: true });
 fs.mkdirSync(STICKER_UPLOAD_DIR, { recursive: true });
 app.use('/uploads', express.static(UPLOADS_DIR));
+app.get('/api/notifications', (req, res) => {
+  const user = requireApiUser(req, res);
+  if (!user) return;
+  const unreadOnly = req.query.unread === '1' || req.query.unread === 'true';
+  res.json({
+    items: listNotificationsForUser(user.id, {
+      unreadOnly,
+      limit: req.query.limit,
+      offset: req.query.offset
+    }),
+    unreadCount: unreadNotificationCount(user.id)
+  });
+});
+
+app.get('/api/notifications/unread-count', (req, res) => {
+  const user = requireApiUser(req, res);
+  if (!user) return;
+  res.json({
+    notifications: unreadNotificationCount(user.id),
+    chat: totalChatUnreadForUser(user.id)
+  });
+});
+
+app.post('/api/notifications/:id/read', (req, res) => {
+  const user = requireApiUser(req, res);
+  if (!user) return;
+  const notification = markNotificationRead(user.id, req.params.id);
+  if (!notification) {
+    res.status(404).json({ error: '通知不存在' });
+    return;
+  }
+  res.json({ notification, unreadCount: unreadNotificationCount(user.id) });
+});
+
+app.post('/api/notifications/read-all', (req, res) => {
+  const user = requireApiUser(req, res);
+  if (!user) return;
+  markAllNotificationsRead(user.id);
+  res.json({ ok: true, unreadCount: 0 });
+});
+
+app.get('/api/search', (req, res) => {
+  const user = requireApiUser(req, res);
+  if (!user) return;
+  res.json(searchUni(user, {
+    q: req.query.q,
+    scope: req.query.scope,
+    limit: req.query.limit,
+    offset: req.query.offset
+  }));
+});
+
+app.get('/api/messages/:messageId/reactions', (req, res) => {
+  const user = requireApiUser(req, res);
+  if (!user) return;
+  const message = messageById(req.params.messageId);
+  if (!canUserViewMessage(user, message)) {
+    res.status(404).json({ error: '消息不存在' });
+    return;
+  }
+  res.json({ messageId: message.id, reactions: reactionSummaryForMessage(message.id, user.id) });
+});
+
+app.post('/api/messages/:messageId/reaction', (req, res) => {
+  const user = requireApiUser(req, res);
+  if (!user) return;
+  const result = toggleMessageReaction(user, req.params.messageId, req.body && req.body.reaction);
+  if (result.error) {
+    res.status(result.status || 400).json({ error: result.error });
+    return;
+  }
+  res.json(result);
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 io.on('connection', (socket) => {
@@ -2310,10 +3060,12 @@ io.on('connection', (socket) => {
     users.push(user);
     recordLogin(socket, user);
     bindUser(socket, user);
+    const apiToken = createApiToken(socket, user);
     clearAuthLimit(socket);
-    socket.emit('authSuccess', { user: publicUser(user) });
+    socket.emit('authSuccess', { user: publicUser(user), apiToken });
     emitRenameStatus(socket);
     emitBulletins(socket);
+    emitNotifications(socket);
     emitLobby(socket);
     broadcastOnlineUsers();
     broadcastAdminDashboards();
@@ -2339,10 +3091,12 @@ io.on('connection', (socket) => {
 
     recordLogin(socket, user);
     bindUser(socket, user);
+    const apiToken = createApiToken(socket, user);
     clearAuthLimit(socket);
-    socket.emit('authSuccess', { user: publicUser(user) });
+    socket.emit('authSuccess', { user: publicUser(user), apiToken });
     emitRenameStatus(socket);
     emitBulletins(socket);
+    emitNotifications(socket);
     emitLobby(socket);
     broadcastOnlineUsers();
     broadcastAdminDashboards();
@@ -2529,6 +3283,20 @@ io.on('connection', (socket) => {
       socket.emit('forum error', '评论失败，请稍后再试');
       return;
     }
+    const post = rawForumPost(postId);
+    if (post && post.user_id !== socket.user.id) {
+      createNotification({
+        userId: post.user_id,
+        actorUserId: socket.user.id,
+        type: 'forum_comment',
+        title: `${displayNameOf(socket.user)} 评论了你的帖子`,
+        body: content,
+        targetType: 'post',
+        targetId: postId,
+        metadata: { commentId: comment.commentId },
+        dedupeKey: `forum-comment:${comment.commentId}:${post.user_id}`
+      });
+    }
     io.to(forumPostChannel(postId)).emit('forum comment created', { comment: publicForumComment(comment) });
     broadcastForumPosts();
   });
@@ -2665,6 +3433,16 @@ io.on('connection', (socket) => {
     }
 
     socket.emit('profileNotice', `已为 ${displayNameOf(target)} 点亮 Star`);
+    createNotification({
+      userId: target.id,
+      actorUserId: socket.user.id,
+      type: 'star_received',
+      title: `${displayNameOf(socket.user)} 给你点亮了 Star`,
+      body: '你的主页收到了一颗新的 Star。',
+      targetType: 'user',
+      targetId: target.id,
+      dedupeKey: `star:${todayStarDate()}:${socket.user.id}:${target.id}`
+    });
     socket.emit('user profile', { profile: publicProfile(target, socket.user) });
     broadcastOnlineUsers();
     broadcastForumPosts();
@@ -2799,6 +3577,42 @@ io.on('connection', (socket) => {
     emitBulletins(socket);
   });
 
+  socket.on('get notifications', (payload = {}) => {
+    if (!requireAuth(socket, '查看通知')) return;
+    socket.emit('notifications', {
+      items: listNotificationsForUser(socket.user.id, {
+        unreadOnly: Boolean(payload && payload.unreadOnly),
+        limit: payload && payload.limit,
+        offset: payload && payload.offset
+      }),
+      unreadCount: unreadNotificationCount(socket.user.id)
+    });
+    emitUnreadUpdate(socket.user.id);
+  });
+
+  socket.on('mark notification read', (notificationId) => {
+    if (!requireAuth(socket, '标记通知')) return;
+    const notification = markNotificationRead(socket.user.id, notificationId);
+    if (notification) socket.emit('notification:read', notification);
+    emitNotifications(socket);
+  });
+
+  socket.on('mark all notifications read', () => {
+    if (!requireAuth(socket, '标记通知')) return;
+    markAllNotificationsRead(socket.user.id);
+    emitNotifications(socket);
+  });
+
+  socket.on('search', (payload = {}) => {
+    if (!requireAuth(socket, '搜索')) return;
+    socket.emit('search results', searchUni(socket.user, {
+      q: payload && payload.q,
+      scope: payload && payload.scope,
+      limit: payload && payload.limit,
+      offset: payload && payload.offset
+    }));
+  });
+
   socket.on('join room', (roomIdValue) => {
     if (!requireAuth(socket, '进入聊天组')) return;
     const roomId = cleanRoomId(roomIdValue);
@@ -2810,7 +3624,8 @@ io.on('connection', (socket) => {
 
     joinSocketRoom(socket, room.id);
     ensureRoomMember(room.id, socket.user.id);
-    socket.emit('room joined', { room: publicRoom(room), messages: messagesForRoom(room.id) });
+    markRoomRead(socket.user.id, room.id);
+    socket.emit('room joined', { room: publicRoom(room), messages: messagesForRoom(room.id, socket.user.id) });
     io.to(roomChannel(room.id)).emit('system', { type: 'join', username: displayNameOf(socket.user), roomId: room.id });
     broadcastLobby();
     broadcastAdminDashboards();
@@ -2826,6 +3641,7 @@ io.on('connection', (socket) => {
 
     const roomId = privateRoomId(socket.user.id, target.id);
     joinSocketRoom(socket, roomId);
+    markRoomRead(socket.user.id, roomId);
     socket.emit('room joined', {
       room: {
         id: roomId,
@@ -2835,7 +3651,7 @@ io.on('connection', (socket) => {
         joinedCount: 2,
         onlineCount: [socket.user.id, target.id].filter((id) => publicOnlineUsers().some((user) => user.id === id)).length
       },
-      messages: messagesForRoom(roomId)
+      messages: messagesForRoom(roomId, socket.user.id)
     });
   });
 
@@ -2866,7 +3682,8 @@ io.on('connection', (socket) => {
     ensureRoomMember(room.id, socket.user.id);
     joinSocketRoom(socket, room.id);
     socket.emit('room created', { room: publicRoom(room) });
-    socket.emit('room joined', { room: publicRoom(room), messages: messagesForRoom(room.id) });
+    markRoomRead(socket.user.id, room.id);
+    socket.emit('room joined', { room: publicRoom(room), messages: messagesForRoom(room.id, socket.user.id) });
     broadcastLobby();
     broadcastAdminDashboards();
   });
@@ -2892,6 +3709,7 @@ io.on('connection', (socket) => {
       socket.leave(roomChannel(roomId));
       io.to(roomChannel(roomId)).emit('system', { type: 'leave', username, roomId });
     }
+    clearApiToken(socket);
     socket.currentRoomId = '';
     socket.user = null;
     onlineUsers.delete(socket.id);
@@ -2922,8 +3740,10 @@ io.on('connection', (socket) => {
     };
     messages = trimHistory([...messages, data]);
     saveHistory(messages);
+    markRoomRead(socket.user.id, socket.currentRoomId);
     io.to(roomChannel(socket.currentRoomId)).emit('chat message', data);
     notifyPrivateRecipients(data);
+    notifyChatRecipients(data);
     broadcastAdminDashboards();
   });
 
@@ -2952,8 +3772,10 @@ io.on('connection', (socket) => {
     };
     messages = trimHistory([...messages, imageData]);
     saveHistory(messages);
+    markRoomRead(socket.user.id, socket.currentRoomId);
     io.to(roomChannel(socket.currentRoomId)).emit('chat message', imageData);
     notifyPrivateRecipients(imageData);
+    notifyChatRecipients(imageData);
     broadcastAdminDashboards();
   });
 
@@ -2984,8 +3806,10 @@ io.on('connection', (socket) => {
     };
     messages = trimHistory([...messages, voiceData]);
     saveHistory(messages);
+    markRoomRead(socket.user.id, socket.currentRoomId);
     io.to(roomChannel(socket.currentRoomId)).emit('chat message', voiceData);
     notifyPrivateRecipients(voiceData);
+    notifyChatRecipients(voiceData);
     broadcastAdminDashboards();
   });
 
@@ -3015,8 +3839,10 @@ io.on('connection', (socket) => {
     };
     messages = trimHistory([...messages, stickerData]);
     saveHistory(messages);
+    markRoomRead(socket.user.id, socket.currentRoomId);
     io.to(roomChannel(socket.currentRoomId)).emit('chat message', stickerData);
     notifyPrivateRecipients(stickerData);
+    notifyChatRecipients(stickerData);
     broadcastAdminDashboards();
   });
 
@@ -3037,6 +3863,24 @@ io.on('connection', (socket) => {
     saveHistory(messages);
     io.to(roomChannel(message.roomId)).emit('message recalled', publicMessage(message));
     broadcastAdminDashboards();
+  });
+
+  socket.on('message reaction', (payload = {}) => {
+    if (!requireCommunityAccess(socket, '添加 Reaction')) return;
+    const result = toggleMessageReaction(socket.user, payload && payload.messageId, payload && payload.reaction);
+    if (result.error) {
+      socket.emit('messageError', result.error);
+      return;
+    }
+    socket.emit('reaction:updated', result);
+  });
+
+  socket.on('mark room read', (roomIdValue) => {
+    if (!requireAuth(socket, '标记聊天已读')) return;
+    const roomId = cleanRoomId(roomIdValue);
+    if (!roomId || !canUserAccessRoom(socket.user, roomId)) return;
+    markRoomRead(socket.user.id, roomId);
+    emitLobby(socket);
   });
 
   socket.on('admin get dashboard', () => {
@@ -3169,6 +4013,17 @@ io.on('connection', (socket) => {
       }
 
       updateReportStatus(reportId, status, socket.user.id, note, actionTaken);
+      createNotification({
+        userId: report.reporter_user_id,
+        actorUserId: socket.user.id,
+        type: 'report_resolved',
+        title: '你的举报已处理',
+        body: `处理结果：${status === 'dismissed' ? '已忽略' : status === 'post_deleted' ? '已删除帖子' : '已封禁用户'}。${note ? `管理员备注：${note}` : ''}`,
+        targetType: 'report',
+        targetId: reportId,
+        metadata: { status, actionTaken },
+        dedupeKey: `report:${reportId}:resolved`
+      });
     } catch (error) {
       socket.emit('admin error', '处理举报失败');
       return;
@@ -3216,6 +4071,17 @@ io.on('connection', (socket) => {
       createdBy: socket.user.id,
       priority: decision === 'approved' ? 'high' : 'normal'
     });
+    createNotification({
+      userId: user.id,
+      actorUserId: socket.user.id,
+      type: 'creator_request_result',
+      title: decision === 'approved' ? '创作者申请已通过' : '创作者申请未通过',
+      body: note ? `管理员备注：${note}` : '审核结果已更新。',
+      targetType: 'sticker_creator_request',
+      targetId: requestId,
+      metadata: { status: decision },
+      dedupeKey: `creator-request:${requestId}:result`
+    });
     socketsForUser(user.id).forEach((connectedSocket) => {
       connectedSocket.user = user;
       connectedSocket.emit('profile updated', { user: publicUser(user) });
@@ -3261,6 +4127,17 @@ io.on('connection', (socket) => {
         targetUserId: owner.id,
         createdBy: socket.user.id,
         priority: status === 'approved' ? 'high' : 'normal'
+      });
+      createNotification({
+        userId: owner.id,
+        actorUserId: socket.user.id,
+        type: 'sticker_submission_result',
+        title: status === 'approved' ? '官方表情包已通过审核' : status === 'removed' ? '官方表情包已下架' : '官方表情包未通过审核',
+        body: `「${sticker.title}」审核状态已更新。${note ? `管理员备注：${note}` : ''}`,
+        targetType: 'sticker',
+        targetId: sticker.id,
+        metadata: { status },
+        dedupeKey: `sticker-submission:${sticker.id}:${status}`
       });
       socketsForUser(owner.id).forEach((connectedSocket) => {
         connectedSocket.emit('stickers', listStickersForUser(owner.id));
@@ -3399,6 +4276,7 @@ io.on('connection', (socket) => {
       const roomId = socket.currentRoomId;
       clearTyping(socket);
       if (roomId) io.to(roomChannel(roomId)).emit('system', { type: 'leave', username: displayNameOf(socket.user), roomId });
+      clearApiToken(socket);
       onlineUsers.delete(socket.id);
       broadcastOnlineUsers();
       broadcastAdminDashboards();
