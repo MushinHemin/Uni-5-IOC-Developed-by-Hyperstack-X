@@ -34,6 +34,8 @@ app.use(express.json({ limit: '1mb' }));
 const DATA_FILE = path.join(__dirname, 'chat-history.json');
 const USERS_FILE = path.join(__dirname, 'users.json');
 const DB_FILE = path.join(__dirname, 'beluga-chat.sqlite');
+const PACKAGE_VERSION = require('./package.json').version;
+const SERVER_STARTED_AT = new Date().toISOString();
 const UPLOADS_DIR = path.join(__dirname, 'uploads');
 const AVATAR_UPLOAD_DIR = path.join(UPLOADS_DIR, 'avatars');
 const BANNER_UPLOAD_DIR = path.join(UPLOADS_DIR, 'banners');
@@ -319,10 +321,11 @@ function stripHtml(value) {
 
 function isSafeLink(value) {
   if (typeof value !== 'string') return false;
-  const href = value.trim();
+  const href = value.trim().replace(/[\u0000-\u001f\u007f\s]+/g, '');
   if (!href) return false;
-  if (href.startsWith('/')) return true;
-  return /^https?:\/\//i.test(href) || /^mailto:/i.test(href);
+  if (/^(javascript|vbscript|data):/i.test(href)) return false;
+  if (href.startsWith('/')) return !href.startsWith('//') && !/^\/uploads\/(?!post-images\/)/i.test(href);
+  return /^https?:\/\//i.test(href);
 }
 
 function isSafePostImageUrl(value) {
@@ -334,7 +337,8 @@ function sanitizeRichHtml(value) {
   if (!raw.trim()) return '';
   const blocked = raw
     .replace(/<!--[\s\S]*?-->/g, '')
-    .replace(/<\/?(script|iframe|object|embed|form|input|button|textarea|select|option|video|audio|svg|math|link|meta|base)[^>]*>/gi, '');
+    .replace(/<\s*(script|style|iframe|object|embed|form|svg|math)[^>]*>[\s\S]*?<\s*\/\s*\1\s*>/gi, '')
+    .replace(/<\/?(script|style|iframe|object|embed|form|input|button|textarea|select|option|video|audio|svg|math|link|meta|base)[^>]*>/gi, '');
   const allowed = new Set(['p', 'br', 'strong', 'b', 'em', 'i', 'u', 's', 'h2', 'h3', 'ul', 'ol', 'li', 'blockquote', 'code', 'pre', 'a', 'img']);
   return blocked.replace(/<\/?([a-z0-9]+)([^>]*)>/gi, (match, tagName, attrText = '') => {
     const tag = String(tagName || '').toLowerCase();
@@ -343,7 +347,7 @@ function sanitizeRichHtml(value) {
     if (match.startsWith('</')) return `</${tag}>`;
     if (tag === 'a') {
       const hrefMatch = String(attrText).match(/\shref\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/i);
-      const href = hrefMatch ? (hrefMatch[2] || hrefMatch[3] || hrefMatch[4] || '').trim() : '';
+      const href = hrefMatch ? (hrefMatch[2] || hrefMatch[3] || hrefMatch[4] || '').trim().replace(/[\u0000-\u001f\u007f\s]+/g, '') : '';
       if (!isSafeLink(href)) return '<a>';
       return `<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">`;
     }
@@ -806,10 +810,12 @@ function initDatabase() {
       title TEXT NOT NULL,
       content TEXT NOT NULL,
       content_html TEXT NOT NULL DEFAULT '',
-      content_text TEXT NOT NULL DEFAULT '',
-      content_format TEXT NOT NULL DEFAULT 'plain',
-      created_at TEXT NOT NULL
-    );
+	      content_text TEXT NOT NULL DEFAULT '',
+	      content_format TEXT NOT NULL DEFAULT 'plain',
+	      created_at TEXT NOT NULL,
+	      updated_at TEXT NOT NULL DEFAULT '',
+	      edited_at TEXT NOT NULL DEFAULT ''
+	    );
 
     CREATE TABLE IF NOT EXISTS comments (
       id TEXT PRIMARY KEY,
@@ -830,11 +836,14 @@ function initDatabase() {
       post_id TEXT NOT NULL DEFAULT '',
       user_id TEXT NOT NULL,
       url TEXT NOT NULL,
-      filename TEXT NOT NULL,
-      mime_type TEXT NOT NULL,
-      size_bytes INTEGER NOT NULL DEFAULT 0,
-      created_at TEXT NOT NULL
-    );
+	      filename TEXT NOT NULL,
+	      mime_type TEXT NOT NULL,
+	      size_bytes INTEGER NOT NULL DEFAULT 0,
+	      draft_token TEXT NOT NULL DEFAULT '',
+	      is_bound INTEGER NOT NULL DEFAULT 0,
+	      updated_at TEXT NOT NULL DEFAULT '',
+	      created_at TEXT NOT NULL
+	    );
 
     CREATE TABLE IF NOT EXISTS post_likes (
       id TEXT PRIMARY KEY,
@@ -1039,15 +1048,25 @@ function initDatabase() {
   ensureColumn('messages', 'room_id', `TEXT NOT NULL DEFAULT '${DEFAULT_ROOM_ID}'`);
   ensureColumn('messages', 'sticker_id', "TEXT NOT NULL DEFAULT ''");
   db.exec('CREATE INDEX IF NOT EXISTS idx_messages_room_id ON messages(room_id)');
-  ensureColumn('posts', 'content_html', "TEXT NOT NULL DEFAULT ''");
-  ensureColumn('posts', 'content_text', "TEXT NOT NULL DEFAULT ''");
-  ensureColumn('posts', 'content_format', "TEXT NOT NULL DEFAULT 'plain'");
-  ensureColumn('comments', 'parent_comment_id', "TEXT NOT NULL DEFAULT ''");
+	  ensureColumn('posts', 'content_html', "TEXT NOT NULL DEFAULT ''");
+	  ensureColumn('posts', 'content_text', "TEXT NOT NULL DEFAULT ''");
+	  ensureColumn('posts', 'content_format', "TEXT NOT NULL DEFAULT 'plain'");
+	  ensureColumn('posts', 'updated_at', "TEXT NOT NULL DEFAULT ''");
+	  ensureColumn('posts', 'edited_at', "TEXT NOT NULL DEFAULT ''");
+	  db.prepare("UPDATE posts SET updated_at = created_at WHERE updated_at IS NULL OR TRIM(updated_at) = ''").run();
+	  ensureColumn('comments', 'parent_comment_id', "TEXT NOT NULL DEFAULT ''");
   ensureColumn('comments', 'floor_number', "INTEGER NOT NULL DEFAULT 0");
   ensureColumn('comments', 'reply_number', "INTEGER NOT NULL DEFAULT 0");
-  ensureColumn('comments', 'is_deleted', "INTEGER NOT NULL DEFAULT 0");
-  ensureColumn('notifications', 'dedupe_key', "TEXT NOT NULL DEFAULT ''");
-  db.exec('CREATE INDEX IF NOT EXISTS idx_comments_parent ON comments(parent_comment_id)');
+	  ensureColumn('comments', 'is_deleted', "INTEGER NOT NULL DEFAULT 0");
+	  ensureColumn('post_images', 'draft_token', "TEXT NOT NULL DEFAULT ''");
+	  ensureColumn('post_images', 'is_bound', "INTEGER NOT NULL DEFAULT 0");
+	  ensureColumn('post_images', 'updated_at', "TEXT NOT NULL DEFAULT ''");
+	  db.prepare("UPDATE post_images SET is_bound = CASE WHEN TRIM(post_id) != '' THEN 1 ELSE 0 END WHERE is_bound IS NULL OR is_bound = 0").run();
+	  db.prepare("UPDATE post_images SET updated_at = created_at WHERE updated_at IS NULL OR TRIM(updated_at) = ''").run();
+	  ensureColumn('notifications', 'dedupe_key', "TEXT NOT NULL DEFAULT ''");
+	  db.exec('CREATE INDEX IF NOT EXISTS idx_comments_parent ON comments(parent_comment_id)');
+	  db.exec('CREATE INDEX IF NOT EXISTS idx_post_images_bound_created ON post_images(is_bound, created_at)');
+	  db.exec('CREATE INDEX IF NOT EXISTS idx_post_images_draft_token ON post_images(draft_token)');
   backfillForumContentFields();
   backfillCommentFloors();
   ensureOfficialStickers();
@@ -1248,13 +1267,15 @@ function rowToPost(row) {
     avatar: cleanAvatar(row.avatar, row.username),
     title,
     content,
-    contentHtml,
-    contentText,
-    contentFormat: row.content_format === 'html' ? 'html' : 'plain',
-    createdAt: Number.isNaN(Date.parse(row.created_at)) ? new Date().toISOString() : row.created_at,
-    commentCount: Number(row.comment_count || 0)
-  };
-}
+	    contentHtml,
+	    contentText,
+	    contentFormat: row.content_format === 'html' ? 'html' : 'plain',
+	    createdAt: Number.isNaN(Date.parse(row.created_at)) ? new Date().toISOString() : row.created_at,
+	    updatedAt: Number.isNaN(Date.parse(row.updated_at)) ? (row.created_at || new Date().toISOString()) : row.updated_at,
+	    editedAt: Number.isNaN(Date.parse(row.edited_at)) ? '' : row.edited_at,
+	    commentCount: Number(row.comment_count || 0)
+	  };
+	}
 
 function rowToComment(row) {
   if (!row) return null;
@@ -1489,10 +1510,13 @@ function publicForumPost(post, viewerUserId = '') {
     title: post.title,
     content: post.content,
     contentHtml: post.contentHtml || '',
-    contentText: post.contentText || post.content,
-    contentFormat: post.contentFormat || 'plain',
-    createdAt: post.createdAt,
-    commentCount: Number(post.commentCount || 0),
+	    contentText: post.contentText || post.content,
+	    contentFormat: post.contentFormat || 'plain',
+	    createdAt: post.createdAt,
+	    updatedAt: post.updatedAt || post.createdAt,
+	    editedAt: post.editedAt || '',
+	    isEdited: Boolean(post.editedAt),
+	    commentCount: Number(post.commentCount || 0),
     likeCount: postLikeCount(post.postId),
     favoriteCount: postFavoriteCount(post.postId),
     likedByMe: userLikedPost(viewerUserId, post.postId),
@@ -1561,8 +1585,22 @@ function listForumComments(postIdValue, viewerUserId = '') {
 
 function insertForumPost(post) {
   db.prepare(`
-    INSERT INTO posts (id, user_id, username, avatar, title, content, content_html, content_text, content_format, created_at)
-    VALUES (@postId, @userId, @username, @avatar, @title, @content, @contentHtml, @contentText, @contentFormat, @createdAt)
+    INSERT INTO posts (id, user_id, username, avatar, title, content, content_html, content_text, content_format, created_at, updated_at, edited_at)
+    VALUES (@postId, @userId, @username, @avatar, @title, @content, @contentHtml, @contentText, @contentFormat, @createdAt, @updatedAt, '')
+  `).run(post);
+}
+
+function updateForumPost(post) {
+  db.prepare(`
+    UPDATE posts
+    SET title = @title,
+        content = @content,
+        content_html = @contentHtml,
+        content_text = @contentText,
+        content_format = @contentFormat,
+        updated_at = @updatedAt,
+        edited_at = @editedAt
+    WHERE id = @postId
   `).run(post);
 }
 
@@ -1606,12 +1644,19 @@ function updatePostImagesForPost(userId, postId, contentHtml) {
   const urls = Array.from(new Set(String(contentHtml || '').match(/\/uploads\/post-images\/[a-zA-Z0-9_.-]+\.(?:jpg|jpeg|png|webp|gif)/g) || []))
     .filter(isSafePostImageUrl)
     .slice(0, MAX_POST_IMAGES);
-  if (urls.length === 0) return;
+  const now = new Date().toISOString();
+  db.prepare(`
+    UPDATE post_images
+    SET post_id = '', is_bound = 0, updated_at = ?
+    WHERE post_id = ? AND url NOT IN (${urls.length ? urls.map(() => '?').join(',') : "''"})
+  `).run(now, postId, ...urls);
+  if (urls.length === 0) return [];
   const placeholders = urls.map(() => '?').join(',');
   db.prepare(`
-    UPDATE post_images SET post_id = ?
+    UPDATE post_images SET post_id = ?, is_bound = 1, updated_at = ?
     WHERE user_id = ? AND url IN (${placeholders})
-  `).run(postId, userId, ...urls);
+  `).run(postId, now, userId, ...urls);
+  return urls;
 }
 
 function togglePostLike(user, postIdValue) {
@@ -1687,6 +1732,85 @@ function toggleCommentLike(user, commentIdValue) {
     }
   }
   return { comment: publicForumComment(rowToComment(rawForumComment(commentId)), user.id), liked, likeCount: commentLikeCount(commentId) };
+}
+
+function canEditForumPost(user, postRow) {
+  if (!user || !postRow) return false;
+  if (user.isBanned) return false;
+  return postRow.user_id === user.id || isAdminUser(user);
+}
+
+function postImageStorageSummary() {
+  fs.mkdirSync(POST_IMAGE_UPLOAD_DIR, { recursive: true });
+  const files = fs.readdirSync(POST_IMAGE_UPLOAD_DIR).filter((file) => /^[a-zA-Z0-9_.-]+\.(jpg|jpeg|png|webp|gif)$/i.test(file));
+  const totalBytes = files.reduce((sum, file) => {
+    try {
+      return sum + fs.statSync(path.join(POST_IMAGE_UPLOAD_DIR, file)).size;
+    } catch (error) {
+      return sum;
+    }
+  }, 0);
+  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const orphanRows = db.prepare(`
+    SELECT * FROM post_images
+    WHERE (post_id IS NULL OR TRIM(post_id) = '' OR is_bound = 0)
+      AND created_at < ?
+  `).all(cutoff);
+  return {
+    fileCount: files.length,
+    totalBytes,
+    orphanCount: orphanRows.length,
+    orphanBytes: orphanRows.reduce((sum, row) => sum + Number(row.size_bytes || 0), 0)
+  };
+}
+
+function tableExists(tableName) {
+  return Boolean(db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(tableName));
+}
+
+function buildMaintenanceStatus() {
+  const keyTables = ['notifications', 'chat_read_states', 'message_reactions', 'post_images', 'post_likes', 'post_favorites', 'comment_likes'];
+  const configuredPassword = cleanEnv(process.env.ADMIN_PASSWORD);
+  return {
+    version: PACKAGE_VERSION,
+    node: process.version,
+    environment: process.env.NODE_ENV || 'development',
+    sqlite: 'connected',
+    adminPasswordWeak: !configuredPassword || configuredPassword === 'change-me-admin-password' || configuredPassword === 'mushin',
+    tables: keyTables.map((name) => ({ name, exists: tableExists(name) })),
+    postImages: postImageStorageSummary(),
+    startedAt: SERVER_STARTED_AT
+  };
+}
+
+function cleanupOrphanPostImages() {
+  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const rows = db.prepare(`
+    SELECT * FROM post_images
+    WHERE (post_id IS NULL OR TRIM(post_id) = '' OR is_bound = 0)
+      AND created_at < ?
+  `).all(cutoff);
+  let deleted = 0;
+  let bytes = 0;
+  const removeRecord = db.prepare('DELETE FROM post_images WHERE id = ?');
+  rows.forEach((row) => {
+    if (!isSafePostImageUrl(row.url)) return;
+    const filePath = postImageFilePath(row.url);
+    if (!filePath || !filePath.startsWith(POST_IMAGE_UPLOAD_DIR)) return;
+    try {
+      if (fs.existsSync(filePath)) {
+        bytes += fs.statSync(filePath).size;
+        fs.unlinkSync(filePath);
+      } else {
+        bytes += Number(row.size_bytes || 0);
+      }
+      removeRecord.run(row.id);
+      deleted += 1;
+    } catch (error) {
+      // Skip files that cannot be safely removed; the next maintenance pass can try again.
+    }
+  });
+  return { deleted, bytes };
 }
 
 function reportReasonLabel(reason) {
@@ -2701,6 +2825,13 @@ function searchUni(user, { q, scope = 'all', limit = 30, offset = 0 } = {}) {
 
 function ensureSystemAnnouncements() {
   createAnnouncement({
+    id: 'update:5.5.7',
+    type: 'update',
+    title: 'Sonoma 5.5.7 已上线',
+    content: '新增论坛草稿自动保存与恢复、帖子编辑、富文本安全加固、图片维护状态和互动防连点，让 5.5.6 的论坛升级更稳定。',
+    priority: 'high'
+  });
+  createAnnouncement({
     id: 'update:5.5.6',
     type: 'update',
     title: 'Sonoma 5.5.6 已上线',
@@ -2884,7 +3015,7 @@ function saveProfileBannerUpload(user, dataUrl) {
   return { profileBanner: `/uploads/banners/${fileName}` };
 }
 
-function savePostImageUpload(user, dataUrl) {
+function savePostImageUpload(user, dataUrl, draftToken = '') {
   if (!user) return { error: '请先登录' };
   if (user.isBanned) return { error: '你的账号已被限制使用社区功能' };
   const parsed = parseDataUrl(dataUrl, ALLOWED_IMAGE_TYPES, MAX_IMAGE_BYTES);
@@ -2895,6 +3026,7 @@ function savePostImageUpload(user, dataUrl) {
   const fileName = `post_${user.id}_${Date.now()}_${crypto.randomBytes(5).toString('hex')}.${ext}`;
   const filePath = path.join(POST_IMAGE_UPLOAD_DIR, fileName);
   fs.writeFileSync(filePath, parsed.buffer, { mode: 0o600 });
+  const now = new Date().toISOString();
   const image = {
     id: `post-image:${crypto.randomUUID()}`,
     postId: '',
@@ -2903,11 +3035,14 @@ function savePostImageUpload(user, dataUrl) {
     filename: fileName,
     mimeType: parsed.mime,
     sizeBytes: parsed.buffer.length,
-    createdAt: new Date().toISOString()
+    draftToken: cleanTargetType(draftToken).slice(0, 80),
+    isBound: 0,
+    createdAt: now,
+    updatedAt: now
   };
   db.prepare(`
-    INSERT INTO post_images (id, post_id, user_id, url, filename, mime_type, size_bytes, created_at)
-    VALUES (@id, @postId, @userId, @url, @filename, @mimeType, @sizeBytes, @createdAt)
+    INSERT INTO post_images (id, post_id, user_id, url, filename, mime_type, size_bytes, draft_token, is_bound, created_at, updated_at)
+    VALUES (@id, @postId, @userId, @url, @filename, @mimeType, @sizeBytes, @draftToken, @isBound, @createdAt, @updatedAt)
   `).run(image);
   return { image };
 }
@@ -3232,11 +3367,12 @@ function buildAdminDashboard() {
     messageCount: messages.length,
     onlineCount: onlineUsers.size,
     renameRequests: listPendingRenameRequests(),
-    postReports: listPostReports(),
-    stickerCreatorRequests: listCreatorRequests(),
-    stickerSubmissions: listStickerSubmissions()
-  };
-}
+	    postReports: listPostReports(),
+	    stickerCreatorRequests: listCreatorRequests(),
+	    stickerSubmissions: listStickerSubmissions(),
+	    maintenance: buildMaintenanceStatus()
+	  };
+	}
 
 function emitAdminDashboard(socket) {
   socket.emit('admin dashboard', buildAdminDashboard());
@@ -3585,14 +3721,14 @@ io.on('connection', (socket) => {
     emitForumPosts(socket);
   });
 
-  socket.on('upload post image', (payload = {}) => {
-    if (!requireCommunityAccess(socket, '上传帖子图片')) return;
-    const result = savePostImageUpload(socket.user, payload && payload.base64);
-    if (result.error) {
-      socket.emit('forum error', result.error);
-      return;
-    }
-    socket.emit('post image uploaded', { image: result.image });
+	  socket.on('upload post image', (payload = {}) => {
+	    if (!requireCommunityAccess(socket, '上传帖子图片')) return;
+	    const result = savePostImageUpload(socket.user, payload && payload.base64, payload && payload.draftToken);
+	    if (result.error) {
+	      socket.emit('forum error', result.error);
+	      return;
+	    }
+	    socket.emit('post image uploaded', { image: result.image });
   });
 
   socket.on('create forum post', (payload) => {
@@ -3622,11 +3758,12 @@ io.on('connection', (socket) => {
       avatar: socket.user.avatar || makeAvatar(displayNameOf(socket.user)),
       title,
       content: contentText || content,
-      contentHtml: incomingHtml,
-      contentText: contentText || content,
-      contentFormat: incomingHtml ? 'html' : 'plain',
-      createdAt: new Date().toISOString()
-    };
+	      contentHtml: incomingHtml,
+	      contentText: contentText || content,
+	      contentFormat: incomingHtml ? 'html' : 'plain',
+	      createdAt: new Date().toISOString(),
+	      updatedAt: new Date().toISOString()
+	    };
     try {
       insertForumPost(post);
       updatePostImagesForPost(socket.user.id, post.postId, incomingHtml);
@@ -3636,8 +3773,61 @@ io.on('connection', (socket) => {
     }
     const publicPost = publicForumPost({ ...post, commentCount: 0 }, socket.user.id);
     socket.emit('forum post created', { post: publicPost, comments: [] });
-    broadcastForumPosts();
-  });
+	    broadcastForumPosts();
+	  });
+
+	  socket.on('update forum post', (payload) => {
+	    if (!requireCommunityAccess(socket, '编辑帖子')) return;
+	    const postId = cleanForumId(payload && payload.postId);
+	    const existing = rawForumPost(postId);
+	    if (!existing) {
+	      socket.emit('forum error', '帖子不存在');
+	      return;
+	    }
+	    if (!canEditForumPost(socket.user, existing)) {
+	      socket.emit('forum error', socket.user.isBanned ? '你的账号已被限制使用社区功能' : '没有权限编辑这个帖子');
+	      return;
+	    }
+	    const title = cleanPostTitle(payload && payload.title);
+	    const incomingHtml = sanitizeRichHtml(payload && payload.contentHtml);
+	    const contentText = richHtmlToText(incomingHtml, payload && payload.content);
+	    const content = cleanPostContent(payload && payload.content) || contentText;
+	    if (!title) {
+	      socket.emit('forum error', '请输入帖子标题');
+	      return;
+	    }
+	    if (!contentText && !content) {
+	      socket.emit('forum error', '请输入帖子正文');
+	      return;
+	    }
+	    const imageCount = (incomingHtml.match(/<img\b/gi) || []).length;
+	    if (imageCount > MAX_POST_IMAGES) {
+	      socket.emit('forum error', `每个帖子最多插入 ${MAX_POST_IMAGES} 张图片`);
+	      return;
+	    }
+	    const now = new Date().toISOString();
+	    try {
+	      updateForumPost({
+	        postId,
+	        title,
+	        content: contentText || content,
+	        contentHtml: incomingHtml,
+	        contentText: contentText || content,
+	        contentFormat: incomingHtml ? 'html' : 'plain',
+	        updatedAt: now,
+	        editedAt: now
+	      });
+	      updatePostImagesForPost(socket.user.id, postId, incomingHtml);
+	    } catch (error) {
+	      socket.emit('forum error', '保存帖子失败，请稍后再试');
+	      return;
+	    }
+	    const post = getForumPost(postId, socket.user.id);
+	    socket.emit('forum post updated', { post, comments: listForumComments(postId, socket.user.id) });
+	    broadcastForumPostDetail(postId);
+	    broadcastForumPosts();
+	    broadcastAdminDashboards();
+	  });
 
   socket.on('get forum post', (postIdValue) => {
     if (!requireAuth(socket, '查看帖子')) return;
@@ -4598,20 +4788,27 @@ io.on('connection', (socket) => {
     broadcastAdminDashboards();
   });
 
-  socket.on('admin clear history', () => {
-    if (!requireAdmin(socket)) return;
-    messages = [];
+	  socket.on('admin clear history', () => {
+	    if (!requireAdmin(socket)) return;
+	    messages = [];
     try {
       db.exec('DELETE FROM messages');
     } catch (error) {
       socket.emit('admin error', '清空聊天记录失败');
       return;
     }
-    refreshOpenRooms();
-    broadcastAdminDashboards();
-  });
+	    refreshOpenRooms();
+	    broadcastAdminDashboards();
+	  });
 
-  socket.on('admin update username', (payload) => {
+	  socket.on('admin cleanup post images', () => {
+	    if (!requireAdmin(socket)) return;
+	    const result = cleanupOrphanPostImages();
+	    socket.emit('admin notice', `已清理 ${result.deleted} 张未绑定帖子图片，释放 ${Math.round(result.bytes / 1024)} KB`);
+	    broadcastAdminDashboards();
+	  });
+
+	  socket.on('admin update username', (payload) => {
     if (!requireAdmin(socket)) return;
     const userId = payload && typeof payload.userId === 'string' ? payload.userId : '';
     const displayName = cleanDisplayName(payload && payload.username);

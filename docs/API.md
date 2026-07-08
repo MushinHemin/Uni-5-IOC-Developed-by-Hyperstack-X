@@ -58,6 +58,7 @@ These notes document the current Web implementation for future Uni 6 Nordkapp na
 - `get forum post`: retrieves a post detail and comments.
 - `upload post image`: uploads a post-editor image from a data URL. Server validates image type and max size, stores it under `/uploads/post-images/`, and returns `post image uploaded`.
 - `create forum post`: creates a post with title, plain-text content, and optional sanitized `contentHtml`.
+- `update forum post`: edits a post when the current user is the author or an admin. Banned users are rejected server-side. The server re-sanitizes `contentHtml`, updates `content_text`, `content_format`, `updated_at`, and `edited_at`.
 - `create forum comment`: creates a root comment or a one-level reply when `parentCommentId` is provided.
 - `toggle post like`: toggles the current user's like for one post.
 - `toggle post favorite`: toggles the current user's favorite state for one post.
@@ -67,8 +68,12 @@ These notes document the current Web implementation for future Uni 6 Nordkapp na
 - `delete forum post` / `delete forum comment`: existing moderation/owner flows.
 - `report forum post`: creates a report for admin review.
 - Forum post payloads include `content`, `contentHtml`, `contentText`, `contentFormat`, `likeCount`, `favoriteCount`, `likedByMe`, and `favoritedByMe`.
+- Edited forum post payloads include `updatedAt`, `editedAt`, and `isEdited`.
 - Forum comment payloads include `parentCommentId`, `floorNumber`, `replyNumber`, `floorLabel`, `likeCount`, and `likedByMe`.
-- Rich text is sanitized server-side with an allowlist for text formatting, links, lists, quotes, code, and uploaded post images. Dangerous tags, event attributes, unsafe protocols, and arbitrary style injection are stripped.
+- Rich text is sanitized server-side with an allowlist for text formatting, links, lists, quotes, code, and uploaded post images. Dangerous tags, event attributes, unsafe protocols, control-character protocol tricks, SVG/math/script/style content, and arbitrary style injection are stripped.
+- Post image uploads may include a front-end `draftToken`; published or edited posts bind only referenced image URLs to the post. Removed images are unbound rather than immediately deleted.
+- Forum drafts are a front-end `localStorage` behavior, not a server API. Draft keys include Uni, mode, post id when editing, and current user identity to avoid cross-user draft reuse.
+- Like/favorite/comment-like/reply actions are guarded in the client with pending states and remain validated server-side for login and banned-user restrictions.
 - Global search uses safe plain-text post content (`content_text`) and comment text rather than raw rich HTML.
 - Replies and selected forum engagement events feed the notification center without notifying the actor about their own action.
 
@@ -95,6 +100,8 @@ These notes document the current Web implementation for future Uni 6 Nordkapp na
 - `admin review report`: dismiss, delete, ban, or combined forum report actions.
 - `admin review sticker creator`: approve or reject creator applications.
 - `admin review sticker submission`: approve, reject, or remove official sticker submissions.
+- `admin get data`: includes a maintenance section with current version, Node environment, SQLite/table status, weak-admin-password risk state, and post-image storage/orphan statistics.
+- `admin cleanup post images`: admin-only cleanup for unbound `/uploads/post-images/` records older than 24 hours. It validates the upload path before deleting files and never exposes administrator secrets.
 - Admin permission is enforced server-side; native clients should never rely on UI hiding alone.
 
 ## App Safety Notes

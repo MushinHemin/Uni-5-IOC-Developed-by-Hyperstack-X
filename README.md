@@ -2,7 +2,7 @@
 
 Uni 5 Sonoma is a lightweight realtime chat and community app with account login, group chat, private chat, forum posts, admin tools, message recall, image paste/upload, voice messages, and a glass-style responsive web UI.
 
-Current release: **Sonoma 5.5.6 Forum Editor & Performance Overhaul Update**
+Current release: **Sonoma 5.5.7 Forum Stability & Draft Recovery Update**
 
 ## Features
 
@@ -42,6 +42,7 @@ Current release: **Sonoma 5.5.6 Forum Editor & Performance Overhaul Update**
 - Sonoma 5.5.3: PWA foundation, mobile app-style layout, bottom navigation, and API / Socket documentation for Uni 6 planning
 - Sonoma 5.5.5: notification center, chat unread state, global discovery search, and message Reactions
 - Sonoma 5.5.6: forum rich editor, post images, forum likes/favorites, comment replies/floors, and GPU/mobile performance polish
+- Sonoma 5.5.7: forum draft recovery, post editing, rich-text hardening, image lifecycle maintenance, and interaction reliability polish
 - Uni 5.4.1: personalization controls, compact presence status, latency monitoring, forum persistence hardening, CORS configuration, and stability cleanup
 
 ## PWA and Native App Preparation
@@ -53,6 +54,23 @@ Current release: **Sonoma 5.5.6 Forum Editor & Performance Overhaul Update**
 - Authentication is still based on the current web Socket.IO/session flow; a dedicated token flow should be evaluated before a native production app.
 
 ## Release Notes
+
+### Sonoma 5.5.7 Forum Stability & Draft Recovery Update
+
+Added:
+
+- Added local forum draft autosave and recovery for new posts and post edits
+- Added author/admin post editing with sanitized rich-text saving and edited timestamps
+- Added admin maintenance status for version, Node runtime, SQLite/table checks, post-image storage, orphan image counts, and weak admin password risk
+- Added admin cleanup for 24-hour-old unbound post images
+
+Improved:
+
+- Hardened rich-text sanitization and preview safety against dangerous tags, event attributes, control-character protocol tricks, and unsafe links
+- Improved post image binding so removed images are unbound while still referenced images remain safe
+- Added pending-state guards for post likes, favorites, comment likes, and comment/reply submission
+- Improved forum editor mobile behavior, draft prompts, and non-native confirmation flows
+- Continued protecting notification, unread, search, Reaction, sticker, report, Star, and Sonoma glass UI systems
 
 ### Sonoma 5.5.6 Forum Editor & Performance Overhaul Update
 

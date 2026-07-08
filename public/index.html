@@ -2995,6 +2995,28 @@
 	      box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.1);
 	    }
 
+	    .forum-draft-banner {
+	      display: flex;
+	      align-items: center;
+	      justify-content: space-between;
+	      gap: 12px;
+	      padding: 12px;
+	      border: 1px solid var(--line);
+	      border-radius: var(--radius-lg);
+	      background: var(--glass-bg-soft);
+	      box-shadow: inset 0 1px 0 var(--glass-highlight);
+	    }
+
+	    .forum-draft-banner[hidden] {
+	      display: none;
+	    }
+
+	    .forum-draft-actions {
+	      display: flex;
+	      flex-wrap: wrap;
+	      gap: 8px;
+	    }
+
     .forum-editor,
     .forum-editor-preview {
       min-height: 360px;
@@ -4883,7 +4905,7 @@
       <div class="forum-body">
         <aside class="forum-sidebar">
           <section class="forum-compose">
-            <h3>发布帖子</h3>
+	              <h3 id="forumComposerTitle">发布帖子</h3>
             <p class="forum-compose-copy">打开独立编辑器，写一篇带图片、链接和排版的帖子。</p>
             <button id="forumComposeOpen" class="admin-btn primary forum-compose-open" type="button">发布帖子</button>
             <div id="forumError" class="forum-error" role="alert"></div>
@@ -4912,10 +4934,18 @@
               <p class="eyebrow">Forum Editor</p>
               <h3>发布帖子</h3>
               <p>支持富文本、图片、链接和预览。</p>
-            </div>
-            <button id="forumComposerClose" class="admin-btn" type="button">返回论坛</button>
-          </header>
-          <input id="forumPostTitle" class="forum-title-input" maxlength="80" placeholder="帖子标题" autocomplete="off">
+	            </div>
+	            <button id="forumComposerClose" class="admin-btn" type="button">返回论坛</button>
+	          </header>
+	          <div id="forumDraftBanner" class="forum-draft-banner" hidden>
+	            <span id="forumDraftText">发现未发布草稿。</span>
+	            <div class="forum-draft-actions">
+	              <button id="forumDraftRestore" class="admin-btn primary" type="button">恢复草稿</button>
+	              <button id="forumDraftDiscard" class="admin-btn danger" type="button">丢弃草稿</button>
+	              <button id="forumDraftLater" class="admin-btn" type="button">稍后再说</button>
+	            </div>
+	          </div>
+	          <input id="forumPostTitle" class="forum-title-input" maxlength="80" placeholder="帖子标题" autocomplete="off">
           <div class="editor-toolbar" aria-label="富文本工具栏">
             <button type="button" data-editor-command="bold"><strong>B</strong></button>
             <button type="button" data-editor-command="italic"><em>I</em></button>
@@ -5017,8 +5047,12 @@
             <h3>官方表情包审核</h3>
             <div id="adminStickerSubmissions" class="rename-request-list"></div>
           </div>
-          <div class="admin-card">
-            <h3>发布公告</h3>
+	          <div class="admin-card">
+	            <h3>维护状态</h3>
+	            <div id="adminMaintenance" class="rename-request-list"></div>
+	          </div>
+	          <div class="admin-card">
+	            <h3>发布公告</h3>
             <form id="adminBulletinForm" class="admin-form">
               <input id="adminBulletinTitle" maxlength="90" placeholder="公告标题">
               <select id="adminBulletinType" aria-label="公告类型">
@@ -5399,10 +5433,14 @@
       forumPosts: [],
       selectedForumPost: null,
       forumComments: [],
-      forumReplyParentId: '',
-      forumPreviewMode: false,
-      forumEditorBusy: false,
-      renameStatus: null,
+	      forumReplyParentId: '',
+	      forumPreviewMode: false,
+	      forumEditorBusy: false,
+	      forumEditPostId: '',
+	      forumDraftTimer: null,
+	      forumDraftPrompted: new Set(),
+	      forumPendingActions: new Set(),
+	      renameStatus: null,
       bulletins: [],
       bulletinUnread: 0,
       notifications: [],
@@ -5537,8 +5575,14 @@
     const forumComposerPage = document.getElementById('forumComposerPage');
     const forumComposerClose = document.getElementById('forumComposerClose');
     const forumComposerCancel = document.getElementById('forumComposerCancel');
-    const forumPostForm = document.getElementById('forumPostForm');
-    const forumPostTitle = document.getElementById('forumPostTitle');
+	    const forumPostForm = document.getElementById('forumPostForm');
+	    const forumComposerTitle = document.getElementById('forumComposerTitle');
+	    const forumDraftBanner = document.getElementById('forumDraftBanner');
+	    const forumDraftText = document.getElementById('forumDraftText');
+	    const forumDraftRestore = document.getElementById('forumDraftRestore');
+	    const forumDraftDiscard = document.getElementById('forumDraftDiscard');
+	    const forumDraftLater = document.getElementById('forumDraftLater');
+	    const forumPostTitle = document.getElementById('forumPostTitle');
     const forumPostContent = document.getElementById('forumPostContent');
     const forumPostSubmit = document.getElementById('forumPostSubmit');
     const forumEditor = document.getElementById('forumEditor');
@@ -5577,9 +5621,10 @@
     const adminGroupCode = document.getElementById('adminGroupCode');
     const adminRooms = document.getElementById('adminRooms');
     const adminRenameRequests = document.getElementById('adminRenameRequests');
-    const adminReports = document.getElementById('adminReports');
-    const adminStickerCreators = document.getElementById('adminStickerCreators');
-    const adminStickerSubmissions = document.getElementById('adminStickerSubmissions');
+	    const adminReports = document.getElementById('adminReports');
+	    const adminStickerCreators = document.getElementById('adminStickerCreators');
+	    const adminStickerSubmissions = document.getElementById('adminStickerSubmissions');
+	    const adminMaintenance = document.getElementById('adminMaintenance');
     const adminBulletinForm = document.getElementById('adminBulletinForm');
     const adminBulletinTitle = document.getElementById('adminBulletinTitle');
     const adminBulletinType = document.getElementById('adminBulletinType');
@@ -6552,9 +6597,13 @@
       state.forumPosts = [];
       state.selectedForumPost = null;
       state.forumComments = [];
-      state.forumReplyParentId = '';
-      state.forumPreviewMode = false;
-      state.forumEditorBusy = false;
+	      state.forumReplyParentId = '';
+	      state.forumPreviewMode = false;
+	      state.forumEditorBusy = false;
+	      state.forumEditPostId = '';
+	      state.forumPendingActions.clear();
+	      window.clearTimeout(state.forumDraftTimer);
+	      state.forumDraftTimer = null;
       state.renameStatus = null;
       state.bulletins = [];
       state.bulletinUnread = 0;
@@ -6862,19 +6911,36 @@
       renderForumDetail();
     });
 
-    socket.on('forum post created', (payload) => {
-      const post = payload && payload.post ? payload.post : null;
-      if (!post) return;
-      clearForumComposer();
-      closeForumComposer();
+	    socket.on('forum post created', (payload) => {
+	      const post = payload && payload.post ? payload.post : null;
+	      if (!post) return;
+	      clearForumDraft();
+	      state.forumEditorBusy = false;
+	      clearForumComposer();
+	      closeForumComposer();
       state.selectedForumPost = post;
       state.forumComments = [];
       forumError.textContent = '';
       renderForumPosts();
       renderForumDetail();
       socket.emit('get forum post', post.postId);
-      showToast('帖子已发布');
-    });
+	      showToast('帖子已发布');
+	    });
+
+	    socket.on('forum post updated', (payload) => {
+	      const post = payload && payload.post ? payload.post : null;
+	      if (!post) return;
+	      clearForumDraft();
+	      state.forumEditorBusy = false;
+	      clearForumComposer();
+	      closeForumComposer();
+	      state.selectedForumPost = post;
+	      state.forumComments = payload && Array.isArray(payload.comments) ? payload.comments : state.forumComments;
+	      forumError.textContent = '';
+	      renderForumPosts();
+	      renderForumDetail();
+	      showToast('帖子已保存');
+	    });
 
     socket.on('forum post detail', (payload) => {
       state.selectedForumPost = payload && payload.post ? payload.post : null;
@@ -6884,8 +6950,9 @@
       renderForumDetail();
     });
 
-    socket.on('forum comment created', (payload) => {
-      const comment = payload && payload.comment ? payload.comment : null;
+	    socket.on('forum comment created', (payload) => {
+	      state.forumPendingActions.delete('comment-submit');
+	      const comment = payload && payload.comment ? payload.comment : null;
       if (!comment || !state.selectedForumPost || comment.postId !== state.selectedForumPost.postId) return;
       if (!state.forumComments.some((item) => item.commentId === comment.commentId)) {
         state.forumComments = [...state.forumComments, comment];
@@ -6899,18 +6966,22 @@
       updateForumCommentButton();
     });
 
-    socket.on('post image uploaded', (payload) => {
+	    socket.on('post image uploaded', (payload) => {
       const image = payload && payload.image ? payload.image : null;
       if (!image || !image.url) return;
       forumEditor.focus();
       document.execCommand('insertHTML', false, `<img src="${image.url}" alt="帖子图片" loading="lazy" decoding="async">`);
-      forumEditorStatus.textContent = '图片已插入正文。';
-      forumImageInput.value = '';
-      syncForumEditorState();
-    });
+	      forumEditorStatus.textContent = '图片已插入正文。';
+	      forumImageInput.value = '';
+	      syncForumEditorState();
+	    });
 
-    socket.on('forum post interaction', (payload) => {
-      const post = payload && payload.post ? payload.post : null;
+	    socket.on('forum post interaction', (payload) => {
+	      if (payload && payload.post) {
+	        state.forumPendingActions.delete(`post-like:${payload.post.postId}`);
+	        state.forumPendingActions.delete(`post-favorite:${payload.post.postId}`);
+	      }
+	      const post = payload && payload.post ? payload.post : null;
       if (post) {
         state.forumPosts = state.forumPosts.map((item) => item.postId === post.postId ? { ...item, ...post } : item);
         if (state.selectedForumPost && state.selectedForumPost.postId === post.postId) {
@@ -6921,10 +6992,11 @@
       renderForumDetail();
     });
 
-    socket.on('forum comment interaction', (payload) => {
-      const comment = payload && payload.comment ? payload.comment : null;
-      if (!comment) return;
-      state.forumComments = state.forumComments.map((item) => item.commentId === comment.commentId ? { ...item, ...comment } : item);
+	    socket.on('forum comment interaction', (payload) => {
+	      const comment = payload && payload.comment ? payload.comment : null;
+	      if (!comment) return;
+	      state.forumPendingActions.delete(`comment-like:${comment.commentId}`);
+	      state.forumComments = state.forumComments.map((item) => item.commentId === comment.commentId ? { ...item, ...comment } : item);
       renderForumComments();
     });
 
@@ -6951,16 +7023,19 @@
       showToast('评论已删除');
     });
 
-    socket.on('forum error', (msg) => {
-      forumError.textContent = msg || '论坛操作失败';
+	    socket.on('forum error', (msg) => {
+	      state.forumEditorBusy = false;
+	      state.forumPendingActions.clear();
+	      forumError.textContent = msg || '论坛操作失败';
       if (!reportModal.hidden) {
         reportStatus.textContent = msg || '举报提交失败';
         reportSubmit.disabled = false;
       }
-      updateForumPostButton();
-      updateForumCommentButton();
-      showToast(msg || '论坛操作失败');
-    });
+	      updateForumPostButton();
+	      updateForumCommentButton();
+	      forumPostSubmit.textContent = state.forumEditPostId ? '保存' : '发布';
+	      showToast(msg || '论坛操作失败');
+	    });
 
     socket.on('forum notice', (msg) => {
       const message = msg || '操作完成';
@@ -7183,12 +7258,26 @@
     });
 
     // Forum controls
-    forumComposeOpen.addEventListener('click', openForumComposer);
-    forumComposerClose.addEventListener('click', closeForumComposer);
-    forumComposerCancel.addEventListener('click', () => {
-      clearForumComposer();
-      closeForumComposer();
-    });
+	    forumComposeOpen.addEventListener('click', openForumComposer);
+	    forumComposerClose.addEventListener('click', closeForumComposer);
+	    forumComposerCancel.addEventListener('click', () => {
+	      saveForumDraftNow();
+	      const draft = loadForumDraft();
+	      if (draft) {
+	        forumDraftText.textContent = '当前内容已保存为草稿。要丢弃并离开吗？';
+	        forumDraftBanner.hidden = false;
+	        forumDraftRestore.onclick = () => forumDraftBanner.hidden = true;
+	        forumDraftDiscard.onclick = () => {
+	          clearForumDraft();
+	          clearForumComposer();
+	          closeForumComposer();
+	        };
+	        forumDraftLater.onclick = () => forumDraftBanner.hidden = true;
+	        return;
+	      }
+	      clearForumComposer();
+	      closeForumComposer();
+	    });
     forumRefresh.addEventListener('click', () => {
       if (state.username) socket.emit('get forum posts');
     });
@@ -7203,7 +7292,10 @@
       createForumComment();
     });
 
-	    forumPostTitle.addEventListener('input', updateForumPostButton);
+	    forumPostTitle.addEventListener('input', () => {
+	      updateForumPostButton();
+	      scheduleForumDraftSave();
+	    });
 	    forumEditor.addEventListener('input', () => {
 	      saveForumSelection();
 	      syncForumEditorState();
@@ -7250,20 +7342,26 @@
       const reader = new FileReader();
       reader.onload = () => {
         forumEditorStatus.textContent = '正在上传图片...';
-        socket.emit('upload post image', { base64: reader.result });
+	        socket.emit('upload post image', { base64: reader.result, draftToken: forumDraftKey() });
       };
       reader.onerror = () => showToast('图片读取失败');
       reader.readAsDataURL(file);
     });
-    forumPreviewToggle.addEventListener('click', () => {
-      state.forumPreviewMode = !state.forumPreviewMode;
-      forumPreviewToggle.classList.toggle('is-active', state.forumPreviewMode);
-      forumEditorPreview.hidden = !state.forumPreviewMode;
-      forumEditor.hidden = state.forumPreviewMode;
-      syncForumEditorState();
-      forumEditorPreview.innerHTML = forumPostContent.value;
-    });
-    forumCommentInput.addEventListener('input', updateForumCommentButton);
+	    forumPreviewToggle.addEventListener('click', () => {
+	      state.forumPreviewMode = !state.forumPreviewMode;
+	      forumPreviewToggle.classList.toggle('is-active', state.forumPreviewMode);
+	      forumEditorPreview.hidden = !state.forumPreviewMode;
+	      forumEditor.hidden = state.forumPreviewMode;
+	      syncForumEditorState();
+	      forumEditorPreview.innerHTML = forumPostContent.value;
+	    });
+	    window.addEventListener('beforeunload', (event) => {
+	      if (forumComposerPage.hidden || !hasMeaningfulForumDraft()) return;
+	      saveForumDraftNow();
+	      event.preventDefault();
+	      event.returnValue = '';
+	    });
+	    forumCommentInput.addEventListener('input', updateForumCommentButton);
     forumReplyCancel.addEventListener('click', () => setForumReplyTarget(null));
 
     // Chat controls
@@ -8135,40 +8233,156 @@
       if (state.selectedForumPost) socket.emit('get forum post', state.selectedForumPost.postId);
     }
 
-    function openForumComposer() {
-      if (!state.username) {
-        showToast('请先登录');
-        return;
-      }
-      if (state.profileUser && state.profileUser.isBanned) {
-        showToast('你的账号已被限制使用社区功能');
-        return;
-      }
-      forumComposerPage.hidden = false;
-      forumError.textContent = '';
-      forumEditorStatus.textContent = '正文最多 3000 字，图片最多 9 张。';
-      updateForumPostButton();
-      requestAnimationFrame(() => forumPostTitle.focus());
-    }
+	    function clientEscapeHtml(value) {
+	      return String(value || '')
+	        .replace(/&/g, '&amp;')
+	        .replace(/</g, '&lt;')
+	        .replace(/>/g, '&gt;')
+	        .replace(/"/g, '&quot;')
+	        .replace(/'/g, '&#39;');
+	    }
 
-    function closeForumComposer() {
-      if (!forumComposerPage || forumComposerPage.hidden) return;
-      forumComposerPage.hidden = true;
-      state.forumPreviewMode = false;
-      forumEditorPreview.hidden = true;
-      forumEditor.hidden = false;
-      forumPreviewToggle.classList.remove('is-active');
-    }
+	    function forumDraftKey(mode = state.forumEditPostId ? 'edit' : 'new', postId = state.forumEditPostId) {
+	      const user = state.userId || state.username || 'guest';
+	      return mode === 'edit'
+	        ? `uni:sonoma:forum-draft:edit:${postId}:${user}`
+	        : `uni:sonoma:forum-draft:new:${user}`;
+	    }
 
-    function clearForumComposer() {
-      forumPostTitle.value = '';
-      forumPostContent.value = '';
-      forumEditor.innerHTML = '';
+	    function currentForumDraft() {
+	      const html = sanitizeClientForumHtml(forumEditor.innerHTML.trim());
+	      return {
+	        version: 1,
+	        mode: state.forumEditPostId ? 'edit' : 'new',
+	        postId: state.forumEditPostId || '',
+	        userId: state.userId || state.username || '',
+	        title: forumPostTitle.value.trim(),
+	        contentHtml: html,
+	        contentText: forumEditorText(),
+	        images: Array.from(forumEditor.querySelectorAll('img')).map((img) => img.getAttribute('src')).filter(Boolean),
+	        savedAt: new Date().toISOString()
+	      };
+	    }
+
+	    function hasMeaningfulForumDraft(draft = currentForumDraft()) {
+	      return Boolean((draft.title && draft.title.trim()) || (draft.contentText && draft.contentText.trim()) || (draft.images && draft.images.length));
+	    }
+
+	    function saveForumDraftNow() {
+	      const key = forumDraftKey();
+	      const draft = currentForumDraft();
+	      if (!hasMeaningfulForumDraft(draft)) {
+	        try { localStorage.removeItem(key); } catch (error) {}
+	        return;
+	      }
+	      try {
+	        localStorage.setItem(key, JSON.stringify(draft));
+	        forumEditorStatus.textContent = `已自动保存草稿 · ${new Date(draft.savedAt).toLocaleTimeString()}`;
+	      } catch (error) {
+	        forumEditorStatus.textContent = '草稿保存失败，本次内容仍在编辑器中。';
+	      }
+	    }
+
+	    function scheduleForumDraftSave() {
+	      window.clearTimeout(state.forumDraftTimer);
+	      state.forumDraftTimer = window.setTimeout(saveForumDraftNow, 800);
+	    }
+
+	    function loadForumDraft(key = forumDraftKey()) {
+	      try {
+	        const raw = localStorage.getItem(key);
+	        if (!raw) return null;
+	        const draft = JSON.parse(raw);
+	        if (!draft || draft.userId !== (state.userId || state.username || '')) return null;
+	        return hasMeaningfulForumDraft(draft) ? draft : null;
+	      } catch (error) {
+	        try { localStorage.removeItem(key); } catch (ignored) {}
+	        return null;
+	      }
+	    }
+
+	    function clearForumDraft(key = forumDraftKey()) {
+	      try { localStorage.removeItem(key); } catch (error) {}
+	      if (forumDraftBanner) forumDraftBanner.hidden = true;
+	    }
+
+	    function applyForumDraft(draft) {
+	      forumPostTitle.value = draft.title || '';
+	      forumEditor.innerHTML = sanitizeClientForumHtml(draft.contentHtml || clientEscapeHtml(draft.contentText || '').replace(/\n/g, '<br>'));
+	      syncForumEditorState({ skipDraft: true });
+	    }
+
+	    function showForumDraftPrompt(draft, key) {
+	      if (!draft || state.forumDraftPrompted.has(key)) return;
+	      state.forumDraftPrompted.add(key);
+	      forumDraftText.textContent = `发现 ${formatFullTime(draft.savedAt)} 保存的草稿。`;
+	      forumDraftBanner.hidden = false;
+	      forumDraftRestore.onclick = () => {
+	        applyForumDraft(draft);
+	        forumDraftBanner.hidden = true;
+	        showToast('草稿已恢复');
+	      };
+	      forumDraftDiscard.onclick = () => {
+	        clearForumDraft(key);
+	        showToast('草稿已丢弃');
+	      };
+	      forumDraftLater.onclick = () => {
+	        forumDraftBanner.hidden = true;
+	      };
+	    }
+
+	    function openForumComposer(options = {}) {
+	      if (!state.username) {
+	        showToast('请先登录');
+	        return;
+	      }
+	      if (state.profileUser && state.profileUser.isBanned) {
+	        showToast('你的账号已被限制使用社区功能');
+	        return;
+	      }
+	      const post = options.post ? normalizeForumPost(options.post) : null;
+	      state.forumEditPostId = post ? post.postId : '';
+	      forumComposerTitle.textContent = post ? '编辑帖子' : '发布帖子';
+	      forumPostSubmit.textContent = post ? '保存' : '发布';
+	      if (post) {
+	        forumPostTitle.value = post.title || '';
+	        forumEditor.innerHTML = post.contentFormat === 'html' && post.contentHtml
+	          ? sanitizeClientForumHtml(post.contentHtml)
+	          : clientEscapeHtml(post.contentText || post.content || '').replace(/\n/g, '<br>');
+	      } else if (!options.keepCurrent) {
+	        clearForumComposer({ preserveDraft: true });
+	      }
+	      forumComposerPage.hidden = false;
+	      forumError.textContent = '';
+	      forumEditorStatus.textContent = '正文最多 3000 字，图片最多 9 张。';
+	      syncForumEditorState({ skipDraft: true });
+	      const key = forumDraftKey();
+	      const draft = loadForumDraft(key);
+	      if (draft) showForumDraftPrompt(draft, key);
+	      requestAnimationFrame(() => forumPostTitle.focus());
+	    }
+
+	    function closeForumComposer() {
+	      if (!forumComposerPage || forumComposerPage.hidden) return;
+	      forumComposerPage.hidden = true;
+	      state.forumPreviewMode = false;
+	      state.forumEditPostId = '';
+	      forumDraftBanner.hidden = true;
+	      forumEditorPreview.hidden = true;
+	      forumEditor.hidden = false;
+	      forumPreviewToggle.classList.remove('is-active');
+	    }
+
+	    function clearForumComposer(options = {}) {
+	      forumPostTitle.value = '';
+	      forumPostContent.value = '';
+	      forumEditor.innerHTML = '';
 	      forumEditorPreview.innerHTML = '';
 	      forumImageInput.value = '';
 	      closeForumLinkPanel();
 	      forumSavedRange = null;
 	      state.forumPreviewMode = false;
+	      if (!options.preserveDraft) clearForumDraft();
 	      updateForumPostButton();
 	    }
 
@@ -8192,14 +8406,17 @@
         Array.from(node.attributes).forEach((attribute) => {
           const name = attribute.name.toLowerCase();
           const value = attribute.value || '';
-          const keepHref = node.tagName === 'A' && name === 'href' && /^(https?:\/\/|mailto:|\/)/i.test(value);
+	          const normalized = String(value || '').trim().replace(/[\u0000-\u001f\u007f\s]+/g, '');
+	          const keepHref = node.tagName === 'A' && name === 'href' && (/^https?:\/\//i.test(normalized) || (normalized.startsWith('/') && !normalized.startsWith('//')));
           const keepImage = node.tagName === 'IMG' && ['src', 'alt', 'loading', 'decoding'].includes(name) && (name !== 'src' || /^\/uploads\/post-images\//.test(value));
           if (!keepHref && !keepImage) node.removeAttribute(attribute.name);
         });
-        if (node.tagName === 'A') {
-          node.setAttribute('target', '_blank');
-          node.setAttribute('rel', 'noopener noreferrer');
-        }
+	        if (node.tagName === 'A') {
+	          const href = (node.getAttribute('href') || '').trim().replace(/[\u0000-\u001f\u007f\s]+/g, '');
+	          if (href) node.setAttribute('href', href);
+	          node.setAttribute('target', '_blank');
+	          node.setAttribute('rel', 'noopener noreferrer');
+	        }
         if (node.tagName === 'IMG') {
           node.setAttribute('loading', 'lazy');
           node.setAttribute('decoding', 'async');
@@ -8208,14 +8425,15 @@
       return template.innerHTML;
     }
 
-    function syncForumEditorState() {
-      forumPostContent.value = sanitizeClientForumHtml(forumEditor.innerHTML.trim());
-      const textLength = forumEditorText().length;
-      const imageCount = forumEditorImageCount();
-      forumEditorStatus.textContent = `${textLength}/3000 字 · 图片 ${imageCount}/9`;
-      updateForumPostButton();
-      if (!forumEditorPreview.hidden) forumEditorPreview.innerHTML = forumPostContent.value;
-    }
+	    function syncForumEditorState(options = {}) {
+	      forumPostContent.value = sanitizeClientForumHtml(forumEditor.innerHTML.trim());
+	      const textLength = forumEditorText().length;
+	      const imageCount = forumEditorImageCount();
+	      forumEditorStatus.textContent = `${textLength}/3000 字 · 图片 ${imageCount}/9`;
+	      updateForumPostButton();
+	      if (!forumEditorPreview.hidden) forumEditorPreview.innerHTML = forumPostContent.value;
+	      if (!options.skipDraft) scheduleForumDraftSave();
+	    }
 
     function runEditorCommand(command, value = null) {
       forumEditor.focus();
@@ -8267,11 +8485,11 @@
 	      closeForumLinkPanel();
 	    }
 
-    function createForumPost() {
-      const title = forumPostTitle.value.trim();
-      syncForumEditorState();
-      const contentHtml = forumPostContent.value.trim();
-      const content = forumEditorText();
+	    function createForumPost() {
+	      const title = forumPostTitle.value.trim();
+	      syncForumEditorState();
+	      const contentHtml = forumPostContent.value.trim();
+	      const content = forumEditorText();
       forumError.textContent = '';
       if (!state.username) {
         forumError.textContent = '请先登录';
@@ -8285,32 +8503,50 @@
         forumError.textContent = '正文最多 3000 字';
         return;
       }
-      if (forumEditorImageCount() > 9) {
-        forumError.textContent = '每个帖子最多 9 张图片';
-        return;
-      }
-      forumPostSubmit.disabled = true;
-      socket.emit('create forum post', { title, content, contentHtml });
-    }
+	      if (forumEditorImageCount() > 9) {
+	        forumError.textContent = '每个帖子最多 9 张图片';
+	        return;
+	      }
+	      if (state.forumEditorBusy) return;
+	      state.forumEditorBusy = true;
+	      forumPostSubmit.disabled = true;
+	      forumPostSubmit.textContent = state.forumEditPostId ? '保存中...' : '发布中...';
+	      const eventName = state.forumEditPostId ? 'update forum post' : 'create forum post';
+	      socket.emit(eventName, { postId: state.forumEditPostId, title, content, contentHtml, draftToken: forumDraftKey() });
+	    }
 
-    function createForumComment() {
-      const content = forumCommentInput.value.trim();
-      if (!state.selectedForumPost || !content) return;
-      forumCommentSubmit.disabled = true;
-      socket.emit('create forum comment', {
+	    function createForumComment() {
+	      const content = forumCommentInput.value.trim();
+	      if (!state.selectedForumPost || !content) return;
+	      if (state.forumPendingActions.has('comment-submit')) return;
+	      state.forumPendingActions.add('comment-submit');
+	      forumCommentSubmit.disabled = true;
+	      socket.emit('create forum comment', {
         postId: state.selectedForumPost.postId,
         parentCommentId: state.forumReplyParentId,
         content
       });
     }
 
-    function updateForumPostButton() {
-      forumPostSubmit.disabled = !state.username || !forumPostTitle.value.trim() || !forumEditorText();
-    }
+	    function updateForumPostButton() {
+	      forumPostSubmit.textContent = state.forumEditorBusy ? (state.forumEditPostId ? '保存中...' : '发布中...') : (state.forumEditPostId ? '保存' : '发布');
+	      forumPostSubmit.disabled = state.forumEditorBusy || !state.username || !forumPostTitle.value.trim() || !forumEditorText();
+	    }
 
-    function updateForumCommentButton() {
-      forumCommentSubmit.disabled = !state.username || !state.selectedForumPost || !forumCommentInput.value.trim();
-    }
+	    function updateForumCommentButton() {
+	      forumCommentSubmit.disabled = state.forumPendingActions.has('comment-submit') || !state.username || !state.selectedForumPost || !forumCommentInput.value.trim();
+	    }
+
+	    function toggleForumAction(key, action) {
+	      if (!state.username) {
+	        showToast('请先登录');
+	        return;
+	      }
+	      if (state.forumPendingActions.has(key)) return;
+	      state.forumPendingActions.add(key);
+	      action();
+	      renderForumDetail(true);
+	    }
 
     function setForumReplyTarget(comment = null) {
       state.forumReplyParentId = comment ? comment.commentId : '';
@@ -8339,10 +8575,13 @@
         title,
         content,
         contentHtml: typeof post.contentHtml === 'string' ? post.contentHtml : '',
-        contentText: typeof post.contentText === 'string' ? post.contentText : content,
-        contentFormat: post.contentFormat === 'html' ? 'html' : 'plain',
-        createdAt: post.createdAt || new Date().toISOString(),
-        commentCount: Number(post.commentCount || 0),
+	        contentText: typeof post.contentText === 'string' ? post.contentText : content,
+	        contentFormat: post.contentFormat === 'html' ? 'html' : 'plain',
+	        createdAt: post.createdAt || new Date().toISOString(),
+	        updatedAt: post.updatedAt || post.createdAt || new Date().toISOString(),
+	        editedAt: typeof post.editedAt === 'string' ? post.editedAt : '',
+	        isEdited: Boolean(post.isEdited || post.editedAt),
+	        commentCount: Number(post.commentCount || 0),
         likeCount: Number(post.likeCount || 0),
         favoriteCount: Number(post.favoriteCount || 0),
         likedByMe: Boolean(post.likedByMe),
@@ -8435,20 +8674,33 @@
       const authorName = document.createElement('strong');
       authorName.textContent = post.username;
       const meta = document.createElement('div');
-      meta.className = 'post-card-meta';
-      meta.textContent = formatFullTime(post.createdAt);
-      authorText.append(authorName, meta);
-      author.append(authorText);
-      if (post.userId === state.userId || state.isAdmin) {
-        const deleteButton = document.createElement('button');
-        deleteButton.type = 'button';
-        deleteButton.className = 'admin-btn danger';
-        deleteButton.textContent = '删除帖子';
-        deleteButton.addEventListener('click', () => {
-          if (!confirm(`删除帖子「${post.title}」？`)) return;
-          socket.emit('delete forum post', post.postId);
-        });
-        author.append(deleteButton);
+	      meta.className = 'post-card-meta';
+	      meta.textContent = `${formatFullTime(post.createdAt)}${post.isEdited ? ` · 编辑于 ${formatFullTime(post.editedAt || post.updatedAt)}` : ''}`;
+	      authorText.append(authorName, meta);
+	      author.append(authorText);
+	      if (post.userId === state.userId || state.isAdmin) {
+	        const editButton = document.createElement('button');
+	        editButton.type = 'button';
+	        editButton.className = 'admin-btn';
+	        editButton.textContent = '编辑';
+	        editButton.addEventListener('click', () => openForumComposer({ post }));
+	        const deleteButton = document.createElement('button');
+	        deleteButton.type = 'button';
+	        deleteButton.className = 'admin-btn danger';
+	        deleteButton.textContent = '删除帖子';
+	        deleteButton.addEventListener('click', () => {
+	          if (deleteButton.dataset.confirm !== 'yes') {
+	            deleteButton.dataset.confirm = 'yes';
+	            deleteButton.textContent = '再次点击删除';
+	            window.setTimeout(() => {
+	              deleteButton.dataset.confirm = '';
+	              deleteButton.textContent = '删除帖子';
+	            }, 2600);
+	            return;
+	          }
+	          socket.emit('delete forum post', post.postId);
+	        });
+	        author.append(editButton, deleteButton);
       } else if (state.userId) {
         const reportButton = document.createElement('button');
         reportButton.type = 'button';
@@ -8476,16 +8728,18 @@
 
       const postActions = document.createElement('div');
       postActions.className = 'post-actions';
-      const likeButton = document.createElement('button');
-      likeButton.type = 'button';
-      likeButton.className = `forum-action-pill${post.likedByMe ? ' is-active' : ''}`;
-      likeButton.textContent = `赞 ${post.likeCount || 0}`;
-      likeButton.addEventListener('click', () => socket.emit('toggle post like', post.postId));
-      const favoriteButton = document.createElement('button');
-      favoriteButton.type = 'button';
-      favoriteButton.className = `forum-action-pill${post.favoritedByMe ? ' is-active' : ''}`;
-      favoriteButton.textContent = `收藏 ${post.favoriteCount || 0}`;
-      favoriteButton.addEventListener('click', () => socket.emit('toggle post favorite', post.postId));
+	      const likeButton = document.createElement('button');
+	      likeButton.type = 'button';
+	      likeButton.className = `forum-action-pill${post.likedByMe ? ' is-active' : ''}`;
+	      likeButton.disabled = state.forumPendingActions.has(`post-like:${post.postId}`);
+	      likeButton.textContent = `赞 ${post.likeCount || 0}`;
+	      likeButton.addEventListener('click', () => toggleForumAction(`post-like:${post.postId}`, () => socket.emit('toggle post like', post.postId)));
+	      const favoriteButton = document.createElement('button');
+	      favoriteButton.type = 'button';
+	      favoriteButton.className = `forum-action-pill${post.favoritedByMe ? ' is-active' : ''}`;
+	      favoriteButton.disabled = state.forumPendingActions.has(`post-favorite:${post.postId}`);
+	      favoriteButton.textContent = `收藏 ${post.favoriteCount || 0}`;
+	      favoriteButton.addEventListener('click', () => toggleForumAction(`post-favorite:${post.postId}`, () => socket.emit('toggle post favorite', post.postId)));
       postActions.append(likeButton, favoriteButton);
 
       const commentsHeader = document.createElement('div');
@@ -8551,12 +8805,20 @@
         if (comment.userId === state.userId || state.isAdmin) {
           const deleteButton = document.createElement('button');
           deleteButton.type = 'button';
-          deleteButton.className = 'admin-btn danger';
-          deleteButton.textContent = '删除';
-          deleteButton.addEventListener('click', () => {
-            if (!confirm('删除这条评论？')) return;
-            socket.emit('delete forum comment', comment.commentId);
-          });
+	          deleteButton.className = 'admin-btn danger';
+	          deleteButton.textContent = '删除';
+	          deleteButton.addEventListener('click', () => {
+	            if (deleteButton.dataset.confirm !== 'yes') {
+	              deleteButton.dataset.confirm = 'yes';
+	              deleteButton.textContent = '确认删除';
+	              window.setTimeout(() => {
+	                deleteButton.dataset.confirm = '';
+	                deleteButton.textContent = '删除';
+	              }, 2400);
+	              return;
+	            }
+	            socket.emit('delete forum comment', comment.commentId);
+	          });
           author.append(deleteButton);
         }
         const content = document.createElement('div');
@@ -8564,11 +8826,12 @@
         content.textContent = comment.content;
         const actions = document.createElement('div');
         actions.className = 'comment-actions';
-        const likeButton = document.createElement('button');
-        likeButton.type = 'button';
-        likeButton.className = `forum-action-pill${comment.likedByMe ? ' is-active' : ''}`;
-        likeButton.textContent = `赞 ${comment.likeCount || 0}`;
-        likeButton.addEventListener('click', () => socket.emit('toggle comment like', comment.commentId));
+	        const likeButton = document.createElement('button');
+	        likeButton.type = 'button';
+	        likeButton.className = `forum-action-pill${comment.likedByMe ? ' is-active' : ''}`;
+	        likeButton.disabled = state.forumPendingActions.has(`comment-like:${comment.commentId}`);
+	        likeButton.textContent = `赞 ${comment.likeCount || 0}`;
+	        likeButton.addEventListener('click', () => toggleForumAction(`comment-like:${comment.commentId}`, () => socket.emit('toggle comment like', comment.commentId)));
         actions.append(likeButton);
         if (!isReply) {
           const replyButton = document.createElement('button');
@@ -9377,16 +9640,67 @@
       adminUsers.textContent = '';
       renderAdminRooms(Array.isArray(data.rooms) ? data.rooms : []);
       renderAdminRenameRequests(Array.isArray(data.renameRequests) ? data.renameRequests : []);
-      renderAdminReports(Array.isArray(data.postReports) ? data.postReports : []);
-      renderAdminStickerCreators(Array.isArray(data.stickerCreatorRequests) ? data.stickerCreatorRequests : []);
-      renderAdminStickerSubmissions(Array.isArray(data.stickerSubmissions) ? data.stickerSubmissions : []);
+	      renderAdminReports(Array.isArray(data.postReports) ? data.postReports : []);
+	      renderAdminStickerCreators(Array.isArray(data.stickerCreatorRequests) ? data.stickerCreatorRequests : []);
+	      renderAdminStickerSubmissions(Array.isArray(data.stickerSubmissions) ? data.stickerSubmissions : []);
+	      renderAdminMaintenance(data.maintenance || {});
 
       if (users.length === 0) {
         const empty = document.createElement('div');
         empty.className = 'admin-muted';
         empty.textContent = '暂无用户';
         adminUsers.append(empty);
-      }
+	    }
+
+	    function renderAdminMaintenance(maintenance) {
+	      adminMaintenance.textContent = '';
+	      const rows = [
+	        `版本：${maintenance.version || '未知'}`,
+	        `Node：${maintenance.node || '未知'} · 环境：${maintenance.environment || 'development'}`,
+	        `SQLite：${maintenance.sqlite || '未知'}`,
+	        `启动：${formatFullTime(maintenance.startedAt)}`
+	      ];
+	      rows.forEach((text) => {
+	        const item = document.createElement('div');
+	        item.className = 'admin-muted';
+	        item.textContent = text;
+	        adminMaintenance.append(item);
+	      });
+	      if (maintenance.adminPasswordWeak) {
+	        const warning = document.createElement('div');
+	        warning.className = 'admin-notice';
+	        warning.textContent = '检测到管理员密码可能过弱，请在 .env 中设置强 ADMIN_PASSWORD。';
+	        adminMaintenance.append(warning);
+	      }
+	      const tables = Array.isArray(maintenance.tables) ? maintenance.tables : [];
+	      const tableStatus = document.createElement('div');
+	      tableStatus.className = 'admin-muted';
+	      tableStatus.textContent = `关键表：${tables.map((table) => `${table.exists ? '✓' : '×'} ${table.name}`).join(' · ') || '暂无数据'}`;
+	      adminMaintenance.append(tableStatus);
+	      const images = maintenance.postImages || {};
+	      const imageStatus = document.createElement('div');
+	      imageStatus.className = 'admin-muted';
+	      imageStatus.textContent = `帖子图片：${images.fileCount || 0} 个 · ${Math.round((images.totalBytes || 0) / 1024)} KB · 疑似孤儿 ${images.orphanCount || 0} 个`;
+	      adminMaintenance.append(imageStatus);
+	      const cleanupButton = document.createElement('button');
+	      cleanupButton.type = 'button';
+	      cleanupButton.className = 'admin-btn danger';
+	      cleanupButton.textContent = '清理 24 小时前未绑定图片';
+	      cleanupButton.disabled = !Number(images.orphanCount || 0);
+	      cleanupButton.addEventListener('click', () => {
+	        if (cleanupButton.dataset.confirm !== 'yes') {
+	          cleanupButton.dataset.confirm = 'yes';
+	          cleanupButton.textContent = '再次点击确认清理';
+	          window.setTimeout(() => {
+	            cleanupButton.dataset.confirm = '';
+	            cleanupButton.textContent = '清理 24 小时前未绑定图片';
+	          }, 2600);
+	          return;
+	        }
+	        socket.emit('admin cleanup post images');
+	      });
+	      adminMaintenance.append(cleanupButton);
+	    }
 
       users.forEach((user) => {
         const button = document.createElement('button');
