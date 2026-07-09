@@ -2,7 +2,7 @@
 
 Uni 5 Sonoma is a lightweight realtime chat and community app with account login, group chat, private chat, forum posts, admin tools, message recall, image paste/upload, voice messages, and a glass-style responsive web UI.
 
-Current release: **Sonoma 5.5.7 Forum Stability & Draft Recovery Update**
+Current release: **Sonoma 5.5.8 Community Workspace Update**
 
 ## Features
 
@@ -43,6 +43,7 @@ Current release: **Sonoma 5.5.7 Forum Stability & Draft Recovery Update**
 - Sonoma 5.5.5: notification center, chat unread state, global discovery search, and message Reactions
 - Sonoma 5.5.6: forum rich editor, post images, forum likes/favorites, comment replies/floors, and GPU/mobile performance polish
 - Sonoma 5.5.7: forum draft recovery, post editing, rich-text hardening, image lifecycle maintenance, and interaction reliability polish
+- Sonoma 5.5.8: community workspace, personal content lists, local draft manager, forum sorting/filtering, profile activity summaries, and notification preferences
 - Uni 5.4.1: personalization controls, compact presence status, latency monitoring, forum persistence hardening, CORS configuration, and stability cleanup
 
 ## PWA and Native App Preparation
@@ -54,6 +55,24 @@ Current release: **Sonoma 5.5.7 Forum Stability & Draft Recovery Update**
 - Authentication is still based on the current web Socket.IO/session flow; a dedicated token flow should be evaluated before a native production app.
 
 ## Release Notes
+
+### Sonoma 5.5.8 Community Workspace Update
+
+Added:
+
+- Added a dedicated My Content / Community Workspace hub
+- Added My Posts, My Comments, My Replies, and My Favorites views
+- Added local browser draft management for 5.5.7 forum drafts
+- Added forum list sorting and filtering controls
+- Added public community activity summaries on user profiles
+- Added lightweight notification preferences for configurable interaction notifications
+
+Improved:
+
+- Notification creation now respects per-user preferences while keeping system and safety messages always on
+- Improved mobile layouts for workspace cards, draft management, forum filters, favorites, and profile activity
+- Kept existing notification, unread, search, Reaction, rich forum editor, draft recovery, sticker, report, Star, and bulletin systems protected
+- Preserved the Sonoma liquid-glass visual language with lightweight list rendering
 
 ### Sonoma 5.5.7 Forum Stability & Draft Recovery Update
 

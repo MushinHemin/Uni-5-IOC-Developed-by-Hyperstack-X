@@ -95,6 +95,16 @@ const NOTIFICATION_TYPES = new Set([
 ]);
 const SEARCH_SCOPES = new Set(['all', 'users', 'posts', 'messages', 'announcements', 'stickers']);
 const ALLOWED_REACTIONS = new Set(['👍', '❤️', '😂', '😭', '⭐', '🎉']);
+const NOTIFICATION_PREFERENCE_KEYS = new Set([
+  'forum_comment',
+  'forum_reply',
+  'post_like',
+  'comment_like',
+  'star_received',
+  'sticker_review',
+  'creator_result'
+]);
+const ALWAYS_ON_NOTIFICATION_TYPES = new Set(['announcement', 'account_restricted', 'report_resolved']);
 const IMAGE_EXTENSIONS = {
   'image/jpeg': 'jpg',
   'image/png': 'png',
@@ -1004,6 +1014,16 @@ function initDatabase() {
       UNIQUE(message_id, user_id)
     );
 
+    CREATE TABLE IF NOT EXISTS user_notification_preferences (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      preference_key TEXT NOT NULL,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE(user_id, preference_key)
+    );
+
     CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at);
     CREATE INDEX IF NOT EXISTS idx_messages_user_id ON messages(user_id);
     CREATE INDEX IF NOT EXISTS idx_room_members_user_id ON room_members(user_id);
@@ -1032,6 +1052,7 @@ function initDatabase() {
     CREATE INDEX IF NOT EXISTS idx_chat_read_states_user_scope ON chat_read_states(user_id, scope, conversation_id);
     CREATE INDEX IF NOT EXISTS idx_message_reactions_message ON message_reactions(message_id);
     CREATE INDEX IF NOT EXISTS idx_message_reactions_user ON message_reactions(user_id);
+    CREATE INDEX IF NOT EXISTS idx_notification_preferences_user ON user_notification_preferences(user_id);
   `);
   migrateForumTables();
   ensureColumn('users', 'display_name', "TEXT NOT NULL DEFAULT ''");
@@ -1549,15 +1570,56 @@ function publicForumComment(comment, viewerUserId = '') {
   };
 }
 
-function listForumPosts(viewerUserId = '') {
-  return db.prepare(`
-    SELECT posts.*, COUNT(comments.id) AS comment_count
+function cleanForumSort(value) {
+  return ['latest', 'updated', 'comments', 'likes', 'favorites'].includes(value) ? value : 'latest';
+}
+
+function cleanForumFilter(value) {
+  return ['all', 'mine', 'favorites', 'has_images', 'edited'].includes(value) ? value : 'all';
+}
+
+function forumOrderSql(sort) {
+  return {
+    latest: 'posts.created_at DESC',
+    updated: "COALESCE(NULLIF(posts.updated_at, ''), posts.created_at) DESC",
+    comments: 'comment_count DESC, posts.created_at DESC',
+    likes: 'like_count DESC, posts.created_at DESC',
+    favorites: 'favorite_count DESC, posts.created_at DESC'
+  }[cleanForumSort(sort)];
+}
+
+function listForumPosts(viewerUserId = '', options = {}) {
+  const sort = cleanForumSort(options.sort);
+  const filter = cleanForumFilter(options.filter);
+  const limit = Math.min(Math.max(Number(options.limit) || MAX_FORUM_POSTS, 1), MAX_FORUM_POSTS);
+  const offset = Math.max(Number(options.offset) || 0, 0);
+  const where = [];
+  const params = { viewerUserId, limit, offset };
+  if (filter === 'mine') {
+    where.push('posts.user_id = @viewerUserId');
+  } else if (filter === 'favorites') {
+    where.push('EXISTS (SELECT 1 FROM post_favorites pf_filter WHERE pf_filter.post_id = posts.id AND pf_filter.user_id = @viewerUserId)');
+  } else if (filter === 'has_images') {
+    where.push("EXISTS (SELECT 1 FROM post_images pi_filter WHERE pi_filter.post_id = posts.id AND pi_filter.is_bound = 1)");
+  } else if (filter === 'edited') {
+    where.push("posts.edited_at IS NOT NULL AND TRIM(posts.edited_at) != ''");
+  }
+  if ((filter === 'mine' || filter === 'favorites') && !viewerUserId) return [];
+  const sql = `
+    SELECT posts.*,
+      COUNT(DISTINCT comments.id) AS comment_count,
+      COUNT(DISTINCT post_likes.id) AS like_count,
+      COUNT(DISTINCT post_favorites.id) AS favorite_count
     FROM posts
     LEFT JOIN comments ON comments.post_id = posts.id AND comments.is_deleted = 0
+    LEFT JOIN post_likes ON post_likes.post_id = posts.id
+    LEFT JOIN post_favorites ON post_favorites.post_id = posts.id
+    ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
     GROUP BY posts.id
-    ORDER BY posts.created_at DESC
-    LIMIT ?
-  `).all(MAX_FORUM_POSTS).map(rowToPost).filter(Boolean).map((post) => publicForumPost(post, viewerUserId));
+    ORDER BY ${forumOrderSql(sort)}
+    LIMIT @limit OFFSET @offset
+  `;
+  return db.prepare(sql).all(params).map(rowToPost).filter(Boolean).map((post) => publicForumPost(post, viewerUserId));
 }
 
 function getForumPost(postIdValue, viewerUserId = '') {
@@ -1581,6 +1643,106 @@ function listForumComments(postIdValue, viewerUserId = '') {
     WHERE post_id = ? AND is_deleted = 0
     ORDER BY floor_number ASC, reply_number ASC, created_at ASC
   `).all(postId).map(rowToComment).filter(Boolean).map((comment) => publicForumComment(comment, viewerUserId));
+}
+
+function forumPostSummary(row, viewerUserId = '') {
+  const post = rowToPost(row);
+  return post ? publicForumPost(post, viewerUserId) : null;
+}
+
+function myForumPosts(userId, sort = 'latest', limit = 60, offset = 0) {
+  return listForumPosts(userId, {
+    filter: 'mine',
+    sort: sort === 'updated' ? 'updated' : 'latest',
+    limit,
+    offset
+  });
+}
+
+function myForumFavorites(userId, limit = 60, offset = 0) {
+  return db.prepare(`
+    SELECT posts.*, post_favorites.created_at AS favorited_at,
+      COUNT(DISTINCT comments.id) AS comment_count
+    FROM post_favorites
+    LEFT JOIN posts ON posts.id = post_favorites.post_id
+    LEFT JOIN comments ON comments.post_id = posts.id AND comments.is_deleted = 0
+    WHERE post_favorites.user_id = ?
+    GROUP BY post_favorites.id
+    ORDER BY post_favorites.created_at DESC
+    LIMIT ? OFFSET ?
+  `).all(userId, Math.min(Number(limit) || 60, 80), Math.max(Number(offset) || 0, 0)).map((row) => {
+    if (!row.id) return { unavailable: true, favoritedAt: row.favorited_at || '' };
+    const post = forumPostSummary(row, userId);
+    return post ? { ...post, favoritedAt: row.favorited_at || '' } : null;
+  }).filter(Boolean);
+}
+
+function myForumComments(userId, replies = false, limit = 80, offset = 0) {
+  return db.prepare(`
+    SELECT comments.*, posts.title AS post_title
+    FROM comments
+    LEFT JOIN posts ON posts.id = comments.post_id
+    WHERE comments.user_id = ?
+      AND comments.is_deleted = 0
+      AND ${replies ? "TRIM(comments.parent_comment_id) != ''" : "(comments.parent_comment_id IS NULL OR TRIM(comments.parent_comment_id) = '')"}
+    ORDER BY comments.created_at DESC
+    LIMIT ? OFFSET ?
+  `).all(userId, Math.min(Number(limit) || 80, 100), Math.max(Number(offset) || 0, 0)).map((row) => {
+    const comment = publicForumComment(rowToComment(row), userId);
+    return comment ? {
+      ...comment,
+      postTitle: row.post_title || '相关内容已不可用',
+      postUnavailable: !row.post_title
+    } : null;
+  }).filter(Boolean);
+}
+
+function userCommunitySummary(userId, viewerUserId = '') {
+  const target = userById(userId);
+  if (!target) return null;
+  const stats = db.prepare(`
+    SELECT
+      (SELECT COUNT(*) FROM posts WHERE user_id = ?) AS posts,
+      (SELECT COUNT(*) FROM comments WHERE user_id = ? AND is_deleted = 0 AND (parent_comment_id IS NULL OR TRIM(parent_comment_id) = '')) AS comments,
+      (SELECT COUNT(*) FROM comments WHERE user_id = ? AND is_deleted = 0 AND TRIM(parent_comment_id) != '') AS replies,
+      (SELECT COUNT(*) FROM post_favorites WHERE user_id = ?) AS favorites
+  `).get(userId, userId, userId, userId);
+  const recentPosts = db.prepare(`
+    SELECT posts.*, COUNT(comments.id) AS comment_count
+    FROM posts
+    LEFT JOIN comments ON comments.post_id = posts.id AND comments.is_deleted = 0
+    WHERE posts.user_id = ?
+    GROUP BY posts.id
+    ORDER BY posts.created_at DESC
+    LIMIT 5
+  `).all(userId).map((row) => forumPostSummary(row, viewerUserId)).filter(Boolean);
+  return {
+    user: publicUser(target),
+    stats: {
+      posts: Number(stats.posts || 0),
+      comments: Number(stats.comments || 0),
+      replies: Number(stats.replies || 0),
+      favorites: viewerUserId === userId ? Number(stats.favorites || 0) : undefined,
+      stars: starCountForUser(userId)
+    },
+    recentPosts,
+    isSelf: viewerUserId === userId
+  };
+}
+
+function myCommunityWorkspace(userId) {
+  const summary = userCommunitySummary(userId, userId);
+  return {
+    stats: {
+      ...(summary ? summary.stats : {}),
+      drafts: 0,
+      unreadNotifications: unreadNotificationCount(userId)
+    },
+    recentPosts: summary ? summary.recentPosts : [],
+    recentComments: myForumComments(userId, false, 5, 0),
+    recentReplies: myForumComments(userId, true, 5, 0),
+    recentFavorites: myForumFavorites(userId, 5, 0)
+  };
 }
 
 function insertForumPost(post) {
@@ -2068,13 +2230,28 @@ function forumPostChannel(postId) {
   return `forum:${postId}`;
 }
 
-function emitForumPosts(socket) {
-  socket.emit('forum posts', { posts: listForumPosts(socket.user ? socket.user.id : '') });
+function cleanForumListOptions(payload = {}) {
+  return {
+    sort: cleanForumSort(payload && payload.sort),
+    filter: cleanForumFilter(payload && payload.filter),
+    limit: Math.min(Math.max(Number(payload && payload.limit) || MAX_FORUM_POSTS, 1), MAX_FORUM_POSTS),
+    offset: Math.max(Number(payload && payload.offset) || 0, 0)
+  };
+}
+
+function emitForumPosts(socket, options = socket.forumListOptions || {}) {
+  const safeOptions = cleanForumListOptions(options);
+  socket.forumListOptions = safeOptions;
+  socket.emit('forum posts', {
+    posts: listForumPosts(socket.user ? socket.user.id : '', safeOptions),
+    sort: safeOptions.sort,
+    filter: safeOptions.filter
+  });
 }
 
 function broadcastForumPosts() {
   io.sockets.sockets.forEach((connectedSocket) => {
-    connectedSocket.emit('forum posts', { posts: listForumPosts(connectedSocket.user ? connectedSocket.user.id : '') });
+    emitForumPosts(connectedSocket, connectedSocket.forumListOptions || {});
   });
 }
 
@@ -2323,6 +2500,57 @@ function rowToNotification(row) {
   };
 }
 
+function notificationPreferenceKey(notification) {
+  const type = cleanNotificationType(notification.type);
+  if (ALWAYS_ON_NOTIFICATION_TYPES.has(type)) return '';
+  if (type === 'forum_comment') {
+    const title = cleanText(notification.title, 120);
+    return title.includes('回复') ? 'forum_reply' : 'forum_comment';
+  }
+  if (type === 'reaction_received') {
+    const title = cleanText(notification.title, 120);
+    if (title.includes('帖子')) return 'post_like';
+    if (title.includes('评论')) return 'comment_like';
+    return '';
+  }
+  if (type === 'star_received') return 'star_received';
+  if (type === 'sticker_submission_result') return 'sticker_review';
+  if (type === 'creator_request_result') return 'creator_result';
+  return '';
+}
+
+function listNotificationPreferences(userId) {
+  const rows = db.prepare('SELECT preference_key, enabled FROM user_notification_preferences WHERE user_id = ?').all(userId);
+  const saved = new Map(rows.map((row) => [row.preference_key, Boolean(row.enabled)]));
+  return Array.from(NOTIFICATION_PREFERENCE_KEYS).map((key) => ({
+    key,
+    enabled: saved.has(key) ? saved.get(key) : true,
+    locked: false
+  })).concat([
+    { key: 'system', enabled: true, locked: true },
+    { key: 'security', enabled: true, locked: true }
+  ]);
+}
+
+function notificationPreferenceEnabled(userId, key) {
+  if (!key || !NOTIFICATION_PREFERENCE_KEYS.has(key)) return true;
+  const row = db.prepare('SELECT enabled FROM user_notification_preferences WHERE user_id = ? AND preference_key = ?').get(userId, key);
+  return row ? Boolean(row.enabled) : true;
+}
+
+function setNotificationPreference(userId, key, enabled) {
+  if (!NOTIFICATION_PREFERENCE_KEYS.has(key)) return null;
+  const now = new Date().toISOString();
+  db.prepare(`
+    INSERT INTO user_notification_preferences (id, user_id, preference_key, enabled, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+    ON CONFLICT(user_id, preference_key) DO UPDATE SET
+      enabled = excluded.enabled,
+      updated_at = excluded.updated_at
+  `).run(`notification-pref:${crypto.randomUUID()}`, userId, key, enabled ? 1 : 0, now, now);
+  return { key, enabled: Boolean(enabled), locked: false };
+}
+
 function unreadNotificationCount(userId) {
   if (!userId) return 0;
   return Number(db.prepare(`
@@ -2382,6 +2610,8 @@ function createNotification({
   const cleanBody = cleanText(body, 600);
   if (!targetUser || !cleanTitle) return null;
   if (actorUserId && actorUserId === userId && type !== 'announcement' && type !== 'account_restricted') return null;
+  const preferenceKey = notificationPreferenceKey({ type, title: cleanTitle });
+  if (preferenceKey && !notificationPreferenceEnabled(userId, preferenceKey)) return null;
   const notification = {
     id: `notification:${crypto.randomUUID()}`,
     userId,
@@ -2824,6 +3054,13 @@ function searchUni(user, { q, scope = 'all', limit = 30, offset = 0 } = {}) {
 }
 
 function ensureSystemAnnouncements() {
+  createAnnouncement({
+    id: 'update:5.5.8',
+    type: 'update',
+    title: 'Sonoma 5.5.8 已上线',
+    content: '新增我的内容中心、我的帖子/评论/回复/收藏、本机草稿管理、论坛排序筛选、用户主页社区摘要和通知偏好设置。',
+    priority: 'high'
+  });
   createAnnouncement({
     id: 'update:5.5.7',
     type: 'update',
@@ -3497,6 +3734,84 @@ app.post('/api/notifications/read-all', (req, res) => {
   res.json({ ok: true, unreadCount: 0 });
 });
 
+app.get('/api/me/community-workspace', (req, res) => {
+  const user = requireApiUser(req, res);
+  if (!user) return;
+  res.json(myCommunityWorkspace(user.id));
+});
+
+app.get('/api/me/posts', (req, res) => {
+  const user = requireApiUser(req, res);
+  if (!user) return;
+  res.json({
+    items: myForumPosts(user.id, req.query.sort, req.query.limit, req.query.offset)
+  });
+});
+
+app.get('/api/me/comments', (req, res) => {
+  const user = requireApiUser(req, res);
+  if (!user) return;
+  res.json({
+    items: myForumComments(user.id, false, req.query.limit, req.query.offset)
+  });
+});
+
+app.get('/api/me/replies', (req, res) => {
+  const user = requireApiUser(req, res);
+  if (!user) return;
+  res.json({
+    items: myForumComments(user.id, true, req.query.limit, req.query.offset)
+  });
+});
+
+app.get('/api/me/favorites', (req, res) => {
+  const user = requireApiUser(req, res);
+  if (!user) return;
+  res.json({
+    items: myForumFavorites(user.id, req.query.limit, req.query.offset)
+  });
+});
+
+app.get('/api/me/notification-preferences', (req, res) => {
+  const user = requireApiUser(req, res);
+  if (!user) return;
+  res.json({ items: listNotificationPreferences(user.id) });
+});
+
+app.post('/api/me/notification-preferences', (req, res) => {
+  const user = requireApiUser(req, res);
+  if (!user) return;
+  const key = cleanText(req.body && req.body.key, 80);
+  if (!NOTIFICATION_PREFERENCE_KEYS.has(key)) {
+    res.status(400).json({ error: '这个通知偏好不可修改' });
+    return;
+  }
+  setNotificationPreference(user.id, key, Boolean(req.body && req.body.enabled));
+  res.json({ items: listNotificationPreferences(user.id) });
+});
+
+app.get('/api/users/:id/community-summary', (req, res) => {
+  const user = requireApiUser(req, res);
+  if (!user) return;
+  const summary = userCommunitySummary(req.params.id, user.id);
+  if (!summary) {
+    res.status(404).json({ error: '用户不存在' });
+    return;
+  }
+  res.json(summary);
+});
+
+app.get('/api/forum/posts', (req, res) => {
+  const user = requireApiUser(req, res);
+  if (!user) return;
+  const options = cleanForumListOptions(req.query || {});
+  res.json({
+    posts: listForumPosts(user.id, options),
+    sort: options.sort,
+    filter: options.filter
+  });
+});
+
 app.get('/api/search', (req, res) => {
   const user = requireApiUser(req, res);
   if (!user) return;
@@ -3716,9 +4031,9 @@ io.on('connection', (socket) => {
     broadcastAdminDashboards();
   });
 
-  socket.on('get forum posts', () => {
+  socket.on('get forum posts', (payload = {}) => {
     if (!requireAuth(socket, '查看论坛')) return;
-    emitForumPosts(socket);
+    emitForumPosts(socket, payload);
   });
 
 	  socket.on('upload post image', (payload = {}) => {

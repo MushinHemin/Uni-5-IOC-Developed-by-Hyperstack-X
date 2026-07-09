@@ -48,13 +48,28 @@ These notes document the current Web implementation for future Uni 6 Nordkapp na
 - `GET /api/notifications/unread-count`: HTTP helper for notification and chat unread counts.
 - `POST /api/notifications/:id/read`: marks one notification read.
 - `POST /api/notifications/read-all`: marks all notifications read.
+- `GET /api/me/notification-preferences`: returns the current user's configurable notification preferences. Missing rows default to enabled.
+- `POST /api/me/notification-preferences`: updates one whitelisted configurable preference for the current user. System and safety notifications remain always on.
 - `GET /api/search?q=&scope=`: HTTP helper for global search.
 - `GET /api/messages/:messageId/reactions`: HTTP helper for Reaction summaries.
 - `POST /api/messages/:messageId/reaction`: HTTP helper to toggle a Reaction.
+- Configurable notification preference keys currently include `forum_comment`, `forum_reply`, `post_like`, `comment_like`, `star_received`, `sticker_review`, and `creator_result`.
+- Always-on notification categories include system announcements, account restrictions, and safety/report processing notices.
+
+## Community Workspace
+
+- `GET /api/me/community-workspace`: returns current-user overview counts, recent posts, recent comments, recent replies, recent favorites, and unread notification count.
+- `GET /api/me/posts?sort=latest|updated`: returns only the current user's forum posts. It includes safe text summaries and interaction counts.
+- `GET /api/me/comments`: returns only the current user's root comments with their target post title and floor labels when available.
+- `GET /api/me/replies`: returns only the current user's replies with target post information and reply floor labels when available.
+- `GET /api/me/favorites`: returns only posts favorited by the current user. If a target post is unavailable, the API returns a safe unavailable item instead of leaking content.
+- Local draft management is a front-end `localStorage` behavior, not a server API. Drafts are filtered by the current user identity and can be continued or deleted from the Community Workspace.
+- The workspace does not expose other users' private notification state, local drafts, or admin review information.
 
 ## Forum
 
-- `get forum posts`: retrieves posts sorted by newest first.
+- `get forum posts`: retrieves posts with optional `sort` and `filter` payload values. Valid sorts are `latest`, `updated`, `comments`, `likes`, and `favorites`. Valid filters are `all`, `mine`, `favorites`, `has_images`, and `edited`.
+- `GET /api/forum/posts?sort=&filter=&limit=&offset=`: HTTP helper for the same forum list behavior. Sort/filter values are server-side whitelisted and SQL is parameterized.
 - `get forum post`: retrieves a post detail and comments.
 - `upload post image`: uploads a post-editor image from a data URL. Server validates image type and max size, stores it under `/uploads/post-images/`, and returns `post image uploaded`.
 - `create forum post`: creates a post with title, plain-text content, and optional sanitized `contentHtml`.
@@ -76,6 +91,8 @@ These notes document the current Web implementation for future Uni 6 Nordkapp na
 - Like/favorite/comment-like/reply actions are guarded in the client with pending states and remain validated server-side for login and banned-user restrictions.
 - Global search uses safe plain-text post content (`content_text`) and comment text rather than raw rich HTML.
 - Replies and selected forum engagement events feed the notification center without notifying the actor about their own action.
+- Forum sorting and private filters (`mine`, `favorites`) require login. Invalid sort/filter values fall back to safe defaults.
+- User profile community summaries are served through `GET /api/users/:id/community-summary`, returning public counts and recent public posts. The viewed user's favorites count is only included for self.
 
 ## Bulletins
 
