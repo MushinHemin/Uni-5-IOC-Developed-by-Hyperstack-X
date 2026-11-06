@@ -66,12 +66,15 @@ const TYPING_TIMEOUT_MS = 3000;
 const AUTH_WINDOW_MS = 60 * 1000;
 const AUTH_MAX_ATTEMPTS = 8;
 const ADMIN_ACCOUNT = cleanEnv(process.env.ADMIN_ACCOUNT) || 'admin';
-const ADMIN_PASSWORD = cleanEnv(process.env.ADMIN_PASSWORD) || 'change-me-admin-password';
+const ADMIN_PASSWORD = cleanEnv(process.env.ADMIN_PASSWORD);
 const ADMIN_USERNAME = cleanEnv(process.env.ADMIN_USERNAME) || 'Administrator';
 const DEFAULT_ROOM_ID = 'club-91';
 const DEFAULT_ROOM_NAME = 'UniIOC World Channel';
 const RECALL_WINDOW_MS = 2 * 60 * 1000;
 const GROUP_CODE_WINDOW_MS = 10 * 60 * 1000;
+let currentGroupInvite = null;
+let transactionSequence = 0;
+const groupInviteAttempts = new Map();
 const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp']);
 const ALLOWED_AVATAR_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const ALLOWED_AUDIO_TYPES = new Set(['audio/webm', 'audio/mp4', 'audio/mpeg', 'audio/ogg', 'audio/wav']);
@@ -149,10 +152,14 @@ function parseAllowedOrigins(value) {
   return configured.length > 0 ? configured : DEFAULT_ALLOWED_ORIGINS;
 }
 
+function isStrongBootstrapPassword(password) {
+  return typeof password === 'string' && password.length >= 12 &&
+    !['change-me-admin-password', 'replace-with-a-strong-password'].includes(password);
+}
+
 function warnIfDefaultAdminPassword() {
-  const configuredPassword = cleanEnv(process.env.ADMIN_PASSWORD);
-  if (!configuredPassword || configuredPassword === 'change-me-admin-password' || configuredPassword === 'mushin') {
-    console.warn('[Uni 5 security] ADMIN_PASSWORD is missing or weak. Set a strong ADMIN_PASSWORD in .env before sharing or deploying.');
+  if (!isStrongBootstrapPassword(ADMIN_PASSWORD)) {
+    console.warn('[Uni 5 security] No strong bootstrap password configured; existing administrator credentials are preserved. New administrator creation will be refused.');
   }
 }
 
@@ -210,29 +217,46 @@ function readJsonArray(filePath, label) {
   }
 }
 
-function loadHistory() {
-  const rows = db.prepare(`
-    SELECT * FROM (
-      SELECT * FROM messages ORDER BY created_at DESC LIMIT ?
-    ) ORDER BY created_at ASC
-  `).all(MAX_HISTORY_MESSAGES);
-  if (rows.length > 0) return rows.map(rowToMessage).filter(Boolean);
+function transaction(operation) {
+  const name = `uni_${++transactionSequence}`;
+  db.exec(`SAVEPOINT ${name}`);
+  try { const result = operation(); db.exec(`RELEASE ${name}`); return result; }
+  catch (error) { db.exec(`ROLLBACK TO ${name}; RELEASE ${name}`); throw error; }
+}
 
-  const history = trimHistory(readJsonArray(DATA_FILE, '聊天记录').map(normalizeMessage).filter(Boolean));
-  history.forEach(upsertMessage);
-  return history;
+function importLegacyOnce(key, table, file, normalize, save) {
+  if (db.prepare('SELECT 1 FROM data_migrations WHERE name=?').get(key)) return;
+  transaction(() => {
+    const existing = db.prepare(`SELECT count(*) AS n FROM ${table}`).get().n;
+    let imported = 0;
+    if (!existing && fs.existsSync(file)) {
+      // Never rewrite malformed source JSON or silently discard invalid records.
+      const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
+      if (!Array.isArray(raw)) throw new Error('Legacy import requires an array');
+      const seen = new Set();
+      for (const record of raw) {
+        const value = normalize(record);
+        if (!value || seen.has(value.id)) throw new Error('Legacy import contains invalid/duplicate records; source retained');
+        seen.add(value.id); save(value); imported++;
+      }
+    }
+    db.prepare('INSERT INTO data_migrations(name,details,completed_at) VALUES(?,?,?)')
+      .run(key, JSON.stringify({ existing, imported }), new Date().toISOString());
+  });
+}
+
+function loadHistory() {
+  importLegacyOnce('legacy-messages-v1', 'messages', DATA_FILE, normalizeMessage, upsertMessage);
+  return db.prepare('SELECT * FROM (SELECT * FROM messages ORDER BY created_at DESC,id DESC LIMIT ?) ORDER BY created_at,id')
+    .all(MAX_HISTORY_MESSAGES).map(rowToMessage).filter(Boolean);
 }
 
 let saveQueue = Promise.resolve();
 let userSaveQueue = Promise.resolve();
 
 function loadUsers() {
-  const rows = db.prepare('SELECT * FROM users ORDER BY created_at ASC').all();
-  if (rows.length > 0) return rows.map(rowToUser).filter(Boolean);
-
-  const migratedUsers = readJsonArray(USERS_FILE, '用户数据').map(normalizeUser).filter(Boolean);
-  migratedUsers.forEach(upsertUser);
-  return migratedUsers;
+  importLegacyOnce('legacy-users-v1', 'users', USERS_FILE, normalizeUser, upsertUser);
+  return db.prepare('SELECT * FROM users ORDER BY created_at').all().map(rowToUser).filter(Boolean);
 }
 
 function loadRooms() {
@@ -240,13 +264,6 @@ function loadRooms() {
   return rows.map(rowToRoom).filter(Boolean);
 }
 
-function saveHistory(messages) {
-  try {
-    trimHistory(messages).forEach(upsertMessage);
-  } catch (error) {
-    console.error('保存聊天记录失败:', error.message);
-  }
-}
 
 function saveUsers() {
   try {
@@ -657,8 +674,8 @@ function normalizeMessage(message) {
     };
   }
 
-  const text = cleanText(content);
-  if (!text) return null;
+  const text = content;
+  if (!text.trim()) return null;
   return {
     id: message.id || crypto.randomUUID(),
     roomId,
@@ -1089,7 +1106,15 @@ function initDatabase() {
 	  db.exec('CREATE INDEX IF NOT EXISTS idx_post_images_bound_created ON post_images(is_bound, created_at)');
 	  db.exec('CREATE INDEX IF NOT EXISTS idx_post_images_draft_token ON post_images(draft_token)');
   backfillForumContentFields();
-  backfillCommentFloors();
+  db.exec(`CREATE TABLE IF NOT EXISTS data_migrations(name TEXT PRIMARY KEY, details TEXT NOT NULL, completed_at TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS post_image_refs(image_id TEXT NOT NULL REFERENCES post_images(id) ON DELETE CASCADE,
+      post_id TEXT NOT NULL REFERENCES posts(id) ON DELETE CASCADE, PRIMARY KEY(image_id,post_id));
+    CREATE INDEX IF NOT EXISTS idx_messages_room_cursor ON messages(room_id,created_at,id);`);
+  ensureColumn('post_images', 'unbound_at', "TEXT NOT NULL DEFAULT ''");
+  ensureColumn('post_images', 'quarantined_at', "TEXT NOT NULL DEFAULT ''");
+  ensureColumn('post_reports', 'original_post_id', "TEXT NOT NULL DEFAULT ''");
+  transaction(() => { backfillCommentFloors(); refreshPostImageReferences(); });
+  recoverQuarantinedPostImages();
   ensureOfficialStickers();
   ensureDefaultRoom();
   ensureSystemAnnouncements();
@@ -1163,6 +1188,12 @@ function migrateForumTable({ tableName, legacyIdColumn, columnsSql, copySql }) {
     db.exec(`ALTER TABLE ${tableName} RENAME TO ${legacyTable}`);
     db.exec(`CREATE TABLE ${tableName} (${columnsSql})`);
     db.exec(copySql(legacyTable));
+    if (db.prepare(`SELECT count(*) AS n FROM ${tableName}`).get().n !== db.prepare(`SELECT count(*) AS n FROM ${legacyTable}`).get().n) {
+      throw new Error('Legacy table migration would omit records; transaction rolled back');
+    }
+    db.exec('CREATE TABLE IF NOT EXISTS legacy_table_archive(source_table TEXT NOT NULL,row_json TEXT NOT NULL,archived_at TEXT NOT NULL)');
+    for (const row of db.prepare(`SELECT * FROM ${legacyTable}`).all()) db.prepare('INSERT INTO legacy_table_archive VALUES(?,?,?)')
+      .run(legacyTable,JSON.stringify(row),new Date().toISOString());
     db.exec(`DROP TABLE ${legacyTable}`);
     db.exec('COMMIT');
   } catch (error) {
@@ -1191,31 +1222,26 @@ function backfillForumContentFields() {
 }
 
 function backfillCommentFloors() {
-  const postRows = db.prepare('SELECT DISTINCT post_id FROM comments').all();
-  postRows.forEach((postRow) => {
-    const postId = postRow.post_id;
-    const roots = db.prepare(`
-      SELECT id, floor_number FROM comments
-      WHERE post_id = ? AND (parent_comment_id = '' OR parent_comment_id IS NULL)
-      ORDER BY created_at ASC, id ASC
-    `).all(postId);
-    roots.forEach((comment, index) => {
-      const floor = Number(comment.floor_number) > 0 ? Number(comment.floor_number) : index + 1;
-      if (Number(comment.floor_number) <= 0) {
-        db.prepare('UPDATE comments SET floor_number = ?, reply_number = 0 WHERE id = ?').run(floor, comment.id);
+  const orphans = db.prepare(`SELECT c.* FROM comments c LEFT JOIN comments p ON p.id=c.parent_comment_id
+    WHERE c.parent_comment_id!='' AND p.id IS NULL ORDER BY c.created_at,c.id`).all();
+  for (const reply of orphans) {
+    db.prepare(`INSERT OR IGNORE INTO comments(id,post_id,user_id,username,avatar,content,parent_comment_id,floor_number,reply_number,is_deleted,created_at)
+      VALUES(?,?,?,?,?,?,'',?,0,1,?)`).run(reply.parent_comment_id,reply.post_id,'','已删除评论','', '原评论已删除',reply.floor_number||0,reply.created_at);
+  }
+  for (const {post_id: postId} of db.prepare('SELECT DISTINCT post_id FROM comments').all()) {
+    const roots = db.prepare("SELECT * FROM comments WHERE post_id=? AND COALESCE(parent_comment_id,'')='' ORDER BY created_at,id").all(postId);
+    let next = Math.max(0,...roots.map(c=>c.floor_number||0));
+    for (const root of roots) {
+      const floor = root.floor_number > 0 ? root.floor_number : ++next;
+      if (!root.floor_number) db.prepare('UPDATE comments SET floor_number=? WHERE id=?').run(floor,root.id);
+      const replies = db.prepare('SELECT id,reply_number,floor_number FROM comments WHERE post_id=? AND parent_comment_id=? ORDER BY created_at,id').all(postId,root.id);
+      let replyNext = Math.max(0,...replies.map(c=>c.reply_number||0));
+      for (const reply of replies) {
+        if (reply.floor_number <= 0 || reply.reply_number <= 0) db.prepare('UPDATE comments SET floor_number=?,reply_number=? WHERE id=?')
+          .run(reply.floor_number > 0 ? reply.floor_number : floor,reply.reply_number > 0 ? reply.reply_number : ++replyNext,reply.id);
       }
-      const replies = db.prepare(`
-        SELECT id, reply_number FROM comments
-        WHERE post_id = ? AND parent_comment_id = ?
-        ORDER BY created_at ASC, id ASC
-      `).all(postId, comment.id);
-      replies.forEach((reply, replyIndex) => {
-        if (Number(reply.reply_number) <= 0 || Number(reply.floor_number) <= 0) {
-          db.prepare('UPDATE comments SET floor_number = ?, reply_number = ? WHERE id = ?').run(floor, replyIndex + 1, reply.id);
-        }
-      });
-    });
-  });
+    }
+  }
 }
 
 function rowToUser(row) {
@@ -1302,7 +1328,7 @@ function rowToComment(row) {
   if (!row) return null;
   const commentId = cleanForumId(row.id || row.comment_id);
   const postId = cleanForumId(row.post_id);
-  const content = cleanCommentContent(row.content);
+  const content = row.is_deleted ? '此评论已删除' : cleanCommentContent(row.content);
   if (!commentId || !postId || !content) return null;
   return {
     id: commentId,
@@ -1430,8 +1456,7 @@ function ensureDefaultRoom() {
 }
 
 function upsertMessage(message) {
-  const payload = publicMessage(message);
-  if (!payload) return;
+  if (!message) return;
   db.prepare(`
     INSERT INTO messages (id, room_id, type, user_id, username, avatar, content, sticker_id, duration, recalled, created_at)
     VALUES (@id, @roomId, @type, @userId, @username, @avatar, @content, @stickerId, @duration, @recalled, @timestamp)
@@ -1447,9 +1472,12 @@ function upsertMessage(message) {
       recalled = excluded.recalled,
       created_at = excluded.created_at
   `).run({
-    ...payload,
-    stickerId: payload.stickerId || '',
-    recalled: payload.recalled ? 1 : 0
+    id: message.id, roomId: message.roomId || DEFAULT_ROOM_ID,
+    type: message.type, userId: message.userId || '',
+    username: message.username || '', avatar: message.avatar || '',
+    content: message.recalled ? '' : (message.content || ''),
+    stickerId: message.stickerId || '', duration: message.duration || 0,
+    timestamp: message.timestamp, recalled: message.recalled ? 1 : 0
   });
 }
 
@@ -1558,7 +1586,7 @@ function publicForumComment(comment, viewerUserId = '') {
     displayName,
     avatar: comment.avatar || makeAvatar(displayName),
     starCount: currentUser ? starCountForUser(currentUser.id) : starCountForUser(comment.userId),
-    content: comment.content,
+    content: comment.isDeleted ? '此评论已删除' : comment.content,
     parentCommentId: comment.parentCommentId || '',
     floorNumber: Number(comment.floorNumber || 0),
     replyNumber: Number(comment.replyNumber || 0),
@@ -1568,6 +1596,32 @@ function publicForumComment(comment, viewerUserId = '') {
     likedByMe: userLikedComment(viewerUserId, comment.commentId),
     createdAt: comment.createdAt
   };
+}
+
+class InputError extends Error {}
+
+// Numeric strings are accepted for HTTP query compatibility; everything else is strict.
+function pageInteger(value, fallback, min, max, name) {
+  if (value === undefined) return fallback;
+  if (typeof value !== 'number' && !(typeof value === 'string' && /^\d+$/.test(value))) {
+    throw new InputError(`${name} 分页参数必须是整数`);
+  }
+  const number = Number(value);
+  if (!Number.isSafeInteger(number) || number < min || number > max) {
+    throw new InputError(`${name} 分页参数范围为 ${min}–${max}`);
+  }
+  return number;
+}
+
+function pagination(limit, offset, defaultLimit, maxLimit) {
+  return { limit: pageInteger(limit, defaultLimit, 1, maxLimit, 'limit'),
+    offset: pageInteger(offset, 0, 0, 1000000, 'offset') };
+}
+
+function forumChoice(value, choices, fallback) {
+  if (value === undefined) return fallback;
+  if (!choices.includes(value)) throw new InputError('论坛筛选或排序参数无效');
+  return value;
 }
 
 function cleanForumSort(value) {
@@ -1589,18 +1643,16 @@ function forumOrderSql(sort) {
 }
 
 function listForumPosts(viewerUserId = '', options = {}) {
-  const sort = cleanForumSort(options.sort);
-  const filter = cleanForumFilter(options.filter);
-  const limit = Math.min(Math.max(Number(options.limit) || MAX_FORUM_POSTS, 1), MAX_FORUM_POSTS);
-  const offset = Math.max(Number(options.offset) || 0, 0);
+  const { sort, filter, limit, offset } = cleanForumListOptions(options);
   const where = [];
-  const params = { viewerUserId, limit, offset };
+  const params = { limit, offset };
+  if (filter === 'mine' || filter === 'favorites') params.viewerUserId = viewerUserId;
   if (filter === 'mine') {
     where.push('posts.user_id = @viewerUserId');
   } else if (filter === 'favorites') {
     where.push('EXISTS (SELECT 1 FROM post_favorites pf_filter WHERE pf_filter.post_id = posts.id AND pf_filter.user_id = @viewerUserId)');
   } else if (filter === 'has_images') {
-    where.push("EXISTS (SELECT 1 FROM post_images pi_filter WHERE pi_filter.post_id = posts.id AND pi_filter.is_bound = 1)");
+    where.push("(EXISTS (SELECT 1 FROM post_image_refs ir WHERE ir.post_id=posts.id) OR EXISTS (SELECT 1 FROM post_images pi_filter WHERE pi_filter.post_id = posts.id AND pi_filter.is_bound = 1))");
   } else if (filter === 'edited') {
     where.push("posts.edited_at IS NOT NULL AND TRIM(posts.edited_at) != ''");
   }
@@ -1640,7 +1692,7 @@ function listForumComments(postIdValue, viewerUserId = '') {
   if (!postId) return [];
   return db.prepare(`
     SELECT * FROM comments
-    WHERE post_id = ? AND is_deleted = 0
+    WHERE post_id = ?
     ORDER BY floor_number ASC, reply_number ASC, created_at ASC
   `).all(postId).map(rowToComment).filter(Boolean).map((comment) => publicForumComment(comment, viewerUserId));
 }
@@ -1660,6 +1712,7 @@ function myForumPosts(userId, sort = 'latest', limit = 60, offset = 0) {
 }
 
 function myForumFavorites(userId, limit = 60, offset = 0) {
+  const page = pagination(limit, offset, 60, 80);
   return db.prepare(`
     SELECT posts.*, post_favorites.created_at AS favorited_at,
       COUNT(DISTINCT comments.id) AS comment_count
@@ -1670,7 +1723,7 @@ function myForumFavorites(userId, limit = 60, offset = 0) {
     GROUP BY post_favorites.id
     ORDER BY post_favorites.created_at DESC
     LIMIT ? OFFSET ?
-  `).all(userId, Math.min(Number(limit) || 60, 80), Math.max(Number(offset) || 0, 0)).map((row) => {
+  `).all(userId, page.limit, page.offset).map((row) => {
     if (!row.id) return { unavailable: true, favoritedAt: row.favorited_at || '' };
     const post = forumPostSummary(row, userId);
     return post ? { ...post, favoritedAt: row.favorited_at || '' } : null;
@@ -1678,6 +1731,7 @@ function myForumFavorites(userId, limit = 60, offset = 0) {
 }
 
 function myForumComments(userId, replies = false, limit = 80, offset = 0) {
+  const page = pagination(limit, offset, 80, 100);
   return db.prepare(`
     SELECT comments.*, posts.title AS post_title
     FROM comments
@@ -1687,7 +1741,7 @@ function myForumComments(userId, replies = false, limit = 80, offset = 0) {
       AND ${replies ? "TRIM(comments.parent_comment_id) != ''" : "(comments.parent_comment_id IS NULL OR TRIM(comments.parent_comment_id) = '')"}
     ORDER BY comments.created_at DESC
     LIMIT ? OFFSET ?
-  `).all(userId, Math.min(Number(limit) || 80, 100), Math.max(Number(offset) || 0, 0)).map((row) => {
+  `).all(userId, page.limit, page.offset).map((row) => {
     const comment = publicForumComment(rowToComment(row), userId);
     return comment ? {
       ...comment,
@@ -1788,7 +1842,7 @@ function rawForumComment(commentId) {
 function nextCommentFloor(postId, parentCommentId = '') {
   if (parentCommentId) {
     const parent = rowToComment(rawForumComment(parentCommentId));
-    if (!parent || parent.postId !== postId || parent.parentCommentId) return null;
+    if (!parent || parent.isDeleted || parent.postId !== postId || parent.parentCommentId) return null;
     const nextReply = Number(db.prepare(`
       SELECT COALESCE(MAX(reply_number), 0) + 1 AS next FROM comments
       WHERE post_id = ? AND parent_comment_id = ?
@@ -1802,23 +1856,28 @@ function nextCommentFloor(postId, parentCommentId = '') {
   return { floorNumber: nextFloor, replyNumber: 0 };
 }
 
-function updatePostImagesForPost(userId, postId, contentHtml) {
-  const urls = Array.from(new Set(String(contentHtml || '').match(/\/uploads\/post-images\/[a-zA-Z0-9_.-]+\.(?:jpg|jpeg|png|webp|gif)/g) || []))
-    .filter(isSafePostImageUrl)
-    .slice(0, MAX_POST_IMAGES);
+function referencedImageUrls(post) {
+  // Conservative matching also protects legacy plain/HTML content and cross-author reuse.
+  return new Set((String(post.content_html || '') + ' ' + String(post.content || '')).match(/\/uploads\/post-images\/[a-zA-Z0-9_.-]+\.(?:jpg|jpeg|png|webp|gif)/g) || []);
+}
+
+function refreshPostImageReferences() {
+  const posts = db.prepare('SELECT id,content_html,content FROM posts').all().map(p=>({id:p.id,urls:referencedImageUrls(p)}));
   const now = new Date().toISOString();
-  db.prepare(`
-    UPDATE post_images
-    SET post_id = '', is_bound = 0, updated_at = ?
-    WHERE post_id = ? AND url NOT IN (${urls.length ? urls.map(() => '?').join(',') : "''"})
-  `).run(now, postId, ...urls);
-  if (urls.length === 0) return [];
-  const placeholders = urls.map(() => '?').join(',');
-  db.prepare(`
-    UPDATE post_images SET post_id = ?, is_bound = 1, updated_at = ?
-    WHERE user_id = ? AND url IN (${placeholders})
-  `).run(postId, now, userId, ...urls);
-  return urls;
+  db.exec('DELETE FROM post_image_refs');
+  for (const image of db.prepare('SELECT * FROM post_images').all()) {
+    const refs = posts.filter(p=>p.urls.has(image.url));
+    for (const post of refs) db.prepare('INSERT INTO post_image_refs(image_id,post_id) VALUES(?,?)').run(image.id,post.id);
+    db.prepare('UPDATE post_images SET post_id=?,is_bound=?,unbound_at=?,draft_token=?,updated_at=? WHERE id=?')
+      .run(refs[0]?.id || '',refs.length?1:0,refs.length?'':(image.is_bound || !image.unbound_at ? now : image.unbound_at),refs.length?'':image.draft_token,now,image.id);
+  }
+}
+
+function updatePostImagesForPost(userId, postId, contentHtml) {
+  // Post content must already be written inside the caller's transaction.
+  refreshPostImageReferences();
+  recoverQuarantinedPostImages();
+  return [...referencedImageUrls({content_html:contentHtml})];
 }
 
 function togglePostLike(user, postIdValue) {
@@ -1945,34 +2004,53 @@ function buildMaintenanceStatus() {
   };
 }
 
-function cleanupOrphanPostImages() {
-  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-  const rows = db.prepare(`
-    SELECT * FROM post_images
-    WHERE (post_id IS NULL OR TRIM(post_id) = '' OR is_bound = 0)
-      AND created_at < ?
-  `).all(cutoff);
-  let deleted = 0;
-  let bytes = 0;
-  const removeRecord = db.prepare('DELETE FROM post_images WHERE id = ?');
-  rows.forEach((row) => {
-    if (!isSafePostImageUrl(row.url)) return;
-    const filePath = postImageFilePath(row.url);
-    if (!filePath || !filePath.startsWith(POST_IMAGE_UPLOAD_DIR)) return;
-    try {
-      if (fs.existsSync(filePath)) {
-        bytes += fs.statSync(filePath).size;
-        fs.unlinkSync(filePath);
-      } else {
-        bytes += Number(row.size_bytes || 0);
-      }
-      removeRecord.run(row.id);
-      deleted += 1;
-    } catch (error) {
-      // Skip files that cannot be safely removed; the next maintenance pass can try again.
+function quarantinePath(image) {
+  return path.join(__dirname, 'image-quarantine', path.basename(postImageFilePath(image.url)));
+}
+
+function recoverQuarantinedPostImages(restoreAll = false) {
+  for (const row of db.prepare('SELECT * FROM post_images').all()) {
+    if (!isSafePostImageUrl(row.url)) continue;
+    const source = quarantinePath(row), destination = postImageFilePath(row.url);
+    if (!fs.existsSync(source)) {
+      if (row.quarantined_at && fs.existsSync(destination)) db.prepare("UPDATE post_images SET quarantined_at='',unbound_at=? WHERE id=?").run(new Date().toISOString(),row.id);
+      continue;
     }
-  });
-  return { deleted, bytes };
+    const referenced = db.prepare('SELECT 1 FROM post_image_refs WHERE image_id=?').get(row.id);
+    if (!restoreAll && row.quarantined_at && !referenced) continue;
+    if (fs.existsSync(destination)) throw new Error('Image recovery conflict; both files retained');
+    fs.mkdirSync(path.dirname(destination),{recursive:true});
+    fs.renameSync(source,destination);
+    db.prepare("UPDATE post_images SET quarantined_at='',unbound_at=? WHERE id=?").run(new Date().toISOString(),row.id);
+  }
+}
+
+function cleanupOrphanPostImages() {
+  const cutoff = new Date(Date.now()-24*60*60*1000).toISOString();
+  transaction(refreshPostImageReferences);
+  recoverQuarantinedPostImages();
+  let quarantined=0;
+  for (const row of db.prepare("SELECT * FROM post_images WHERE is_bound=0 AND draft_token='' AND unbound_at < ? AND quarantined_at=''").all(cutoff)) {
+    if (!isSafePostImageUrl(row.url)) continue;
+    const original=postImageFilePath(row.url), target=quarantinePath(row);
+    if (!fs.existsSync(original) || !fs.lstatSync(original).isFile() || fs.lstatSync(original).isSymbolicLink()) continue;
+    fs.mkdirSync(path.dirname(target),{recursive:true});
+    if (fs.existsSync(target)) throw new Error('Quarantine conflict; no file overwritten');
+    try {
+      transaction(() => {
+        // Recheck actual content under the database write transaction immediately before moving.
+        if (db.prepare('SELECT content_html,content FROM posts').all().some(p=>referencedImageUrls(p).has(row.url))) return;
+        fs.renameSync(original,target);
+        db.prepare('UPDATE post_images SET quarantined_at=? WHERE id=?').run(new Date().toISOString(),row.id);
+      });
+      if (fs.existsSync(target)) quarantined++;
+    } catch (error) {
+      if (fs.existsSync(target) && !fs.existsSync(original)) fs.renameSync(target,original);
+      throw error;
+    }
+  }
+  // Retain files and metadata for recovery; irreversible disposal requires separate approval/policy.
+  return {deleted:0,bytes:0,quarantined};
 }
 
 function reportReasonLabel(reason) {
@@ -2189,14 +2267,51 @@ function deleteStickerFile(sticker) {
   fs.promises.unlink(filePath).catch(() => {});
 }
 
+function deleteForumCommentById(id) {
+  transaction(() => {
+    db.prepare('UPDATE comments SET is_deleted=1 WHERE id=?').run(id);
+    db.prepare('DELETE FROM comment_likes WHERE comment_id=?').run(id);
+    db.prepare("DELETE FROM notifications WHERE json_extract(CASE WHEN json_valid(metadata_json) THEN metadata_json ELSE '{}' END,'$.commentId')=?").run(id);
+  });
+}
+
+function deleteMessageData(roomId = null) {
+  transaction(() => {
+    const where=roomId===null?'':' WHERE room_id=?';const args=roomId===null?[]:[roomId];
+    db.prepare(`DELETE FROM message_reactions WHERE message_id IN (SELECT id FROM messages${where})`).run(...args);
+    if (roomId===null) {
+      db.exec("DELETE FROM notifications WHERE target_type='chat'; DELETE FROM chat_read_states; DELETE FROM messages;");
+    } else {
+      db.prepare("DELETE FROM notifications WHERE target_type='chat' AND (target_id=? OR json_extract(CASE WHEN json_valid(metadata_json) THEN metadata_json ELSE '{}' END,'$.roomId')=?)").run(roomId,roomId);
+      db.prepare('DELETE FROM chat_read_states WHERE conversation_id=?').run(roomId);
+      db.prepare('DELETE FROM messages WHERE room_id=?').run(roomId);
+    }
+    db.prepare("INSERT OR IGNORE INTO data_migrations VALUES('legacy-messages-v1','explicit deletion',?)").run(new Date().toISOString());
+  });
+}
+
+function deleteRoomData(roomId) {
+  transaction(() => {
+    deleteMessageData(roomId);
+    db.prepare('DELETE FROM room_members WHERE room_id=?').run(roomId);
+    db.prepare('DELETE FROM rooms WHERE id=?').run(roomId);
+  });
+}
+
 function deleteForumPostById(postId) {
   const id = cleanForumId(postId);
   if (!id) return false;
   const post = rawForumPost(id);
   if (!post) return false;
-  db.prepare('DELETE FROM comments WHERE post_id = ?').run(id);
-  db.prepare('DELETE FROM posts WHERE id = ?').run(id);
-  io.to(forumPostChannel(id)).emit('forum post deleted', { postId: id });
+  transaction(() => {
+    db.prepare('DELETE FROM comment_likes WHERE comment_id IN (SELECT id FROM comments WHERE post_id=?)').run(id);
+    db.prepare("DELETE FROM notifications WHERE target_type='post' AND target_id=?").run(id);
+    db.prepare("UPDATE post_reports SET original_post_id=post_id,post_id='',status=CASE WHEN status='pending' THEN 'post_deleted' ELSE status END WHERE post_id=?").run(id);
+    for (const table of ['post_likes','post_favorites','comments','post_image_refs']) db.prepare(`DELETE FROM ${table} WHERE post_id=?`).run(id);
+    db.prepare('DELETE FROM posts WHERE id=?').run(id);
+    refreshPostImageReferences();
+  });
+  emitForumSubscribers(id, 'forum post deleted', { postId: id });
   broadcastForumPosts();
   return true;
 }
@@ -2226,20 +2341,27 @@ function banUser(user, reason = '') {
   return true;
 }
 
+function emitForumSubscribers(postId, event, payload) {
+  for (const socket of io.sockets.sockets.values()) {
+    if (currentSocketUser(socket) && socket.currentForumPostId === postId) socket.emit(event, payload);
+  }
+}
+
 function forumPostChannel(postId) {
   return `forum:${postId}`;
 }
 
 function cleanForumListOptions(payload = {}) {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw new InputError('分页参数必须是对象');
   return {
-    sort: cleanForumSort(payload && payload.sort),
-    filter: cleanForumFilter(payload && payload.filter),
-    limit: Math.min(Math.max(Number(payload && payload.limit) || MAX_FORUM_POSTS, 1), MAX_FORUM_POSTS),
-    offset: Math.max(Number(payload && payload.offset) || 0, 0)
+    sort: forumChoice(payload.sort, ['latest', 'updated', 'comments', 'likes', 'favorites'], 'latest'),
+    filter: forumChoice(payload.filter, ['all', 'mine', 'favorites', 'has_images', 'edited'], 'all'),
+    ...pagination(payload.limit, payload.offset, MAX_FORUM_POSTS, MAX_FORUM_POSTS)
   };
 }
 
 function emitForumPosts(socket, options = socket.forumListOptions || {}) {
+  if (!currentSocketUser(socket)) return;
   const safeOptions = cleanForumListOptions(options);
   socket.forumListOptions = safeOptions;
   socket.emit('forum posts', {
@@ -2251,13 +2373,18 @@ function emitForumPosts(socket, options = socket.forumListOptions || {}) {
 
 function broadcastForumPosts() {
   io.sockets.sockets.forEach((connectedSocket) => {
-    emitForumPosts(connectedSocket, connectedSocket.forumListOptions || {});
+    try {
+      emitForumPosts(connectedSocket, connectedSocket.forumListOptions || {});
+    } catch (error) {
+      console.error('Forum broadcast failed:', error.code || error.name);
+      connectedSocket.emit('forum error', '论坛列表暂时无法加载，请重试');
+    }
   });
 }
 
 function broadcastForumPostDetail(postId) {
   io.sockets.sockets.forEach((connectedSocket) => {
-    if (connectedSocket.currentForumPostId !== postId) return;
+    if (!currentSocketUser(connectedSocket) || connectedSocket.currentForumPostId !== postId) return;
     const userId = connectedSocket.user ? connectedSocket.user.id : '';
     const post = getForumPost(postId, userId);
     if (!post) return;
@@ -2560,8 +2687,7 @@ function unreadNotificationCount(userId) {
 }
 
 function listNotificationsForUser(userId, { unreadOnly = false, limit = 50, offset = 0 } = {}) {
-  const safeLimit = Math.min(Math.max(Number(limit) || 50, 1), 80);
-  const safeOffset = Math.max(Number(offset) || 0, 0);
+  const { limit: safeLimit, offset: safeOffset } = pagination(limit, offset, 50, 80);
   const sql = `
     SELECT * FROM notifications
     WHERE user_id = ? ${unreadOnly ? 'AND is_read = 0' : ''}
@@ -2585,7 +2711,7 @@ function emitUnreadUpdate(userId) {
 }
 
 function emitNotifications(socket) {
-  if (!socket.user) return;
+  if (!currentSocketUser(socket)) return;
   socket.emit('notifications', {
     items: listNotificationsForUser(socket.user.id),
     unreadCount: unreadNotificationCount(socket.user.id)
@@ -2850,7 +2976,7 @@ function canUserAccessRoom(user, roomId) {
 function emitReactionUpdate(message) {
   if (!message) return;
   io.sockets.sockets.forEach((connectedSocket) => {
-    if (!connectedSocket.user || connectedSocket.currentRoomId !== message.roomId) return;
+    if (!currentSocketUser(connectedSocket) || !canUserAccessRoom(connectedSocket.user, message.roomId) || connectedSocket.currentRoomId !== message.roomId) return;
     connectedSocket.emit('reaction:update', {
       messageId: message.id,
       reactions: reactionSummaryForMessage(message.id, connectedSocket.user.id)
@@ -2909,10 +3035,10 @@ function likePattern(query) {
 
 function searchUni(user, { q, scope = 'all', limit = 30, offset = 0 } = {}) {
   const query = cleanSearchQuery(q);
+  pagination(limit, offset, 30, 50);
   if (!user || !query) return { query, scope, results: [] };
   const safeScope = cleanSearchScope(scope);
-  const safeLimit = Math.min(Math.max(Number(limit) || 30, 1), 50);
-  const safeOffset = Math.max(Number(offset) || 0, 0);
+  const { limit: safeLimit, offset: safeOffset } = pagination(limit, offset, 30, 50);
   const pattern = likePattern(query);
   const results = [];
   const include = (name) => safeScope === 'all' || safeScope === name;
@@ -3192,9 +3318,57 @@ function recordLogin(socket, user) {
   saveUsers();
 }
 
+function currentSocketUser(socket) {
+  const user = socket.user && userById(socket.user.id);
+  return user && socket.authPasswordHash === user.passwordHash ? user : null;
+}
+
+function clearSocketIdentity(socket, notify = false) {
+  const previous = socket.user;
+  const previousRoom = socket.currentRoomId;
+  clearTyping(socket);
+  for (const room of Array.from(socket.rooms)) if (room !== socket.id) socket.leave(room);
+  for (const [token, session] of apiSessions) if (session.socketId === socket.id) apiSessions.delete(token);
+  socket.apiToken = '';
+  socket.currentRoomId = '';
+  socket.currentForumPostId = '';
+  socket.forumListOptions = undefined;
+  socket.authPasswordHash = '';
+  socket.user = null;
+  onlineUsers.delete(socket.id);
+  if (previous && previousRoom) emitAuthorizedRoom(previousRoom, 'system', { type: 'leave', username: displayNameOf(previous), roomId: previousRoom });
+  if (notify) socket.emit('loggedOut');
+}
+
+function revokeUserSessions(userId) {
+  for (const [token, session] of apiSessions) if (session.userId === userId) apiSessions.delete(token);
+  for (const socket of io.sockets.sockets.values()) {
+    if (socket.user && socket.user.id === userId) clearSocketIdentity(socket, true);
+  }
+  broadcastOnlineUsers();
+}
+
 function bindUser(socket, user) {
+  clearSocketIdentity(socket, Boolean(socket.user));
   socket.user = user;
+  socket.authPasswordHash = user.passwordHash;
   onlineUsers.set(socket.id, user);
+}
+
+function emitAuthorizedRoom(roomId, event, payload) {
+  for (const recipient of io.sockets.sockets.values()) {
+    const user = currentSocketUser(recipient);
+    if (user && recipient.currentRoomId === roomId && canUserAccessRoom(user, roomId)) recipient.emit(event, payload);
+  }
+}
+
+function requireCurrentRoom(socket) {
+  if (!requireAuth(socket, '使用会话')) return false;
+  if (canUserAccessRoom(socket.user, socket.currentRoomId)) return true;
+  leaveCurrentRoom(socket);
+  socket.currentRoomId = '';
+  socket.emit('messageError', '请先进入有权限的会话');
+  return false;
 }
 
 function syncUserAvatar(user, avatar) {
@@ -3328,7 +3502,7 @@ function privateRoomUsers(roomId) {
 
 function socketsForUser(userId) {
   return Array.from(io.sockets.sockets.values()).filter((connectedSocket) => (
-    connectedSocket.user && connectedSocket.user.id === userId
+    currentSocketUser(connectedSocket) && connectedSocket.user.id === userId
   ));
 }
 
@@ -3403,12 +3577,24 @@ function groupOnlineCount(roomId) {
   return onlineIds.size;
 }
 
+function roomHistoryPage(roomId, viewerUserId, options = {}) {
+  if (!canUserAccessRoom(userById(viewerUserId),roomId)) throw new InputError('没有会话访问权限');
+  const limit = pageInteger(options.limit,MAX_HISTORY_MESSAGES,1,MAX_HISTORY_MESSAGES,'limit');
+  let cursor=''; const params=[roomId];
+  if (options.before !== undefined) {
+    const before=options.before;
+    if (!before || typeof before.id!=='string' || !before.id || before.id.length>200 || typeof before.timestamp!=='string' || Number.isNaN(Date.parse(before.timestamp))) throw new InputError('历史游标无效');
+    cursor=' AND (created_at < ? OR (created_at = ? AND id < ?))';params.push(before.timestamp,before.timestamp,before.id);
+  }
+  const rows=db.prepare(`SELECT * FROM messages WHERE room_id=?${cursor} ORDER BY created_at DESC,id DESC LIMIT ?`).all(...params,limit+1);
+  const hasMore=rows.length>limit;const page=rows.slice(0,limit);const last=page.at(-1);
+  return {roomId,messages:page.reverse().map(rowToMessage).filter(Boolean).map(m=>publicMessage(m,viewerUserId)),hasMore,
+    nextCursor:hasMore&&last?{timestamp:last.created_at,id:last.id}:null};
+}
+
 function messagesForRoom(roomId, viewerUserId = '') {
-  return messages
-    .filter((message) => message.roomId === roomId)
-    .slice(-MAX_HISTORY_MESSAGES)
-    .map((message) => publicMessage(message, viewerUserId))
-    .filter(Boolean);
+  if (!canUserAccessRoom(userById(viewerUserId),roomId)) return [];
+  return roomHistoryPage(roomId,viewerUserId).messages;
 }
 
 function publicRoom(room) {
@@ -3453,28 +3639,17 @@ function broadcastLobby() {
 
 function refreshOpenRooms() {
   io.sockets.sockets.forEach((connectedSocket) => {
-    if (connectedSocket.currentRoomId) {
+    if (currentSocketUser(connectedSocket) && canUserAccessRoom(connectedSocket.user, connectedSocket.currentRoomId)) {
       connectedSocket.emit('history', messagesForRoom(connectedSocket.currentRoomId, connectedSocket.user ? connectedSocket.user.id : ''));
     }
   });
 }
 
 function ensureAdminUser() {
-  const existing = findUserByAccount(ADMIN_ACCOUNT);
-  if (existing) {
-    let changed = false;
-    if (existing.username !== ADMIN_USERNAME) {
-      existing.username = ADMIN_USERNAME;
-      existing.displayName = existing.displayName || ADMIN_USERNAME;
-      if (!isUploadedAvatar(existing.avatar)) existing.avatar = makeAvatar(ADMIN_USERNAME);
-      changed = true;
-    }
-    if (!verifyPassword(ADMIN_PASSWORD, existing.passwordHash)) {
-      existing.passwordHash = hashPassword(ADMIN_PASSWORD);
-      changed = true;
-    }
-    if (changed) saveUsers();
-    return;
+  // Configuration only bootstraps a missing account. Never overwrite existing credentials.
+  if (findUserByAccount(ADMIN_ACCOUNT)) return;
+  if (!isStrongBootstrapPassword(ADMIN_PASSWORD)) {
+    throw new Error('A new administrator requires a non-placeholder ADMIN_PASSWORD of at least 12 characters');
   }
 
   const admin = {
@@ -3492,8 +3667,8 @@ function ensureAdminUser() {
     isStickerCreator: false,
     stickerCreatorStatus: ''
   };
+  upsertUser(admin);
   users.push(admin);
-  saveUsers();
 }
 
 function validateAuthPayload(payload, isRegister = false) {
@@ -3507,7 +3682,9 @@ function validateAuthPayload(payload, isRegister = false) {
 }
 
 function requireAuth(socket, action = '操作') {
-  if (socket.user) return true;
+  const user = currentSocketUser(socket);
+  if (user) { socket.user = user; return true; }
+  if (socket.user) clearSocketIdentity(socket, true);
   socket.emit('authError', `请先登录后再${action}`);
   return false;
 }
@@ -3548,7 +3725,10 @@ function userFromRequest(req) {
   const header = req.headers.authorization || '';
   const token = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
   const session = token ? apiSessions.get(token) : null;
-  return session ? userById(session.userId) : null;
+  if (!session) return null;
+  const socket = io.sockets.sockets.get(session.socketId);
+  const user = socket && currentSocketUser(socket);
+  return user && user.id === session.userId && socket.apiToken === token ? user : null;
 }
 
 function requireApiUser(req, res) {
@@ -3616,22 +3796,36 @@ function emitAdminDashboard(socket) {
 }
 
 function groupCodeInfo(now = Date.now()) {
-  const bucket = Math.floor(now / GROUP_CODE_WINDOW_MS);
-  const hash = crypto.createHash('sha256').update(`beluga:${bucket}:${ADMIN_ACCOUNT}`).digest('hex');
-  const digits = hash.replace(/\D/g, '').padEnd(6, '0').slice(0, 6);
-  return {
-    code: digits,
-    expiresAt: new Date((bucket + 1) * GROUP_CODE_WINDOW_MS).toISOString()
-  };
+  if (!currentGroupInvite || currentGroupInvite.used || now >= currentGroupInvite.expiresAt) {
+    const previous = currentGroupInvite && currentGroupInvite.code;
+    let code;
+    do { code = String(crypto.randomInt(0, 1000000)).padStart(6, '0'); } while (code === previous);
+    currentGroupInvite = { code, expiresAt: now + GROUP_CODE_WINDOW_MS, used: false };
+  }
+  return { code: currentGroupInvite.code, expiresAt: new Date(currentGroupInvite.expiresAt).toISOString() };
 }
 
-function isValidGroupCode(code) {
-  return String(code || '').trim() === groupCodeInfo().code;
+function isValidGroupCode(code, now = Date.now()) {
+  return Boolean(currentGroupInvite && !currentGroupInvite.used && now < currentGroupInvite.expiresAt &&
+    typeof code === 'string' && /^\d{6}$/.test(code.trim()) && code.trim() === currentGroupInvite.code);
+}
+
+function allowGroupInviteAttempt(socket, now = Date.now()) {
+  for (const [key, entry] of groupInviteAttempts) if (now >= entry.until) groupInviteAttempts.delete(key);
+  // Do not trust client-supplied forwarding headers for this security limit.
+  const key = socket.handshake.address || 'unknown-peer';
+  let entry = groupInviteAttempts.get(key);
+  if (!entry) {
+    if (groupInviteAttempts.size >= 10000) return false;
+    entry = { count: 0, until: now + GROUP_CODE_WINDOW_MS };
+    groupInviteAttempts.set(key, entry);
+  }
+  return ++entry.count <= 5;
 }
 
 function broadcastAdminDashboards() {
   io.sockets.sockets.forEach((connectedSocket) => {
-    if (connectedSocket.user && isAdminUser(connectedSocket.user)) {
+    if (currentSocketUser(connectedSocket) && isAdminUser(connectedSocket.user)) {
       emitAdminDashboard(connectedSocket);
     }
   });
@@ -3680,8 +3874,8 @@ function isValidVoiceData(value) {
 }
 
 initDatabase();
-let messages = loadHistory();
 let users = loadUsers();
+let messages = loadHistory();
 notificationsReady = true;
 ensureAdminUser();
 let rooms = loadRooms();
@@ -3845,7 +4039,67 @@ app.post('/api/messages/:messageId/reaction', (req, res) => {
   res.json(result);
 });
 
+app.use((error, req, res, next) => {
+  if (res.headersSent) return next(error);
+  const invalid = error instanceof InputError;
+  if (!invalid) console.error('HTTP operation failed:', error.code || error.name);
+  res.status(invalid ? 400 : 500).json({ error: invalid ? error.message : '操作失败，请稍后重试' });
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Catch synchronous business failures without exposing database details to clients.
+function safeSocketHandler(socket, event, handler) {
+  socket.on(event, (payload, acknowledgement) => {
+    let answered = false;
+    const reply = (result) => {
+      if (answered) return;
+      answered = true;
+      if (typeof acknowledgement === 'function') acknowledgement(result);
+    };
+    try {
+      handler(payload, reply);
+      if (!answered && ['chat message', 'chat image', 'chat voice', 'chat sticker'].includes(event)) {
+        reply({ ok: false, error: '请求未完成，请检查提示后重试' });
+      }
+    } catch (error) {
+      const message = error instanceof InputError ? error.message : '操作失败，未确认成功，请重试';
+      console.error(`Socket operation failed [${event}]:`, error.code || error.name);
+      socket.emit(event.startsWith('admin ') ? 'admin error' : event.includes('forum') ? 'forum error' : 'messageError', message);
+      reply({ ok: false, error: message });
+    }
+  });
+}
+
+function persistAndPublishMessage(socket, data, payload, reply) {
+  const clientId = payload && typeof payload === 'object' ? payload.clientMessageId : undefined;
+  if (clientId !== undefined) {
+    if (typeof clientId !== 'string' || !/^[a-zA-Z0-9_-]{8,100}$/.test(clientId)) throw new InputError('消息重试标识无效');
+    data.id = 'client:' + crypto.createHash('sha256').update(JSON.stringify([socket.user.id, data.roomId, clientId])).digest('hex');
+    const existing = messageById(data.id);
+    if (existing) {
+      if (!existing.recalled && (existing.type !== data.type || existing.content !== data.content || (existing.stickerId || '') !== (data.stickerId || '') || (existing.duration || 0) !== (data.duration || 0))) {
+        throw new InputError('消息重试标识已用于其他内容');
+      }
+      reply({ ok: true, messageId: existing.id, duplicate: true });
+      return;
+    }
+  }
+  // The database is authoritative. Never update cache, acknowledge, or broadcast first.
+  upsertMessage(data);
+  messages = trimHistory([...messages, data]);
+  reply({ ok: true, messageId: data.id });
+  emitAuthorizedRoom(data.roomId, 'chat message', data);
+  try {
+    markRoomRead(socket.user.id, data.roomId);
+    notifyPrivateRecipients(data);
+    notifyChatRecipients(data);
+    broadcastAdminDashboards();
+  } catch (error) {
+    // Delivery is committed; secondary notification failure must not claim it was rolled back.
+    console.error('Message notification failed:', error.code || error.name);
+  }
+}
 
 io.on('connection', (socket) => {
   socket.emit('onlineUsers', { count: onlineUsers.size, users: Array.from(onlineUsers.values()).map(publicUser) });
@@ -4031,12 +4285,12 @@ io.on('connection', (socket) => {
     broadcastAdminDashboards();
   });
 
-  socket.on('get forum posts', (payload = {}) => {
+  safeSocketHandler(socket, 'get forum posts', (payload = {}) => {
     if (!requireAuth(socket, '查看论坛')) return;
     emitForumPosts(socket, payload);
   });
 
-	  socket.on('upload post image', (payload = {}) => {
+	  safeSocketHandler(socket, 'upload post image', (payload = {}) => {
 	    if (!requireCommunityAccess(socket, '上传帖子图片')) return;
 	    const result = savePostImageUpload(socket.user, payload && payload.base64, payload && payload.draftToken);
 	    if (result.error) {
@@ -4046,7 +4300,7 @@ io.on('connection', (socket) => {
 	    socket.emit('post image uploaded', { image: result.image });
   });
 
-  socket.on('create forum post', (payload) => {
+  safeSocketHandler(socket, 'create forum post', (payload) => {
     if (!requireCommunityAccess(socket, '发帖')) return;
     const title = cleanPostTitle(payload && payload.title);
     const incomingHtml = sanitizeRichHtml(payload && payload.contentHtml);
@@ -4080,8 +4334,8 @@ io.on('connection', (socket) => {
 	      updatedAt: new Date().toISOString()
 	    };
     try {
-      insertForumPost(post);
-      updatePostImagesForPost(socket.user.id, post.postId, incomingHtml);
+      transaction(() => { insertForumPost(post);
+      updatePostImagesForPost(socket.user.id, post.postId, incomingHtml); });
     } catch (error) {
       socket.emit('forum error', '发帖失败，请稍后再试');
       return;
@@ -4091,7 +4345,7 @@ io.on('connection', (socket) => {
 	    broadcastForumPosts();
 	  });
 
-	  socket.on('update forum post', (payload) => {
+	  safeSocketHandler(socket, 'update forum post', (payload) => {
 	    if (!requireCommunityAccess(socket, '编辑帖子')) return;
 	    const postId = cleanForumId(payload && payload.postId);
 	    const existing = rawForumPost(postId);
@@ -4122,7 +4376,7 @@ io.on('connection', (socket) => {
 	    }
 	    const now = new Date().toISOString();
 	    try {
-	      updateForumPost({
+	      transaction(() => { updateForumPost({
 	        postId,
 	        title,
 	        content: contentText || content,
@@ -4132,7 +4386,7 @@ io.on('connection', (socket) => {
 	        updatedAt: now,
 	        editedAt: now
 	      });
-	      updatePostImagesForPost(socket.user.id, postId, incomingHtml);
+	      updatePostImagesForPost(socket.user.id, postId, incomingHtml); });
 	    } catch (error) {
 	      socket.emit('forum error', '保存帖子失败，请稍后再试');
 	      return;
@@ -4144,7 +4398,7 @@ io.on('connection', (socket) => {
 	    broadcastAdminDashboards();
 	  });
 
-  socket.on('get forum post', (postIdValue) => {
+  safeSocketHandler(socket, 'get forum post', (postIdValue) => {
     if (!requireAuth(socket, '查看帖子')) return;
     const postId = cleanForumId(postIdValue);
     const post = getForumPost(postId, socket.user.id);
@@ -4160,7 +4414,7 @@ io.on('connection', (socket) => {
     socket.emit('forum post detail', { post, comments: listForumComments(postId, socket.user.id) });
   });
 
-  socket.on('create forum comment', (payload) => {
+  safeSocketHandler(socket, 'create forum comment', (payload) => {
     if (!requireCommunityAccess(socket, '评论')) return;
     const postId = cleanForumId(payload && payload.postId);
     const content = cleanCommentContent(payload && payload.content);
@@ -4192,7 +4446,12 @@ io.on('connection', (socket) => {
       createdAt: new Date().toISOString()
     };
     try {
-      insertForumComment(comment);
+      transaction(() => {
+        const allocated = nextCommentFloor(postId,parentCommentId);
+        if (!allocated) throw new InputError('要回复的评论不存在');
+        comment.floorNumber=allocated.floorNumber;comment.replyNumber=allocated.replyNumber;
+        insertForumComment(comment);
+      });
     } catch (error) {
       socket.emit('forum error', '评论失败，请稍后再试');
       return;
@@ -4213,12 +4472,12 @@ io.on('connection', (socket) => {
         dedupeKey: `forum-comment:${comment.commentId}:${notifyTargetId}`
       });
     }
-    io.to(forumPostChannel(postId)).emit('forum comment created', { comment: publicForumComment(comment) });
+    emitForumSubscribers(postId, 'forum comment created', { comment: publicForumComment(comment) });
     broadcastForumPostDetail(postId);
     broadcastForumPosts();
   });
 
-  socket.on('toggle post like', (postIdValue) => {
+  safeSocketHandler(socket, 'toggle post like', (postIdValue) => {
     if (!requireCommunityAccess(socket, '点赞帖子')) return;
     const result = togglePostLike(socket.user, postIdValue);
     if (result.error) {
@@ -4230,7 +4489,7 @@ io.on('connection', (socket) => {
     broadcastForumPosts();
   });
 
-  socket.on('toggle post favorite', (postIdValue) => {
+  safeSocketHandler(socket, 'toggle post favorite', (postIdValue) => {
     if (!requireCommunityAccess(socket, '收藏帖子')) return;
     const result = togglePostFavorite(socket.user, postIdValue);
     if (result.error) {
@@ -4242,7 +4501,7 @@ io.on('connection', (socket) => {
     broadcastForumPosts();
   });
 
-  socket.on('toggle comment like', (commentIdValue) => {
+  safeSocketHandler(socket, 'toggle comment like', (commentIdValue) => {
     if (!requireCommunityAccess(socket, '点赞评论')) return;
     const result = toggleCommentLike(socket.user, commentIdValue);
     if (result.error) {
@@ -4253,7 +4512,7 @@ io.on('connection', (socket) => {
     if (result.comment && result.comment.postId) broadcastForumPostDetail(result.comment.postId);
   });
 
-  socket.on('delete forum post', (postIdValue) => {
+  safeSocketHandler(socket, 'delete forum post', (postIdValue) => {
     if (!requireAuth(socket, '删除帖子')) return;
     const postId = cleanForumId(postIdValue);
     const post = rawForumPost(postId);
@@ -4274,7 +4533,7 @@ io.on('connection', (socket) => {
     broadcastAdminDashboards();
   });
 
-  socket.on('delete forum comment', (commentIdValue) => {
+  safeSocketHandler(socket, 'delete forum comment', (commentIdValue) => {
     if (!requireAuth(socket, '删除评论')) return;
     const commentId = cleanForumId(commentIdValue);
     const comment = rawForumComment(commentId);
@@ -4287,12 +4546,12 @@ io.on('connection', (socket) => {
       return;
     }
     try {
-      db.prepare('DELETE FROM comments WHERE id = ?').run(commentId);
+      deleteForumCommentById(commentId);
     } catch (error) {
       socket.emit('forum error', '删除评论失败');
       return;
     }
-    io.to(forumPostChannel(comment.post_id)).emit('forum comment deleted', {
+    emitForumSubscribers(comment.post_id, 'forum comment deleted', {
       postId: comment.post_id,
       commentId
     });
@@ -4301,7 +4560,7 @@ io.on('connection', (socket) => {
     broadcastAdminDashboards();
   });
 
-  socket.on('report forum post', (payload) => {
+  safeSocketHandler(socket, 'report forum post', (payload) => {
     if (!requireCommunityAccess(socket, '举报帖子')) return;
     const postId = cleanForumId(payload && payload.postId);
     const reason = cleanReportReason(payload && payload.reason);
@@ -4529,7 +4788,7 @@ io.on('connection', (socket) => {
     emitBulletins(socket);
   });
 
-  socket.on('get notifications', (payload = {}) => {
+  safeSocketHandler(socket, 'get notifications', (payload = {}) => {
     if (!requireAuth(socket, '查看通知')) return;
     socket.emit('notifications', {
       items: listNotificationsForUser(socket.user.id, {
@@ -4555,7 +4814,7 @@ io.on('connection', (socket) => {
     emitNotifications(socket);
   });
 
-  socket.on('search', (payload = {}) => {
+  safeSocketHandler(socket, 'search', (payload = {}) => {
     if (!requireAuth(socket, '搜索')) return;
     socket.emit('search results', searchUni(socket.user, {
       q: payload && payload.q,
@@ -4563,6 +4822,13 @@ io.on('connection', (socket) => {
       limit: payload && payload.limit,
       offset: payload && payload.offset
     }));
+  });
+
+  safeSocketHandler(socket, 'get room history', (payload = {}, reply) => {
+    if (!requireAuth(socket,'读取历史')) return;
+    const roomId=cleanRoomId(payload && payload.roomId);
+    const page=roomHistoryPage(roomId,socket.user.id,payload || {});
+    socket.emit('room history',page);reply({ok:true,...page});
   });
 
   socket.on('join room', (roomIdValue) => {
@@ -4607,7 +4873,7 @@ io.on('connection', (socket) => {
     });
   });
 
-  socket.on('create room', (payload) => {
+  safeSocketHandler(socket, 'create room', (payload) => {
     if (!requireAuth(socket, '创建聊天组')) return;
     const name = cleanRoomName(payload && payload.name);
     const code = payload && payload.code;
@@ -4616,7 +4882,7 @@ io.on('connection', (socket) => {
       socket.emit('messageError', '请输入聊天组名称');
       return;
     }
-    if (!isAdmin && !isValidGroupCode(code)) {
+    if (!isAdmin && (!allowGroupInviteAttempt(socket) || !isValidGroupCode(code))) {
       socket.emit('messageError', '建组码不正确或已过期');
       return;
     }
@@ -4629,9 +4895,14 @@ io.on('connection', (socket) => {
       createdBy: socket.user.id,
       createdAt: new Date().toISOString()
     };
+    db.exec('BEGIN IMMEDIATE');
+    try {
+      upsertRoom(room);
+      ensureRoomMember(room.id, socket.user.id);
+      db.exec('COMMIT');
+    } catch (error) { db.exec('ROLLBACK'); throw error; }
+    if (!isAdmin) currentGroupInvite.used = true;
     rooms.push(room);
-    upsertRoom(room);
-    ensureRoomMember(room.id, socket.user.id);
     joinSocketRoom(socket, room.id);
     socket.emit('room created', { room: publicRoom(room) });
     markRoomRead(socket.user.id, room.id);
@@ -4649,35 +4920,16 @@ io.on('connection', (socket) => {
   });
 
   socket.on('logout', () => {
-    if (!socket.user) {
-      socket.emit('loggedOut');
-      return;
-    }
-
-    const roomId = socket.currentRoomId;
-    const username = displayNameOf(socket.user);
-    clearTyping(socket);
-    if (roomId) {
-      socket.leave(roomChannel(roomId));
-      io.to(roomChannel(roomId)).emit('system', { type: 'leave', username, roomId });
-    }
-    clearApiToken(socket);
-    socket.currentRoomId = '';
-    socket.user = null;
-    onlineUsers.delete(socket.id);
-    socket.emit('loggedOut');
+    clearSocketIdentity(socket, true);
     emitLobby(socket);
     broadcastOnlineUsers();
     broadcastAdminDashboards();
   });
 
-  socket.on('chat message', (msg) => {
-    const content = cleanText(msg);
+  safeSocketHandler(socket, 'chat message', (msg, reply) => {
+    const content = cleanText(typeof msg === 'object' && msg ? msg.content : msg);
     if (!requireAuth(socket, '发消息') || !content) return;
-    if (!socket.currentRoomId) {
-      socket.emit('messageError', '请先选择聊天组或私聊');
-      return;
-    }
+    if (!requireCurrentRoom(socket)) return;
     clearTyping(socket);
     const data = {
       id: crypto.randomUUID(),
@@ -4690,22 +4942,13 @@ io.on('connection', (socket) => {
       timestamp: new Date().toISOString(),
       recalled: false
     };
-    messages = trimHistory([...messages, data]);
-    saveHistory(messages);
-    markRoomRead(socket.user.id, socket.currentRoomId);
-    io.to(roomChannel(socket.currentRoomId)).emit('chat message', data);
-    notifyPrivateRecipients(data);
-    notifyChatRecipients(data);
-    broadcastAdminDashboards();
+    persistAndPublishMessage(socket, data, msg, reply);
   });
 
-  socket.on('chat image', (data) => {
+  safeSocketHandler(socket, 'chat image', (data, reply) => {
     const base64 = data && typeof data.base64 === 'string' ? data.base64 : '';
     if (!requireAuth(socket, '发图片')) return;
-    if (!socket.currentRoomId) {
-      socket.emit('messageError', '请先选择聊天组或私聊');
-      return;
-    }
+    if (!requireCurrentRoom(socket)) return;
     if (!isValidImageData(base64)) {
       socket.emit('messageError', '图片格式不支持或超过 5MB');
       return;
@@ -4722,23 +4965,14 @@ io.on('connection', (socket) => {
       timestamp: new Date().toISOString(),
       recalled: false
     };
-    messages = trimHistory([...messages, imageData]);
-    saveHistory(messages);
-    markRoomRead(socket.user.id, socket.currentRoomId);
-    io.to(roomChannel(socket.currentRoomId)).emit('chat message', imageData);
-    notifyPrivateRecipients(imageData);
-    notifyChatRecipients(imageData);
-    broadcastAdminDashboards();
+    persistAndPublishMessage(socket, imageData, data, reply);
   });
 
-  socket.on('chat voice', (data) => {
+  safeSocketHandler(socket, 'chat voice', (data, reply) => {
     const base64 = data && typeof data.base64 === 'string' ? data.base64 : '';
     const duration = Number(data && data.duration);
     if (!requireAuth(socket, '发语音')) return;
-    if (!socket.currentRoomId) {
-      socket.emit('messageError', '请先选择聊天组或私聊');
-      return;
-    }
+    if (!requireCurrentRoom(socket)) return;
     if (!isValidVoiceData(base64)) {
       socket.emit('messageError', '语音格式不支持或超过 3MB');
       return;
@@ -4756,21 +4990,12 @@ io.on('connection', (socket) => {
       timestamp: new Date().toISOString(),
       recalled: false
     };
-    messages = trimHistory([...messages, voiceData]);
-    saveHistory(messages);
-    markRoomRead(socket.user.id, socket.currentRoomId);
-    io.to(roomChannel(socket.currentRoomId)).emit('chat message', voiceData);
-    notifyPrivateRecipients(voiceData);
-    notifyChatRecipients(voiceData);
-    broadcastAdminDashboards();
+    persistAndPublishMessage(socket, voiceData, data, reply);
   });
 
-  socket.on('chat sticker', (payload) => {
+  safeSocketHandler(socket, 'chat sticker', (payload, reply) => {
     if (!requireCommunityAccess(socket, '发送表情包')) return;
-    if (!socket.currentRoomId) {
-      socket.emit('messageError', '请先选择聊天组或私聊');
-      return;
-    }
+    if (!requireCurrentRoom(socket)) return;
     const sticker = stickerById(payload && payload.stickerId);
     if (!isStickerSendable(sticker, socket.user.id)) {
       socket.emit('messageError', '这个表情包不可发送');
@@ -4789,18 +5014,13 @@ io.on('connection', (socket) => {
       timestamp: new Date().toISOString(),
       recalled: false
     };
-    messages = trimHistory([...messages, stickerData]);
-    saveHistory(messages);
-    markRoomRead(socket.user.id, socket.currentRoomId);
-    io.to(roomChannel(socket.currentRoomId)).emit('chat message', stickerData);
-    notifyPrivateRecipients(stickerData);
-    notifyChatRecipients(stickerData);
-    broadcastAdminDashboards();
+    persistAndPublishMessage(socket, stickerData, payload, reply);
   });
 
-  socket.on('recall message', (messageId) => {
+  safeSocketHandler(socket, 'recall message', (messageId) => {
     if (!requireAuth(socket, '撤回消息') || typeof messageId !== 'string') return;
-    const message = messages.find((item) => item.id === messageId);
+    if (!requireCurrentRoom(socket)) return;
+    const message = messageById(messageId);
     if (!message || message.userId !== socket.user.id || message.recalled || message.roomId !== socket.currentRoomId) {
       socket.emit('messageError', '只能撤回自己发出的消息');
       return;
@@ -4810,10 +5030,10 @@ io.on('connection', (socket) => {
       return;
     }
 
-    message.recalled = true;
-    message.content = '';
-    saveHistory(messages);
-    io.to(roomChannel(message.roomId)).emit('message recalled', publicMessage(message));
+    const recalled = { ...message, recalled: true, content: '' };
+    upsertMessage(recalled);
+    Object.assign(message, recalled);
+    emitAuthorizedRoom(message.roomId, 'message recalled', publicMessage(message));
     broadcastAdminDashboards();
   });
 
@@ -5105,9 +5325,9 @@ io.on('connection', (socket) => {
 
 	  socket.on('admin clear history', () => {
 	    if (!requireAdmin(socket)) return;
-	    messages = [];
     try {
-      db.exec('DELETE FROM messages');
+      deleteMessageData();
+      messages = [];
     } catch (error) {
       socket.emit('admin error', '清空聊天记录失败');
       return;
@@ -5116,10 +5336,10 @@ io.on('connection', (socket) => {
 	    broadcastAdminDashboards();
 	  });
 
-	  socket.on('admin cleanup post images', () => {
+	  safeSocketHandler(socket, 'admin cleanup post images', () => {
 	    if (!requireAdmin(socket)) return;
 	    const result = cleanupOrphanPostImages();
-	    socket.emit('admin notice', `已清理 ${result.deleted} 张未绑定帖子图片，释放 ${Math.round(result.bytes / 1024)} KB`);
+	    socket.emit('admin notice', `已将 ${result.quarantined} 张无引用图片移入可恢复隔离区；未永久删除文件`);
 	    broadcastAdminDashboards();
 	  });
 
@@ -5160,7 +5380,7 @@ io.on('connection', (socket) => {
     broadcastAdminDashboards();
   });
 
-  socket.on('admin reset password', (payload) => {
+  safeSocketHandler(socket, 'admin reset password', (payload) => {
     if (!requireAdmin(socket)) return;
     const userId = payload && typeof payload.userId === 'string' ? payload.userId : '';
     const password = typeof (payload && payload.password) === 'string' ? payload.password : '';
@@ -5175,8 +5395,14 @@ io.on('connection', (socket) => {
       return;
     }
 
-    user.passwordHash = hashPassword(password);
-    saveUsers();
+    if (isAdminUser(user) && !isStrongBootstrapPassword(password)) {
+      socket.emit('admin error', '管理员密码至少 12 位，且不能使用示例口令');
+      return;
+    }
+    const updated = { ...user, passwordHash: hashPassword(password) };
+    upsertUser(updated);
+    user.passwordHash = updated.passwordHash;
+    revokeUserSessions(user.id);
     socket.emit('admin notice', `已重置 ${user.username} 的密码`);
     broadcastAdminDashboards();
   });
@@ -5195,9 +5421,7 @@ io.on('connection', (socket) => {
     }
 
     try {
-      db.prepare('DELETE FROM rooms WHERE id = ?').run(roomId);
-      db.prepare('DELETE FROM room_members WHERE room_id = ?').run(roomId);
-      db.prepare('DELETE FROM messages WHERE room_id = ?').run(roomId);
+      deleteRoomData(roomId);
     } catch (error) {
       socket.emit('admin error', '删除群组失败');
       return;
@@ -5218,7 +5442,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('typing', (isTyping) => {
-    if (!socket.user || !socket.currentRoomId) return;
+    if (!requireCurrentRoom(socket)) return;
 
     if (isTyping) {
       socket.to(roomChannel(socket.currentRoomId)).emit('typing', { username: displayNameOf(socket.user), isTyping: true, roomId: socket.currentRoomId });
@@ -5231,22 +5455,16 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
-    if (socket.user) {
-      const roomId = socket.currentRoomId;
-      clearTyping(socket);
-      if (roomId) io.to(roomChannel(roomId)).emit('system', { type: 'leave', username: displayNameOf(socket.user), roomId });
-      clearApiToken(socket);
-      onlineUsers.delete(socket.id);
-      broadcastOnlineUsers();
-      broadcastAdminDashboards();
-    }
+    clearSocketIdentity(socket);
+    broadcastOnlineUsers();
+    broadcastAdminDashboards();
   });
 });
 
 function clearTyping(socket) {
   clearTimeout(typingTimers.get(socket.id));
   typingTimers.delete(socket.id);
-  if (socket.user && socket.currentRoomId) {
+  if (currentSocketUser(socket) && canUserAccessRoom(socket.user, socket.currentRoomId)) {
     socket.to(roomChannel(socket.currentRoomId)).emit('typing', { username: displayNameOf(socket.user), isTyping: false, roomId: socket.currentRoomId });
   }
 }

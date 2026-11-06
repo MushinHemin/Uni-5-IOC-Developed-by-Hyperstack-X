@@ -5748,6 +5748,9 @@
       bio: '',
       profileBanner: '',
       isAdmin: false,
+      isBanned: false,
+      isMessageComposing: false,
+      messageCompositionEndedAt: -Infinity,
       currentRoom: null,
       lobbyRooms: [],
       lobbyUsers: [],
@@ -6152,7 +6155,9 @@
 
     function readGlassIntensity() {
       try {
-        const saved = Number(localStorage.getItem(GLASS_KEY));
+        const stored = localStorage.getItem(GLASS_KEY);
+        if (stored === null || stored.trim() === '') return 50;
+        const saved = Number(stored);
         if (Number.isFinite(saved)) return Math.min(100, Math.max(0, saved));
       } catch (error) {
         return 50;
@@ -7432,6 +7437,9 @@
       state.bio = '';
       state.profileBanner = '';
       state.isAdmin = false;
+      state.isBanned = false;
+      state.isMessageComposing = false;
+      state.messageCompositionEndedAt = -Infinity;
       state.currentRoom = null;
       state.adminData = null;
       state.selectedAdminUserId = '';
@@ -7544,6 +7552,9 @@
       setView('auth');
       setChatEnabled(false);
       state.isAdmin = false;
+      state.isBanned = false;
+      state.isMessageComposing = false;
+      state.messageCompositionEndedAt = -Infinity;
       state.currentRoom = null;
       updateAdminEntries();
       backToLobby.hidden = true;
@@ -7561,6 +7572,7 @@
       state.bio = user.bio || '';
       state.profileBanner = user.profileBanner || '';
       state.isAdmin = Boolean(user.isAdmin);
+      state.isBanned = Boolean(user.isBanned);
       state.apiToken = data && data.apiToken ? String(data.apiToken) : '';
       state.stickers.creator = {
         isCreator: Boolean(user.isStickerCreator),
@@ -7597,6 +7609,7 @@
       state.bio = user.bio || '';
       state.profileBanner = user.profileBanner || '';
       state.isAdmin = Boolean(user.isAdmin);
+      state.isBanned = Boolean(user.isBanned);
       if (typeof user.isStickerCreator !== 'undefined') {
         state.stickers.creator.isCreator = Boolean(user.isStickerCreator);
         state.stickers.creator.status = user.stickerCreatorStatus || state.stickers.creator.status || '';
@@ -8531,12 +8544,30 @@
       adminPasswordInput.value = '';
     });
 
+    function isMessageCompositionPending(event) {
+      return state.isMessageComposing || Boolean(event && (event.isComposing || event.keyCode === 229)) ||
+        performance.now() - state.messageCompositionEndedAt < 50;
+    }
+
+    input.addEventListener('compositionstart', () => {
+      state.isMessageComposing = true;
+    });
+    input.addEventListener('compositionend', () => {
+      state.isMessageComposing = false;
+      // Some IMEs end composition before dispatching the confirming Enter keydown.
+      state.messageCompositionEndedAt = performance.now();
+    });
+    input.addEventListener('blur', () => {
+      state.isMessageComposing = false;
+    });
+
     composer.addEventListener('submit', (event) => {
       event.preventDefault();
       sendMessage();
     });
 
     input.addEventListener('keydown', (event) => {
+      if (isMessageCompositionPending(event)) return;
       if (event.key === 'Enter' && !event.shiftKey) {
         event.preventDefault();
         sendMessage();
@@ -8933,25 +8964,75 @@
       }, 2200);
     }
 
+    // Keep uncertain sends in memory so an explicit retry uses the same business ID.
+    const pendingMessageRequests = new Map();
+    let messageSendInFlight = false;
+    function sendReliableMessage(event, payload) {
+      if (!state.currentRoom || !state.isConnected) return Promise.reject(new Error('连接未就绪，请重新登录并进入会话'));
+      const key = JSON.stringify([state.userId, state.currentRoom.id, event, payload]);
+      let request = pendingMessageRequests.get(key);
+      if (request && request.promise) return request.promise;
+      if (!request) {
+        if (pendingMessageRequests.size >= 20) return Promise.reject(new Error('待确认消息过多，请先重试之前的消息'));
+        request = { clientMessageId: crypto.randomUUID ? crypto.randomUUID() : Array.from(crypto.getRandomValues(new Uint8Array(16)), b => b.toString(16).padStart(2, '0')).join('') };
+        pendingMessageRequests.set(key, request);
+      }
+      request.promise = new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('发送结果未确认，请重试；相同请求不会重复保存')), 10000);
+        socket.emit(event, { ...payload, clientMessageId: request.clientMessageId }, (result) => {
+          clearTimeout(timer);
+          if (result && result.ok) resolve(result);
+          else reject(new Error(result && result.error || '发送失败，请重试'));
+        });
+      }).then((result) => {
+        pendingMessageRequests.delete(key);
+        return result;
+      }).finally(() => { request.promise = null; });
+      return request.promise;
+    }
+
+    async function sendMediaWithRetry(event, payload) {
+      const roomId = state.currentRoom && state.currentRoom.id;
+      const userId = state.userId;
+      do {
+        try { await sendReliableMessage(event, payload); return; }
+        catch (error) {
+          showToast(error.message);
+          if (!confirm(`${error.message}\n是否重试这条消息？`)) return;
+        }
+      } while (state.userId === userId && state.currentRoom && state.currentRoom.id === roomId);
+    }
+
     async function sendMessage() {
-      let message = input.value.trim();
-      const hasImage = Boolean(state.pendingImage && state.pendingImage.base64);
-      if ((!message && !hasImage) || !state.username || !state.isConnected || !state.currentRoom) return;
-      if (state.quotedMessage) {
-        message = `> 引用 ${state.quotedMessage.username}: ${compactText(state.quotedMessage.content, 80)}\n\n${message}`;
-      }
+      if (state.isMessageComposing || (Number.isFinite(state.messageCompositionEndedAt) && performance.now() - state.messageCompositionEndedAt < 50)) return;
+      const text = input.value;
+      const image = state.pendingImage;
+      let message = text.trim();
+      const hasImage = Boolean(image && image.base64);
+      if (messageSendInFlight || (!message && !hasImage) || !state.username || !state.isConnected || !state.currentRoom) return;
+      if (state.quotedMessage) message = `> 引用 ${state.quotedMessage.username}: ${compactText(state.quotedMessage.content, 80)}\n\n${message}`;
+      const sendingRoomId = state.currentRoom.id;
+      const sendingUserId = state.userId;
+      messageSendInFlight = true;
       stopTyping();
-      if (hasImage) {
-        socket.emit('chat image', { base64: state.pendingImage.base64 });
-        startImageCooldown();
+      try {
+        if (hasImage) {
+          await sendReliableMessage('chat image', { base64: image.base64 });
+          if (state.userId === sendingUserId && state.pendingImage === image) clearPendingImage();
+          startImageCooldown();
+        }
+        if (message) {
+          if (state.userId !== sendingUserId || !state.currentRoom || state.currentRoom.id !== sendingRoomId) throw new Error('会话已切换，文字尚未发送');
+          await sendReliableMessage('chat message', { content: message });
+          if (state.userId === sendingUserId && state.currentRoom && state.currentRoom.id === sendingRoomId && input.value === text) { input.value = ''; input.style.height = 'auto'; clearQuote(); }
+        }
+        mentionMenu.hidden = true;
+      } catch (error) {
+        showToast(error.message);
+      } finally {
+        messageSendInFlight = false;
+        sendBtn.disabled = !state.isConnected || (!input.value.trim() && !state.pendingImage);
       }
-      if (message) socket.emit('chat message', message);
-      input.value = '';
-      input.style.height = 'auto';
-      sendBtn.disabled = true;
-      mentionMenu.hidden = true;
-      clearQuote();
-      clearPendingImage();
     }
 
     function openMessageMenu(x, y, message, isMe) {
@@ -9237,7 +9318,7 @@
 	        showToast('请先登录');
 	        return;
 	      }
-	      if (state.profileUser && state.profileUser.isBanned) {
+	      if (state.isBanned) {
 	        showToast('你的账号已被限制使用社区功能');
 	        return;
 	      }
@@ -9506,6 +9587,7 @@
         starCount: Number(comment.starCount || 0),
         content,
         parentCommentId: typeof comment.parentCommentId === 'string' ? comment.parentCommentId : '',
+        isDeleted: Boolean(comment.isDeleted),
         floorNumber: Number(comment.floorNumber || 0),
         replyNumber: Number(comment.replyNumber || 0),
         floorLabel: typeof comment.floorLabel === 'string' ? comment.floorLabel : '',
@@ -9532,7 +9614,7 @@
         const button = document.createElement('button');
         button.type = 'button';
         button.className = `post-card${state.selectedForumPost && state.selectedForumPost.postId === post.postId ? ' is-active' : ''}`;
-        button.append(attachProfileOpen(createAvatar(post.avatar || post.username, post.username), post));
+        button.append(attachProfileOpen(createAvatar(post.avatar || post.username, post.username), { id: post.userId }));
 
         const main = document.createElement('div');
         main.className = 'post-card-main';
@@ -9570,7 +9652,7 @@
       forumPostDetail.className = 'post-detail';
       const author = document.createElement('div');
       author.className = 'post-author';
-      author.append(attachProfileOpen(createAvatar(post.avatar || post.username, post.username), post));
+      author.append(attachProfileOpen(createAvatar(post.avatar || post.username, post.username), { id: post.userId }));
       const authorText = document.createElement('div');
       const authorName = document.createElement('strong');
       authorName.textContent = post.username;
@@ -9690,7 +9772,7 @@
         item.className = `comment-card${isReply ? ' is-reply' : ''}`;
         const author = document.createElement('div');
         author.className = 'comment-author';
-        author.append(attachProfileOpen(createAvatar(comment.avatar || comment.username, comment.username), comment));
+        author.append(attachProfileOpen(createAvatar(comment.avatar || comment.username, comment.username), { id: comment.userId }));
         const text = document.createElement('div');
         const name = document.createElement('strong');
         name.textContent = comment.username;
@@ -9703,7 +9785,7 @@
         text.append(name, meta);
         author.append(text);
         author.append(floor);
-        if (comment.userId === state.userId || state.isAdmin) {
+        if (!comment.isDeleted && (comment.userId === state.userId || state.isAdmin)) {
           const deleteButton = document.createElement('button');
           deleteButton.type = 'button';
 	          deleteButton.className = 'admin-btn danger';
@@ -9730,11 +9812,11 @@
 	        const likeButton = document.createElement('button');
 	        likeButton.type = 'button';
 	        likeButton.className = `forum-action-pill${comment.likedByMe ? ' is-active' : ''}`;
-	        likeButton.disabled = state.forumPendingActions.has(`comment-like:${comment.commentId}`);
+	        likeButton.disabled = comment.isDeleted || state.forumPendingActions.has(`comment-like:${comment.commentId}`);
 	        likeButton.textContent = `赞 ${comment.likeCount || 0}`;
 	        likeButton.addEventListener('click', () => toggleForumAction(`comment-like:${comment.commentId}`, () => socket.emit('toggle comment like', comment.commentId)));
         actions.append(likeButton);
-        if (!isReply) {
+        if (!isReply && !comment.isDeleted) {
           const replyButton = document.createElement('button');
           replyButton.type = 'button';
           replyButton.className = 'forum-action-pill';
@@ -10179,7 +10261,7 @@
         showToast('请先选择聊天');
         return;
       }
-      socket.emit('chat sticker', { stickerId });
+      void sendMediaWithRetry('chat sticker', { stickerId });
       closeStickerPanel();
     }
 
@@ -11224,7 +11306,7 @@
           }
 
           const base64 = await blobToDataUrl(blob);
-          socket.emit('chat voice', { base64, duration });
+          await sendMediaWithRetry('chat voice', { base64, duration });
         });
 
         recorder.start();

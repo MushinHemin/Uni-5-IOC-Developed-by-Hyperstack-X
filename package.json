@@ -1,6 +1,6 @@
 {
   "name": "beluga-chat",
-  "version": "5.5.8",
+  "version": "5.5.9",
   "private": true,
   "description": "Uni 5 Sonoma realtime chat app developed by Hyperstack X.",
   "main": "server.js",
@@ -8,7 +8,8 @@
     "start": "node server.js",
     "android:add": "npx cap add android",
     "android:sync": "npx cap sync android",
-    "android:open": "npx cap open android"
+    "android:open": "npx cap open android",
+    "test": "node --test test/*.test.cjs"
   },
   "engines": {
     "node": ">=22.0.0"

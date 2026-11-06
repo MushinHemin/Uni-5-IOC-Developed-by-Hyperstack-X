@@ -2,7 +2,17 @@
 
 Uni 5 Sonoma is a lightweight realtime chat and community app with account login, group chat, private chat, forum posts, admin tools, message recall, image paste/upload, voice messages, and a glass-style responsive web UI.
 
-Current release: **Sonoma 5.5.8 Community Workspace Update**
+Source version: **Sonoma 5.5.9 Reliability & Security Update**
+
+See [the 5.5.9 changelog](docs/CHANGELOG-5.5.9.md) for implemented fixes, known limitations and validation status. The final UI/IME changes were not tested in this finalization pass; no deployment or GitHub Release is implied.
+
+Previous source baseline: Sonoma 5.5.8 Community Workspace Update.
+
+See [phase 1 reliability notes and test contract](docs/RELIABILITY-5.5.9.md) for U01/U02/U04 fixes, compatibility and remaining risks.
+
+See [phase 2 identity and security lifecycle](docs/SECURITY-5.5.9.md) for U03/U07/U08/U10/U28, administrator bootstrap policy and single-use invitations.
+
+See [phase 3 data integrity and recovery](docs/DATA-INTEGRITY-5.5.9.md) for legacy import, shared images, comment tombstones, transactional deletion and room history cursors.
 
 ## Features
 

@@ -17,6 +17,7 @@ beluga-chat.sqlite-*
 *.sqlite-wal
 *.sqlite-journal
 uploads/
+image-quarantine/
 
 # macOS and archives
 .DS_Store
