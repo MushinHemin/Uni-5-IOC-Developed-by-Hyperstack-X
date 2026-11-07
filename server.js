@@ -4,6 +4,9 @@ const { Server } = require('socket.io');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const sharp = require('sharp');
+sharp.cache(false);
+sharp.concurrency(1);
 const { DatabaseSync } = require('node:sqlite');
 
 loadDotEnv();
@@ -29,7 +32,7 @@ const io = new Server(server, {
     }
   }
 });
-app.use(express.json({ limit: '1mb' }));
+app.use(express.json({ limit: '1mb', inflate: false }));
 
 const DATA_FILE = path.join(__dirname, 'chat-history.json');
 const USERS_FILE = path.join(__dirname, 'users.json');
@@ -623,7 +626,7 @@ function normalizeMessage(message) {
   }
 
   if (type === 'image') {
-    if (!isValidImageData(content)) return null;
+    if (!parseStoredMediaData(content, ALLOWED_IMAGE_TYPES, MAX_IMAGE_BYTES, true)) return null;
     return {
       id: message.id || crypto.randomUUID(),
       roomId,
@@ -639,7 +642,7 @@ function normalizeMessage(message) {
   }
 
   if (type === 'voice') {
-    if (!isValidVoiceData(content)) return null;
+    if (!parseStoredMediaData(content, ALLOWED_AUDIO_TYPES, MAX_VOICE_BYTES, true)) return null;
     return {
       id: message.id || crypto.randomUUID(),
       roomId,
@@ -1898,6 +1901,7 @@ function togglePostLike(user, postIdValue) {
         userId: post.user_id,
         actorUserId: user.id,
         type: 'reaction_received',
+        eventType: 'post_like',
         title: `${displayNameOf(user)} 点赞了你的帖子`,
         body: cleanPostTitle(post.title),
         targetType: 'post',
@@ -1944,6 +1948,7 @@ function toggleCommentLike(user, commentIdValue) {
         userId: comment.userId,
         actorUserId: user.id,
         type: 'reaction_received',
+        eventType: 'comment_like',
         title: `${displayNameOf(user)} 点赞了你的评论`,
         body: cleanCommentContent(comment.content),
         targetType: 'post',
@@ -2630,15 +2635,20 @@ function rowToNotification(row) {
 function notificationPreferenceKey(notification) {
   const type = cleanNotificationType(notification.type);
   if (ALWAYS_ON_NOTIFICATION_TYPES.has(type)) return '';
+  const metadata = notification.metadata || {};
   if (type === 'forum_comment') {
-    const title = cleanText(notification.title, 120);
-    return title.includes('回复') ? 'forum_reply' : 'forum_comment';
+    if (['forum_reply','forum_comment'].includes(metadata.eventType)) return metadata.eventType;
+    // Legacy rows retain their original type and metadata. Resolve existing
+    // comment relationships when possible; never infer from display text.
+    const comment = metadata.commentId && db.prepare('SELECT parent_comment_id FROM comments WHERE id = ?').get(metadata.commentId);
+    return metadata.parentCommentId || (comment && comment.parent_comment_id) ? 'forum_reply' : 'forum_comment';
   }
   if (type === 'reaction_received') {
-    const title = cleanText(notification.title, 120);
-    if (title.includes('帖子')) return 'post_like';
-    if (title.includes('评论')) return 'comment_like';
-    return '';
+    if (['post_like','comment_like'].includes(metadata.eventType)) return metadata.eventType;
+    if (notification.targetType === 'chat' || metadata.eventType === 'message_reaction') return '';
+    if (String(notification.dedupeKey || '').startsWith('comment-like:')) return 'comment_like';
+    if (String(notification.dedupeKey || '').startsWith('post-like:')) return 'post_like';
+    return ''; // Ambiguous legacy data remains visible; no title-based guess.
   }
   if (type === 'star_received') return 'star_received';
   if (type === 'sticker_submission_result') return 'sticker_review';
@@ -2729,6 +2739,7 @@ function createNotification({
   targetId = '',
   targetUrl = '',
   metadata = {},
+  eventType = '',
   dedupeKey = ''
 }) {
   const targetUser = userById(userId);
@@ -2736,7 +2747,9 @@ function createNotification({
   const cleanBody = cleanText(body, 600);
   if (!targetUser || !cleanTitle) return null;
   if (actorUserId && actorUserId === userId && type !== 'announcement' && type !== 'account_restricted') return null;
-  const preferenceKey = notificationPreferenceKey({ type, title: cleanTitle });
+  const eventMetadata = { ...metadata };
+  if (eventType) eventMetadata.eventType = eventType;
+  const preferenceKey = notificationPreferenceKey({ type, metadata: eventMetadata, targetType, dedupeKey });
   if (preferenceKey && !notificationPreferenceEnabled(userId, preferenceKey)) return null;
   const notification = {
     id: `notification:${crypto.randomUUID()}`,
@@ -2748,7 +2761,7 @@ function createNotification({
     targetType: cleanTargetType(targetType),
     targetId: cleanText(targetId, 100),
     targetUrl: cleanText(targetUrl, 240),
-    metadataJson: safeJsonStringify(metadata),
+    metadataJson: safeJsonStringify(eventMetadata),
     createdAt: new Date().toISOString(),
     dedupeKey: cleanText(dedupeKey, 160)
   };
@@ -2756,6 +2769,7 @@ function createNotification({
   if (notification.dedupeKey) {
     const existing = db.prepare('SELECT * FROM notifications WHERE user_id = ? AND dedupe_key = ?').get(userId, notification.dedupeKey);
     if (existing) {
+      if (Date.parse(existing.created_at) >= Date.parse(notification.createdAt)) notification.createdAt = new Date(Date.parse(existing.created_at) + 1).toISOString();
       db.prepare(`
         UPDATE notifications
         SET actor_user_id = ?, type = ?, title = ?, body = ?, target_type = ?, target_id = ?, target_url = ?, metadata_json = ?, is_read = 0, created_at = ?, read_at = ''
@@ -2839,23 +2853,24 @@ function lastMessageForRoom(roomId) {
   return db.prepare(`
     SELECT id, created_at FROM messages
     WHERE room_id = ?
-    ORDER BY created_at DESC
+    ORDER BY created_at DESC, id DESC
     LIMIT 1
   `).get(roomId) || null;
 }
 
-function markRoomRead(userId, roomId) {
-  if (!userId || !roomId) return;
-  const last = lastMessageForRoom(roomId);
+function markRoomRead(userId, roomId, cursor) {
+  if (!cursor || typeof cursor.id !== 'string' || typeof cursor.timestamp !== 'string') throw new InputError('需要有效的已读消息游标');
+  const last = db.prepare('SELECT id, created_at FROM messages WHERE id = ? AND room_id = ?').get(cursor.id, roomId);
+  if (!last || last.created_at !== cursor.timestamp) throw new InputError('消息游标不属于当前会话');
   const now = new Date().toISOString();
   db.prepare(`
     INSERT INTO chat_read_states (id, user_id, scope, conversation_id, last_read_message_id, last_read_at, updated_at)
     VALUES (?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(user_id, scope, conversation_id) DO UPDATE SET
-      last_read_message_id = excluded.last_read_message_id,
-      last_read_at = excluded.last_read_at,
-      updated_at = excluded.updated_at
-  `).run(`read:${crypto.randomUUID()}`, userId, roomScope(roomId), roomId, last ? last.id : '', last ? last.created_at : now, now);
+      last_read_message_id = excluded.last_read_message_id, last_read_at = excluded.last_read_at, updated_at = excluded.updated_at
+    WHERE excluded.last_read_at > chat_read_states.last_read_at
+       OR (excluded.last_read_at = chat_read_states.last_read_at AND excluded.last_read_message_id > chat_read_states.last_read_message_id)
+  `).run(`read:${crypto.randomUUID()}`, userId, roomScope(roomId), roomId, last.id, last.created_at, now);
   emitUnreadUpdate(userId);
 }
 
@@ -2873,8 +2888,8 @@ function unreadCountForRoom(userId, roomId) {
   const lastReadAt = state && state.last_read_at ? state.last_read_at : '1970-01-01T00:00:00.000Z';
   return Number(db.prepare(`
     SELECT COUNT(*) AS count FROM messages
-    WHERE room_id = ? AND created_at > ? AND COALESCE(user_id, '') != ? AND recalled = 0
-  `).get(roomId, lastReadAt, userId).count || 0);
+    WHERE room_id = ? AND (created_at > ? OR (created_at = ? AND id > ?)) AND COALESCE(user_id, '') != ? AND recalled = 0
+  `).get(roomId, lastReadAt, lastReadAt, state ? state.last_read_message_id : '', userId).count || 0);
 }
 
 function roomsVisibleToUser(userId) {
@@ -2911,11 +2926,6 @@ function chatRecipientIds(message) {
 
 function notifyChatRecipients(message) {
   chatRecipientIds(message).forEach((userId) => {
-    const activeSocket = socketsForUser(userId).find((connectedSocket) => connectedSocket.currentRoomId === message.roomId);
-    if (activeSocket) {
-      markRoomRead(userId, message.roomId);
-      return;
-    }
     createNotification({
       userId,
       actorUserId: message.userId || '',
@@ -3020,6 +3030,7 @@ function toggleMessageReaction(user, messageIdValue, reactionValue) {
       targetType: 'chat',
       targetId: message.roomId,
       metadata: { messageId: message.id, reaction },
+      eventType: 'message_reaction',
       dedupeKey: `reaction:${message.id}:${user.id}:${message.userId}`
     });
   }
@@ -3265,30 +3276,26 @@ function verifyPassword(password, storedHash) {
   return stored.length === candidate.length && crypto.timingSafeEqual(stored, candidate);
 }
 
-const authAttempts = new Map();
-
-function authLimitKey(socket) {
-  return socket.handshake.address || socket.id;
-}
-
-function checkAuthLimit(socket) {
-  const key = authLimitKey(socket);
-  const now = Date.now();
-  const record = authAttempts.get(key) || { count: 0, resetAt: now + AUTH_WINDOW_MS };
-
-  if (record.resetAt <= now) {
-    record.count = 0;
-    record.resetAt = now + AUTH_WINDOW_MS;
+// Registration quota is never cleared by successful authentication. Login buckets
+// are peer + account scoped so another account's mistakes do not lock out this one.
+const registrationAttempts = new Map();
+const loginAttempts = new Map();
+function authLimitKey(socket) { return socket.handshake.address || socket.id; }
+function takeQuota(map, key, limit, windowMs = AUTH_WINDOW_MS, now = Date.now()) {
+  for (const [k, v] of map) if (v.resetAt <= now) map.delete(k);
+  let record = map.get(key);
+  if (!record) {
+    if (map.size >= 10000) return false;
+    record = { count: 0, resetAt: now + windowMs }; map.set(key, record);
   }
-
-  record.count += 1;
-  authAttempts.set(key, record);
-  return record.count <= AUTH_MAX_ATTEMPTS;
+  if (record.count >= limit) return false;
+  record.count++; return true;
 }
-
-function clearAuthLimit(socket) {
-  authAttempts.delete(authLimitKey(socket));
+function loginLimitKey(socket, account) { return JSON.stringify([authLimitKey(socket), account]); }
+function checkAuthLimit(socket, account) {
+  return takeQuota(loginAttempts, loginLimitKey(socket, account), AUTH_MAX_ATTEMPTS);
 }
+function clearAuthLimit(socket, account) { loginAttempts.delete(loginLimitKey(socket, account)); }
 
 function findUserByAccount(account) {
   return users.find((user) => user.account === account);
@@ -3329,6 +3336,7 @@ function clearSocketIdentity(socket, notify = false) {
   clearTyping(socket);
   for (const room of Array.from(socket.rooms)) if (room !== socket.id) socket.leave(room);
   for (const [token, session] of apiSessions) if (session.socketId === socket.id) apiSessions.delete(token);
+  for (const [id, upload] of mediaTickets) if (upload.socketId === socket.id) mediaTickets.delete(id);
   socket.apiToken = '';
   socket.currentRoomId = '';
   socket.currentForumPostId = '';
@@ -3623,6 +3631,10 @@ function buildLobbyPayload(viewer = null) {
       unreadCount: viewer && canUserAccessRoom(viewer, room.id) ? unreadCountForRoom(viewer.id, room.id) : 0
     })),
     users: publicOnlineUsers(),
+    privateUnread: viewer ? Object.fromEntries(roomsVisibleToUser(viewer.id)
+      .filter(id=>id.startsWith('dm:') && canUserAccessRoom(viewer,id))
+      .map(id=>[privateRoomUsers(id).find(uid=>uid!==viewer.id),unreadCountForRoom(viewer.id,id)])
+      .filter(([id])=>id)) : {},
     chatUnreadCount: viewer ? totalChatUnreadForUser(viewer.id) : 0
   };
 }
@@ -3831,47 +3843,223 @@ function broadcastAdminDashboards() {
   });
 }
 
+function mediaType(value) {
+  if (typeof value !== 'string' || value.length > 160) return null;
+  const match = value.trim().toLowerCase().match(/^(image\/(?:jpeg|png|gif|webp)|audio\/(?:webm|mp4|mpeg|ogg|wav))(?:\s*;\s*codecs\s*=\s*(?:"([a-z0-9., -]+)"|([a-z0-9.,-]+)))?$/);
+  if (!match) return null;
+  const mime = match[1], codecs = (match[2] || match[3] || '').split(',').map(x => x.trim()).filter(Boolean);
+  const allowed = { 'audio/webm': ['opus','vorbis'], 'audio/ogg': ['opus','vorbis'], 'audio/mp4': ['mp4a.40.2','mp4a.40.5','mp4a.40.29'], 'audio/mpeg':['mp3'], 'audio/wav':['1','pcm'] };
+  if (codecs.some(c => !(allowed[mime] || []).includes(c))) return null;
+  return { mime, codecs, value: mime + (codecs.length ? ';codecs=' + codecs.join(',') : '') };
+}
+function parseStoredMediaData(value, allowedTypes, maxBytes, legacy = false) {
+  if (typeof value !== 'string' || (!legacy && value.length > Math.ceil(maxBytes / 3) * 4 + 200)) return false;
+  const match = value.match(legacy ? /^data:([^,]+);base64,([a-z0-9+/=\s]+)$/i : /^data:([^,]+);base64,([a-z0-9+/]*={0,2})$/i);
+  if (match && legacy) match[2] = match[2].replace(/\s/g, '');
+  const type = match && mediaType(match[1]);
+  if (!type || !allowedTypes.has(type.mime) || !match[2] || match[2].length % 4) return false;
+  const buffer = Buffer.from(match[2], 'base64');
+  if (!buffer.length || buffer.length > maxBytes || (!legacy && buffer.toString('base64') !== match[2])) return false;
+  return { ...type, buffer };
+}
+function imageSignature(buffer, mime) {
+  if (buffer.length < 12) return false;
+  if (mime === 'image/png') return buffer.subarray(0,8).equals(Buffer.from('89504e470d0a1a0a','hex'));
+  if (mime === 'image/jpeg') return buffer[0] === 255 && buffer[1] === 216 && buffer[2] === 255;
+  if (mime === 'image/gif') return /^GIF8[79]a$/.test(buffer.toString('ascii',0,6));
+  return mime === 'image/webp' && buffer.toString('ascii',0,4) === 'RIFF' && buffer.toString('ascii',8,12) === 'WEBP';
+}
+// Bounded EBML parsing: require a WebM document, audio track and actual blocks.
+// This validates structure/codec identifiers; it is not an audio decoder.
+function webmAudio(buffer, codecs) {
+  let elements=0, doc=false, track=false, frames=false, invalid=false;
+  function vint(at, end, id=false) {
+    if(at>=end || !buffer[at])throw new Error('vint');
+    let width=1, mask=128;while(!(buffer[at]&mask)){width++;mask>>=1;}
+    if(width>(id?4:8) || at+width>end)throw new Error('vint');
+    let value=BigInt(id?buffer[at]:buffer[at]&(mask-1));
+    for(let i=1;i<width;i++)value=(value<<8n)|BigInt(buffer[at+i]);
+    return {width,value,unknown:!id && value===(1n<<BigInt(7*width))-1n};
+  }
+  function walk(start,end,depth=0,parent=0) {
+    if(depth>8)throw new Error('depth');
+    let at=start, audio=false, codec='';
+    while(at<end){
+      if(++elements>50000)throw new Error('elements');
+      const id=vint(at,end,true);at+=id.width;const size=vint(at,end);at+=size.width;
+      const code=Number(id.value);
+      if(size.unknown && ![0x18538067,0x1f43b675].includes(code))throw new Error('size');
+      const length=size.unknown?end-at:Number(size.value);if(!Number.isSafeInteger(length) || length>end-at)throw new Error('length');
+      const stop=at+length;
+      if(code===0x4282 && parent===0x1a45dfa3)doc=buffer.toString('ascii',at,stop)==='webm';
+      if(code===0x83 && parent===0xae){audio=length===1 && buffer[at]===2;if(!audio)invalid=true;}
+      if(code===0x86 && parent===0xae)codec=buffer.toString('ascii',at,stop);
+      if([0xa3,0xa1].includes(code) && [0x1f43b675,0xa0].includes(parent)){
+        const number=vint(at,stop);if(length>number.width+3)frames=true;
+      }
+      if([0x1a45dfa3,0x18538067,0x1654ae6b,0xae,0x1f43b675,0xa0].includes(code))walk(at,stop,depth+1,code);
+      at=stop;
+    }
+    if(parent===0xae){const supported=codec==='A_OPUS'?'opus':codec==='A_VORBIS'?'vorbis':'';if(audio && supported && (!codecs.length || codecs.every(c=>c===supported)))track=true;else invalid=true;}
+  }
+  try {walk(0,buffer.length);return doc&&track&&frames&&!invalid;}catch{return false;}
+}
+function oggAudio(buffer,codecs) {
+  let at=0,pages=0;const packets=[];let parts=[];let serial;
+  while(at<buffer.length){
+    if(at+27>buffer.length || buffer.toString('ascii',at,at+4)!=='OggS' || buffer[at+4]!==0)return false;
+    const stream=buffer.readUInt32LE(at+14);if(serial!==undefined && stream!==serial)return false;serial=stream;
+    const count=buffer[at+26];if(at+27+count>buffer.length)return false;
+    let body=at+27+count;
+    for(let i=0;i<count;i++){const size=buffer[at+27+i];if(body+size>buffer.length)return false;parts.push(buffer.subarray(body,body+size));body+=size;if(size<255){packets.push(Buffer.concat(parts));parts=[];}}
+    at=body;if(++pages>10000)return false;
+  }
+  const first=packets[0];if(!first || parts.length)return false;
+  const codec=first.subarray(0,8).toString()==='OpusHead'?'opus':first[0]===1 && first.subarray(1,7).toString()==='vorbis'?'vorbis':'';
+  return Boolean(codec && packets.length>=(codec==='opus'?3:4) && packets.at(-1).length && (!codecs.length || codecs.every(c=>c===codec)));
+}
+function audioSignature(buffer, type) {
+  if (buffer.length < 16) return false;
+  const ascii = buffer.toString('latin1');
+  if (type.mime === 'audio/webm') return buffer.readUInt32BE(0) === 0x1a45dfa3 && webmAudio(buffer,type.codecs);
+  if (type.mime === 'audio/ogg') return oggAudio(buffer,type.codecs);
+  if (type.mime === 'audio/mp4') {
+    let at = 0, ftyp = false, moov = false, mdat = false;
+    while (at + 8 <= buffer.length) {
+      let size = buffer.readUInt32BE(at), header = 8; const box = buffer.toString('ascii',at+4,at+8);
+      if (size === 1) { if (at+16 > buffer.length) return false; const big = buffer.readBigUInt64BE(at+8); if (big > BigInt(buffer.length)) return false; size=Number(big); header=16; }
+      if (size === 0) size = buffer.length-at;
+      if (size < header || at+size > buffer.length) return false;
+      if (box === 'ftyp') ftyp = true;
+      if (box === 'moov') moov = buffer.subarray(at+header,at+size).includes(Buffer.from('soun')) && buffer.subarray(at+header,at+size).includes(Buffer.from('mp4a'));
+      if (box === 'mdat') mdat = size > header;
+      at += size;
+    }
+    return at === buffer.length && ftyp && moov && mdat;
+  }
+  if (type.mime === 'audio/wav') {
+    if (!ascii.startsWith('RIFF') || ascii.slice(8,12) !== 'WAVE' || buffer.readUInt32LE(4)+8 !== buffer.length) return false;
+    let at=12, fmt=false, data=false;
+    while(at+8<=buffer.length){const name=ascii.slice(at,at+4), size=buffer.readUInt32LE(at+4);if(at+8+size>buffer.length)return false;
+      if(name==='fmt '){if(size<16)return false;const format=buffer.readUInt16LE(at+8), channels=buffer.readUInt16LE(at+10), rate=buffer.readUInt32LE(at+12);fmt=[1,3,0xfffe].includes(format)&&channels>=1&&channels<=2&&rate>=8000&&rate<=96000;}
+      if(name==='data')data=size>0; at+=8+size+(size%2);
+    } return fmt&&data&&at===buffer.length;
+  }
+  if (type.mime === 'audio/mpeg') {
+    let at=0;
+    if(ascii.startsWith('ID3')) { if(buffer.subarray(6,10).some(b=>b>127))return false; at=10+((buffer[6]<<21)|(buffer[7]<<14)|(buffer[8]<<7)|buffer[9]); }
+    return at+4<buffer.length && buffer[at]===255 && (buffer[at+1]&0xe0)===0xe0 && (buffer[at+1]&6)!==0 && (buffer[at+2]&0xf0)!==0xf0 && (buffer[at+2]&0xf0)!==0 && (buffer[at+2]&12)!==12;
+  }
+  return false;
+}
 function parseDataUrl(value, allowedTypes, maxBytes) {
-  if (typeof value !== 'string') return false;
-  const match = value.match(/^data:(image\/[a-z0-9.+-]+);base64,([a-z0-9+/=\s]+)$/i);
-  if (!match) return false;
-  const mime = match[1].toLowerCase();
-  if (!allowedTypes.has(mime)) return false;
+  const parsed = parseStoredMediaData(value, allowedTypes, maxBytes);
+  return parsed && imageSignature(parsed.buffer, parsed.mime) ? parsed : false;
+}
+function isValidImageData(value) { return Boolean(parseDataUrl(value, ALLOWED_IMAGE_TYPES, MAX_IMAGE_BYTES)); }
+function parseAvatarData(value) { return parseDataUrl(value, ALLOWED_AVATAR_TYPES, MAX_AVATAR_BYTES); }
+function isValidVoiceData(value) { const p=parseStoredMediaData(value,ALLOWED_AUDIO_TYPES,MAX_VOICE_BYTES); return Boolean(p && audioSignature(p.buffer,p)); }
 
-  const base64 = match[2].replace(/\s/g, '');
-  if (!base64 || base64.length % 4 !== 0) return false;
-
+// HTTP carries raw bytes; existing Socket events carry a short, session-bound ticket.
+// Two in-flight decoders (<=16M RGBA pixels each), 32 MiB encoded ticket cache,
+// 5 MiB request bodies. Socket.IO keeps its 1 MB inbound ceiling.
+const MEDIA_EVENTS = new Map([
+  ['chat image', MAX_IMAGE_BYTES], ['chat voice', MAX_VOICE_BYTES], ['avatar upload', MAX_AVATAR_BYTES],
+  ['profile banner upload', MAX_BANNER_BYTES], ['upload post image', MAX_IMAGE_BYTES],
+  ['upload sticker', MAX_STICKER_BYTES], ['submit official sticker', MAX_STICKER_BYTES]
+]);
+const mediaTickets = new Map(), mediaAttempts = new Map();
+let activeMedia = 0;
+function releaseMediaTicket(socket, payload) {
+  const ticket=payload && mediaTickets.get(payload._mediaTicket);
+  if(ticket && ticket.socketId===socket.id && ticket.apiToken===socket.apiToken)mediaTickets.delete(payload._mediaTicket);
+}
+function pruneMediaTickets(now = Date.now()) { for (const [id,t] of mediaTickets) if(t.expiresAt <= now) mediaTickets.delete(id); }
+async function validateMedia(buffer, type, event) {
+  if (!type || !Buffer.isBuffer(buffer) || !buffer.length || buffer.length > MEDIA_EVENTS.get(event)) throw new InputError('文件类型不支持或超过大小上限');
+  if(event === 'chat voice') { if(!audioSignature(buffer,type)) throw new InputError('语音内容与格式不匹配'); return; }
+  if (!imageSignature(buffer,type.mime) || (event === 'avatar upload' && !ALLOWED_AVATAR_TYPES.has(type.mime))) throw new InputError('图片内容与格式不匹配');
   try {
-    const buffer = Buffer.from(base64, 'base64');
-    if (buffer.length > maxBytes) return false;
-    return { mime, buffer };
-  } catch (error) {
-    return false;
-  }
+    const decoder = sharp(buffer, { animated: true, limitInputPixels: 16000000, failOn: 'warning' });
+    const meta = await decoder.metadata();
+    if (!meta.width || !meta.height || meta.width > 8192 || (meta.pageHeight || meta.height)>8192 || meta.width*meta.height>16000000 || (meta.pages||1)>100 || 'image/'+(meta.format==='jpeg'?'jpeg':meta.format)!==type.mime) throw new Error('dimensions');
+    // Decode every allowed animation frame; reject truncated/broken data. Keep original bytes/animation.
+    await decoder.timeout({seconds:5}).raw().toBuffer();
+  } catch { throw new InputError('图片损坏或尺寸过大（最多 1600 万总像素、100 帧）'); }
 }
-
-function isValidImageData(value) {
-  return Boolean(parseDataUrl(value, ALLOWED_IMAGE_TYPES, MAX_IMAGE_BYTES));
+function mediaFailure(socket,event,error,reply) {
+  const message=error instanceof InputError?error.message:'上传失败，请重试';
+  socket.emit(event.includes('sticker')?'sticker error':event==='avatar upload'||event==='profile banner upload'?'profileError':event==='upload post image'?'forum error':'messageError',message);
+  if(typeof reply==='function')reply({ok:false,error:message});
 }
-
-function parseAvatarData(value) {
-  return parseDataUrl(value, ALLOWED_AVATAR_TYPES, MAX_AVATAR_BYTES);
+function installMediaBoundary(socket) {
+  socket.use(async (packet,next) => {
+    const [event,payload,reply]=packet;
+    if(!MEDIA_EVENTS.has(event))return next();
+    let reserved=false;
+    try {
+      const user=currentSocketUser(socket), token=socket.apiToken, originalRoom=socket.currentRoomId;
+      if(!user || user.isBanned)throw new InputError('请重新登录或检查账号权限');
+      if(!payload || typeof payload.base64!=='string')throw new InputError('缺少上传内容');
+      pruneMediaTickets();
+      if(payload.base64.startsWith('upload:')) {
+        const ticket=mediaTickets.get(payload.base64);
+        if(!ticket || ticket.socketId!==socket.id || ticket.apiToken!==token || ticket.event!==event || (event.startsWith('chat ') && ticket.roomId!==socket.currentRoomId))throw new InputError('上传已过期或会话已改变，请重新上传');
+        if(event.startsWith('chat ')) {
+          if(!payload.clientMessageId || (ticket.clientMessageId && ticket.clientMessageId!==payload.clientMessageId))throw new InputError('上传重试标识不一致');
+          ticket.clientMessageId=payload.clientMessageId;
+        } else mediaTickets.delete(payload.base64);
+        packet[1]={...payload,base64:ticket.dataUrl,_mediaTicket:payload.base64};
+      } else {
+        // Small legacy clients still work, with identical validation and resource limits.
+        if(activeMedia>=2 || !takeQuota(mediaAttempts,user.id,30,60000))throw new InputError('上传繁忙，请稍后重试');
+        activeMedia++;reserved=true;
+        const parsed=parseStoredMediaData(payload.base64,event==='chat voice'?ALLOWED_AUDIO_TYPES:ALLOWED_IMAGE_TYPES,MEDIA_EVENTS.get(event));
+        if(!parsed)throw new InputError('文件格式无效');
+        await validateMedia(parsed.buffer,parsed,event);
+        if(!currentSocketUser(socket) || socket.apiToken!==token || socket.user.isBanned || (event.startsWith('chat ') && socket.currentRoomId!==originalRoom))throw new InputError('会话已改变，请重新登录');
+      }
+      next();
+    } catch(error) { mediaFailure(socket,event,error,reply); }
+    finally { if(reserved)activeMedia--; }
+  });
 }
-
-function isValidVoiceData(value) {
-  if (typeof value !== 'string') return false;
-  const match = value.match(/^data:(audio\/[a-z0-9.+-]+);base64,([a-z0-9+/=\s]+)$/i);
-  if (!match || !ALLOWED_AUDIO_TYPES.has(match[1].toLowerCase())) return false;
-
-  const base64 = match[2].replace(/\s/g, '');
-  if (!base64 || base64.length % 4 !== 0) return false;
-
-  try {
-    return Buffer.byteLength(base64, 'base64') <= MAX_VOICE_BYTES;
-  } catch (error) {
-    return false;
-  }
-}
+app.post('/api/media', (req,res) => {
+  const user=requireApiUser(req,res); if(!user)return;
+  const event=req.headers['x-uni-media-event'], type=mediaType(req.headers['content-type']);
+  const sessionToken=(req.headers.authorization||'').slice(7).trim();
+  const session=apiSessions.get(sessionToken), socket=session && io.sockets.sockets.get(session.socketId);
+  if(user.isBanned)return res.status(403).json({error:'账号已被限制'});
+  if(!MEDIA_EVENTS.has(event) || !type || (event==='chat voice'?!ALLOWED_AUDIO_TYPES.has(type.mime):!ALLOWED_IMAGE_TYPES.has(type.mime)))return res.status(415).json({error:'文件类型不支持'});
+  const roomId=socket.currentRoomId;
+  if(event.startsWith('chat ') && !canUserAccessRoom(user,roomId))return res.status(403).json({error:'请先进入会话'});
+  if(req.headers['content-encoding'] && req.headers['content-encoding']!=='identity')return res.status(415).json({error:'上传不接受压缩编码'});
+  if(activeMedia>=2 || !takeQuota(mediaAttempts,user.id,30,60000))return res.status(429).json({error:'上传繁忙，请稍后重试'});
+  activeMedia++;
+  let released=false;
+  const release=()=>{if(!released){released=true;activeMedia--;}};
+  let decoding=false;
+  const onClose=()=>{if(!decoding)release();}; res.once('close',onClose);
+  const deadline=setTimeout(()=>{if(!res.headersSent)res.status(408).json({error:'上传超时，请重试'});req.destroy();},15000);
+  res.once('close',()=>clearTimeout(deadline));
+  express.raw({type:()=>true,limit:MEDIA_EVENTS.get(event),inflate:false})(req,res,async error=>{
+    try {
+      if(error && (res.writableEnded || req.destroyed))return;
+      if(error)return res.status(error.status===413?413:400).json({error:'文件过大或上传不完整'});
+      decoding=true;
+      await validateMedia(req.body,type,event);
+      if(!userFromRequest(req) || user.isBanned || socket.apiToken!==sessionToken || (event.startsWith('chat ') && socket.currentRoomId!==roomId))return res.status(401).json({error:'会话已改变，请重新登录'});
+      pruneMediaTickets();
+      const dataUrl='data:'+type.value+';base64,'+req.body.toString('base64');
+      const entries=[...mediaTickets.values()];
+      if(entries.filter(t=>t.socketId===socket.id).length>=4 || entries.reduce((n,t)=>n+t.dataUrl.length,0)+dataUrl.length>32*1024*1024)return res.status(429).json({error:'待确认上传过多，请稍后重试'});
+      const ticket='upload:'+crypto.randomBytes(24).toString('hex');
+      mediaTickets.set(ticket,{dataUrl,event,socketId:socket.id,apiToken:sessionToken,roomId,expiresAt:Date.now()+120000});
+      res.json({ticket,expiresIn:120});
+    } catch(error) { res.status(error instanceof InputError?400:500).json({error:error instanceof InputError?error.message:'上传失败，请重试'}); }
+    finally { clearTimeout(deadline);res.off('close',onClose);release(); }
+  });
+});
 
 initDatabase();
 let users = loadUsers();
@@ -3886,7 +4074,7 @@ fs.mkdirSync(AVATAR_UPLOAD_DIR, { recursive: true });
 fs.mkdirSync(BANNER_UPLOAD_DIR, { recursive: true });
 fs.mkdirSync(STICKER_UPLOAD_DIR, { recursive: true });
 fs.mkdirSync(POST_IMAGE_UPLOAD_DIR, { recursive: true });
-app.use('/uploads', express.static(UPLOADS_DIR));
+app.use('/uploads', (req,res,next)=>{res.setHeader('X-Content-Type-Options','nosniff');next();}, express.static(UPLOADS_DIR));
 app.get('/api/notifications', (req, res) => {
   const user = requireApiUser(req, res);
   if (!user) return;
@@ -4043,7 +4231,8 @@ app.use((error, req, res, next) => {
   if (res.headersSent) return next(error);
   const invalid = error instanceof InputError;
   if (!invalid) console.error('HTTP operation failed:', error.code || error.name);
-  res.status(invalid ? 400 : 500).json({ error: invalid ? error.message : '操作失败，请稍后重试' });
+  const status=invalid?400:[400,413,415].includes(error.status)?error.status:500;
+  res.status(status).json({ error: invalid ? error.message : status===413 ? '请求超过大小上限' : status===415 ? '不支持此请求编码' : status===400 ? '请求格式无效' : '操作失败，请稍后重试' });
 });
 
 app.use(express.static(path.join(__dirname, 'public')));
@@ -4081,17 +4270,21 @@ function persistAndPublishMessage(socket, data, payload, reply) {
       if (!existing.recalled && (existing.type !== data.type || existing.content !== data.content || (existing.stickerId || '') !== (data.stickerId || '') || (existing.duration || 0) !== (data.duration || 0))) {
         throw new InputError('消息重试标识已用于其他内容');
       }
+      releaseMediaTicket(socket, payload);
       reply({ ok: true, messageId: existing.id, duplicate: true });
       return;
     }
   }
+  // Keep new writes ordered even when several sends share a clock millisecond.
+  const latest = lastMessageForRoom(data.roomId);
+  if (latest && latest.created_at >= data.timestamp) data.timestamp = new Date(Date.parse(latest.created_at) + 1).toISOString();
   // The database is authoritative. Never update cache, acknowledge, or broadcast first.
   upsertMessage(data);
   messages = trimHistory([...messages, data]);
+  releaseMediaTicket(socket, payload);
   reply({ ok: true, messageId: data.id });
   emitAuthorizedRoom(data.roomId, 'chat message', data);
   try {
-    markRoomRead(socket.user.id, data.roomId);
     notifyPrivateRecipients(data);
     notifyChatRecipients(data);
     broadcastAdminDashboards();
@@ -4102,6 +4295,7 @@ function persistAndPublishMessage(socket, data, payload, reply) {
 }
 
 io.on('connection', (socket) => {
+  installMediaBoundary(socket);
   socket.emit('onlineUsers', { count: onlineUsers.size, users: Array.from(onlineUsers.values()).map(publicUser) });
   emitLobby(socket);
 
@@ -4109,8 +4303,8 @@ io.on('connection', (socket) => {
     socket.emit('latency:pong', sentAt);
   });
 
-  socket.on('register', (payload) => {
-    if (!checkAuthLimit(socket)) {
+  safeSocketHandler(socket, 'register', (payload) => {
+    if (!takeQuota(registrationAttempts, authLimitKey(socket), AUTH_MAX_ATTEMPTS)) {
       socket.emit('authError', '尝试次数太多了，请稍后再试');
       return;
     }
@@ -4145,7 +4339,6 @@ io.on('connection', (socket) => {
     recordLogin(socket, user);
     bindUser(socket, user);
     const apiToken = createApiToken(socket, user);
-    clearAuthLimit(socket);
     socket.emit('authSuccess', { user: publicUser(user), apiToken });
     emitRenameStatus(socket);
     emitBulletins(socket);
@@ -4155,16 +4348,11 @@ io.on('connection', (socket) => {
     broadcastAdminDashboards();
   });
 
-  socket.on('login', (payload) => {
-    if (!checkAuthLimit(socket)) {
-      socket.emit('authError', '尝试次数太多了，请稍后再试');
-      return;
-    }
-
+  safeSocketHandler(socket, 'login', (payload) => {
     const input = validateAuthPayload(payload);
-    if (input.error) {
-      socket.emit('authError', input.error);
-      return;
+    if (input.error) { socket.emit('authError', input.error); return; }
+    if (!checkAuthLimit(socket, input.account)) {
+      socket.emit('authError', '尝试次数太多了，请稍后再试'); return;
     }
 
     const user = findUserByAccount(input.account);
@@ -4176,7 +4364,7 @@ io.on('connection', (socket) => {
     recordLogin(socket, user);
     bindUser(socket, user);
     const apiToken = createApiToken(socket, user);
-    clearAuthLimit(socket);
+    clearAuthLimit(socket, input.account);
     socket.emit('authSuccess', { user: publicUser(user), apiToken });
     emitRenameStatus(socket);
     emitBulletins(socket);
@@ -4196,7 +4384,7 @@ io.on('connection', (socket) => {
     socket.emit('stickers', listStickersForUser(socket.user.id));
   });
 
-  socket.on('upload sticker', (payload) => {
+  safeSocketHandler(socket, 'upload sticker', (payload) => {
     if (!requireCommunityAccess(socket, '上传表情包')) return;
     if (personalStickerCount(socket.user.id) >= MAX_PERSONAL_STICKERS) {
       socket.emit('sticker error', `个人表情包最多保存 ${MAX_PERSONAL_STICKERS} 个`);
@@ -4258,7 +4446,7 @@ io.on('connection', (socket) => {
     broadcastAdminDashboards();
   });
 
-  socket.on('submit official sticker', (payload) => {
+  safeSocketHandler(socket, 'submit official sticker', (payload) => {
     if (!requireCommunityAccess(socket, '提交官方表情包')) return;
     if (!socket.user.isStickerCreator) {
       socket.emit('sticker error', '需要通过创作者审核后才能提交官方表情包');
@@ -4468,7 +4656,8 @@ io.on('connection', (socket) => {
         body: content,
         targetType: 'post',
         targetId: postId,
-        metadata: { commentId: comment.commentId },
+        metadata: { commentId: comment.commentId, parentCommentId: parentCommentId || '' },
+        eventType: parent ? 'forum_reply' : 'forum_comment',
         dedupeKey: `forum-comment:${comment.commentId}:${notifyTargetId}`
       });
     }
@@ -4668,7 +4857,7 @@ io.on('connection', (socket) => {
     socket.emit('user profile', { profile: publicProfile(socket.user, socket.user) });
   });
 
-  socket.on('profile banner upload', (payload) => {
+  safeSocketHandler(socket, 'profile banner upload', (payload) => {
     if (!requireCommunityAccess(socket, '上传主页背景')) return;
     const base64 = payload && typeof payload.base64 === 'string' ? payload.base64 : '';
     const previousBanner = socket.user.profileBanner;
@@ -4692,7 +4881,7 @@ io.on('connection', (socket) => {
     socket.emit('user profile', { profile: publicProfile(socket.user, socket.user) });
   });
 
-  socket.on('avatar upload', (payload) => {
+  safeSocketHandler(socket, 'avatar upload', (payload) => {
     if (!requireCommunityAccess(socket, '修改头像')) return;
     const base64 = payload && typeof payload.base64 === 'string' ? payload.base64 : '';
     const previousAvatar = socket.user.avatar;
@@ -4842,7 +5031,6 @@ io.on('connection', (socket) => {
 
     joinSocketRoom(socket, room.id);
     ensureRoomMember(room.id, socket.user.id);
-    markRoomRead(socket.user.id, room.id);
     socket.emit('room joined', { room: publicRoom(room), messages: messagesForRoom(room.id, socket.user.id) });
     io.to(roomChannel(room.id)).emit('system', { type: 'join', username: displayNameOf(socket.user), roomId: room.id });
     broadcastLobby();
@@ -4859,7 +5047,6 @@ io.on('connection', (socket) => {
 
     const roomId = privateRoomId(socket.user.id, target.id);
     joinSocketRoom(socket, roomId);
-    markRoomRead(socket.user.id, roomId);
     socket.emit('room joined', {
       room: {
         id: roomId,
@@ -4905,7 +5092,6 @@ io.on('connection', (socket) => {
     rooms.push(room);
     joinSocketRoom(socket, room.id);
     socket.emit('room created', { room: publicRoom(room) });
-    markRoomRead(socket.user.id, room.id);
     socket.emit('room joined', { room: publicRoom(room), messages: messagesForRoom(room.id, socket.user.id) });
     broadcastLobby();
     broadcastAdminDashboards();
@@ -4971,6 +5157,7 @@ io.on('connection', (socket) => {
   safeSocketHandler(socket, 'chat voice', (data, reply) => {
     const base64 = data && typeof data.base64 === 'string' ? data.base64 : '';
     const duration = Number(data && data.duration);
+    if (!Number.isFinite(duration) || duration < 0 || duration > 120) throw new InputError('语音时长必须在 0–120 秒之间');
     if (!requireAuth(socket, '发语音')) return;
     if (!requireCurrentRoom(socket)) return;
     if (!isValidVoiceData(base64)) {
@@ -5047,12 +5234,11 @@ io.on('connection', (socket) => {
     socket.emit('reaction:updated', result);
   });
 
-  socket.on('mark room read', (roomIdValue) => {
-    if (!requireAuth(socket, '标记聊天已读')) return;
-    const roomId = cleanRoomId(roomIdValue);
-    if (!roomId || !canUserAccessRoom(socket.user, roomId)) return;
-    markRoomRead(socket.user.id, roomId);
-    emitLobby(socket);
+  safeSocketHandler(socket, 'mark room read', (payload, reply) => {
+    if (!requireCurrentRoom(socket)) return;
+    if (!payload || payload.roomId !== socket.currentRoomId) throw new InputError('已读回执会话已改变');
+    markRoomRead(socket.user.id, payload.roomId, payload.cursor);
+    socketsForUser(socket.user.id).forEach(emitLobby); reply({ ok: true });
   });
 
   socket.on('admin get dashboard', () => {

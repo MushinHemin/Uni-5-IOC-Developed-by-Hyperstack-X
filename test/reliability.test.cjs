@@ -1,3 +1,4 @@
+const {pngUrl,wavUrl}=require('./media-fixtures.cjs');
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs'),os=require('node:os'),path=require('node:path'),Module=require('node:module'),http=require('node:http');
@@ -57,7 +58,7 @@ test('Socket/HTTP controlled errors, media persistence, retries, write failure a
   const res=await fetch(`http://127.0.0.1:${a.server.address().port}/api/${url}`,{headers:{Authorization:`Bearer ${auth.apiToken}`}});assert.equal(res.status,400);assert.match((await res.json()).error,/参数/);
  }
  a.db.prepare("INSERT INTO stickers(id,owner_user_id,url,sticker_type,status,created_at) VALUES(?,?,?,?,?,?)").run('sticker:test',auth.user.id,'/uploads/stickers/test.png','personal','active',new Date().toISOString());
- const payloads=[['chat message',{content:'persisted text'}],['chat image',{base64:'data:image/png;base64,YWJjZA=='}],['chat voice',{base64:'data:audio/webm;base64,YWJjZA==',duration:2}],['chat sticker',{stickerId:'sticker:test'}]];
+ const payloads=[['chat message',{content:'persisted text'}],['chat image',{base64:pngUrl}],['chat voice',{base64:wavUrl,duration:2}],['chat sticker',{stickerId:'sticker:test'}]];
  let received=[];s.on('chat message',m=>received.push(m));
  for(let i=0;i<payloads.length;i++){
   const [name,p]=payloads[i];p.clientMessageId='request-'+i;
@@ -101,7 +102,7 @@ const vm=require('node:vm');
 function frontend(){
  const html=fs.readFileSync(path.join(root,'public/index.html'),'utf8');
  const code=html.slice(html.indexOf('    const pendingMessageRequests'),html.indexOf('    function openMessageMenu'));
- const c={crypto:require('node:crypto').webcrypto,Map,Promise,setTimeout,clearTimeout,Error,JSON,state:{userId:'u1',username:'test',isConnected:true,currentRoom:{id:'club-91'},pendingImage:null},input:{value:'hello',style:{}},sendBtn:{},mentionMenu:{},stopTyping(){},clearQuote(){},clearPendingImage(){c.state.pendingImage=null},startImageCooldown(){},compactText:s=>s,showToast:m=>c.lastError=m,confirm:()=>false,socket:{emit(){}}};
+ const c={clientSessionGeneration:0,prepareMediaPayload:async (_e,p)=>p,crypto:require('node:crypto').webcrypto,Map,Promise,setTimeout,clearTimeout,Error,JSON,state:{userId:'u1',username:'test',isConnected:true,currentRoom:{id:'club-91'},pendingImage:null},input:{value:'hello',style:{}},sendBtn:{},mentionMenu:{},stopTyping(){},clearQuote(){},clearPendingImage(){c.state.pendingImage=null},startImageCooldown(){},compactText:s=>s,showToast:m=>c.lastError=m,confirm:()=>false,socket:{emit(){}}};
  vm.createContext(c);vm.runInContext(code,c);return c;
 }
 test('Client failure retains input and retry uses same ID; successful send clears input',async()=>{
@@ -116,11 +117,11 @@ test('Client coalesces pending sends and keeps retry ID after acknowledgement ti
  c.setTimeout=f=>{expire=f;return 1};c.clearTimeout=()=>{};
  c.socket.emit=(_e,p,cb)=>{sent.push(p);callback=cb};
  const first=c.sendReliableMessage('chat message',{content:'hello'});assert.equal(c.sendReliableMessage('chat message',{content:'hello'}),first);
- expire();await assert.rejects(first,/未确认/);
- const retry=c.sendReliableMessage('chat message',{content:'hello'});assert.equal(sent[0].clientMessageId,sent[1].clientMessageId);callback({ok:true});await retry;
+ await Promise.resolve();expire();await assert.rejects(first,/未确认/);
+ const retry=c.sendReliableMessage('chat message',{content:'hello'});await Promise.resolve();assert.equal(sent[0].clientMessageId,sent[1].clientMessageId);callback({ok:true});await retry;
 });
 test('Client does not resend confirmed image when text fails',async()=>{
- const c=frontend(),events=[];c.state.pendingImage={base64:'data:image/png;base64,YWJjZA=='};let fail=true;
+ const c=frontend(),events=[];c.state.pendingImage={base64:pngUrl};let fail=true;
  c.socket.emit=(e,p,cb)=>{events.push(e);cb(e==='chat message'&&fail?{ok:false,error:'failed'}:{ok:true})};
  await c.sendMessage();assert.equal(c.state.pendingImage,null);assert.equal(c.input.value,'hello');fail=false;await c.sendMessage();assert.deepEqual(events,['chat image','chat message','chat message']);
 });

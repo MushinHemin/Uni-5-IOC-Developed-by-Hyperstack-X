@@ -5738,6 +5738,16 @@
 
   <script>
     const socket = io();
+    // Never retain mutations/password submissions in Socket.IO's offline queue.
+    const connectedEmit = socket.emit;
+    socket.emit = function(event, ...args) {
+      if (!socket.connected) {
+        const reply = args[args.length - 1];
+        if (typeof reply === 'function') reply({ ok: false, error: '连接已断开，请重新登录' });
+        return socket;
+      }
+      return connectedEmit.call(socket, event, ...args);
+    };
 
     // State
     const state = {
@@ -6739,13 +6749,36 @@
       }, 180);
     }
 
-    function markCurrentRoomRead() {
-      if (!state.currentRoom || !state.currentRoom.id || !state.userId) return;
-      window.clearTimeout(state.readReceiptTimer);
-      state.readReceiptTimer = window.setTimeout(() => {
-        socket.emit('mark room read', state.currentRoom.id);
-      }, 600);
+    // A transport subscription is not a read receipt. Capture the room and the
+    // last fully visible rendered message, then recheck visibility after dwell.
+    function visibleReadCursor() {
+      if (!state.userId || !state.isConnected || !state.currentRoom || state.view !== 'chat' || document.visibilityState !== 'visible' || !document.hasFocus()) return null;
+      if (document.body.classList.contains('is-page-transitioning') || document.querySelector('[role="dialog"]:not([hidden]), .modal:not([hidden])')) return null;
+      const bounds = messagesDiv.getBoundingClientRect();
+      if (bounds.height <= 0) return null;
+      const rows = messagesDiv.querySelectorAll('[data-message-id]');
+      for (let i=rows.length-1;i>=0;i--) {
+        const row=rows[i], rect=row.getBoundingClientRect();
+        if(Array.from(row.querySelectorAll('img')).some(img=>!img.complete || !img.naturalWidth))continue;
+        if (rect.bottom>bounds.top && rect.bottom<=Math.min(bounds.bottom,window.innerHeight) && rect.top>=bounds.top && row.dataset.timestamp) {
+          return {roomId:state.currentRoom.id,cursor:{id:row.dataset.messageId,timestamp:row.dataset.timestamp}};
+        }
+      }
+      return null;
     }
+    function markCurrentRoomRead() {
+      window.clearTimeout(state.readReceiptTimer);
+      const captured=visibleReadCursor(), userId=state.userId;
+      if(!captured)return;
+      state.readReceiptTimer=window.setTimeout(()=>{
+        const current=visibleReadCursor();
+        if(!current || state.userId!==userId || current.roomId!==captured.roomId || current.cursor.id!==captured.cursor.id)return;
+        socket.volatile.emit('mark room read',captured);
+      },600);
+    }
+    document.addEventListener('visibilitychange',markCurrentRoomRead);
+    window.addEventListener('focus',markCurrentRoomRead);
+    window.addEventListener('blur',()=>window.clearTimeout(state.readReceiptTimer));
 
     function openSearchTarget(item) {
       closeSearchModal();
@@ -7383,6 +7416,7 @@
         state.viewTransitionTimer = window.setTimeout(() => {
           document.body.classList.remove('is-page-transitioning');
           cleanupViews(view);
+          markCurrentRoomRead();
         }, delay);
       });
     }
@@ -7429,6 +7463,10 @@
     }
 
     function resetClientSession() {
+      flushForumDraftSave();
+      clientSessionGeneration++;
+      activeUploads.forEach(controller=>controller.abort());
+      if(state.recorder && state.recorder.state !== 'inactive') state.recorder.stop();
       stopTyping();
       state.userId = '';
       state.username = '';
@@ -7521,7 +7559,9 @@
 
     // Socket events
     socket.on('connect', () => {
+      socket.sendBuffer.length = 0;
       setConnection(true);
+      if (!state.userId) { setView('auth'); subtitle.textContent='连接已恢复，请登录'; }
     });
 
     socket.on('latency:pong', (sentAt) => {
@@ -7536,12 +7576,10 @@
 
     socket.on('disconnect', () => {
       setConnection(false);
-      state.currentRoom = null;
-      setChatEnabled(false);
-      backToLobby.hidden = true;
-      closeMessageMenu();
-      state.typingUsers.clear();
-      renderTyping();
+      // Server revokes the socket-bound token. Never replay it or buffered emits.
+      socket.sendBuffer.length = 0;
+      resetClientSession();
+      loginError.textContent = '连接已断开。恢复连接后请重新登录；未确认消息请进入原会话核对后重试。';
     });
 
     socket.on('loggedOut', () => {
@@ -7688,13 +7726,22 @@
 
     socket.on('notification:new', (payload) => {
       const item = payload && payload.notification ? payload.notification : payload;
-      if (item && !state.notifications.some((existing) => existing.id === item.id)) {
-        state.notifications = [item, ...state.notifications].slice(0, 80);
-      }
-      state.notificationUnread = Number(payload && payload.unreadCount) || state.notificationUnread + (item && !item.isRead ? 1 : 0);
+      if (!item || !item.id) return;
+      const previous = state.notifications.find(existing => existing.id === item.id);
+      // Aggregated updates have a monotonically increasing server timestamp.
+      // Ignore duplicate/older deliveries, including a replay after marking read.
+      if (previous && Date.parse(item.createdAt) <= Date.parse(previous.createdAt)) return;
+      const updated = { ...previous, ...item };
+      state.notifications = [updated, ...state.notifications.filter(existing => existing.id !== item.id)]
+        .sort((a,b) => (Date.parse(b.createdAt) - Date.parse(a.createdAt)) || String(a.id).localeCompare(String(b.id)))
+        .slice(0, 80);
+      const count = payload && payload.unreadCount;
+      const delta = (updated.isRead ? 0 : 1) - (previous && !previous.isRead ? 1 : 0);
+      state.notificationUnread = typeof count === 'number' && Number.isFinite(count) && count >= 0
+        ? count : Math.max(0, state.notificationUnread + delta);
       renderNotificationBadges();
       renderNotifications();
-      if (item && item.title) showToast(item.title);
+      if (item.title) showToast(item.title);
       if (state.soundEnabled) playMessageSound();
     });
 
@@ -7754,6 +7801,7 @@
       state.lobbyRooms = payload && Array.isArray(payload.rooms) ? payload.rooms : [];
       state.lobbyUsers = payload && Array.isArray(payload.users) ? payload.users : [];
       state.chatUnread = Number(payload && payload.chatUnreadCount) || 0;
+      state.privateUnread = payload && payload.privateUnread && typeof payload.privateUnread === 'object' ? payload.privateUnread : {};
       renderLobby();
       renderHome();
       renderNotificationBadges();
@@ -7951,7 +7999,6 @@
       clearQuote();
       roomTitle.textContent = room.name || '聊天';
       subtitle.textContent = room.type === 'private' ? '私聊已就绪' : '聊天组已就绪';
-      clearPrivateUnread(room);
       setChatEnabled(true);
       messagesDiv.textContent = '';
       const list = payload && Array.isArray(payload.messages) ? payload.messages : [];
@@ -7960,7 +8007,7 @@
       renderMessageCount();
       renderEmptyState();
       settleAtBottom();
-      socket.emit('mark room read', room.id);
+      markCurrentRoomRead();
       input.focus();
     });
 
@@ -7987,7 +8034,8 @@
     });
 
     socket.on('chat message', (data) => {
-      if (state.currentRoom && data.roomId && data.roomId !== state.currentRoom.id) return;
+      if (!state.userId || !state.currentRoom || data.roomId !== state.currentRoom.id) return;
+      if (Array.from(messagesDiv.querySelectorAll('[data-message-id]')).some(row => row.dataset.messageId === data.id)) return;
       const shouldScroll = isNearBottom() || data.userId === state.userId;
       appendMessage(data);
       state.messageCount += 1;
@@ -7997,7 +8045,7 @@
       renderTyping();
       if (shouldScroll) {
         settleAtBottom();
-        if (state.currentRoom && state.currentRoom.id) socket.emit('mark room read', state.currentRoom.id);
+        markCurrentRoomRead();
       }
       else newMessageBtn.hidden = false;
       if (data.userId !== state.userId && !data.recalled && data.type !== 'recalled') playMessageSound();
@@ -8009,14 +8057,13 @@
       if (state.currentRoom && state.currentRoom.id === room.id) return;
       const senderId = payload.from.id || room.targetUserId || '';
       if (!senderId) return;
-      state.privateUnread[senderId] = (state.privateUnread[senderId] || 0) + 1;
-      renderLobby();
       showToast(`${payload.from.username || '有人'} 发来私聊消息`);
       playMessageSound();
     });
 
     socket.on('message recalled', (data) => {
-      if (state.currentRoom && data.roomId && data.roomId !== state.currentRoom.id) return;
+      if (!state.userId || !state.currentRoom || data.roomId !== state.currentRoom.id) return;
+      if (Array.from(messagesDiv.querySelectorAll('[data-message-id]')).some(row => row.dataset.messageId === data.id)) return;
       replaceMessage(data);
       renderEmptyState();
       closeMessageMenu();
@@ -8102,6 +8149,7 @@
     loginForm.addEventListener('submit', (event) => {
       event.preventDefault();
       loginError.textContent = '';
+      if(!socket.connected){loginError.textContent='连接尚未恢复，请稍后登录';return;}
       socket.emit(state.authMode, {
         account: accountInput.value,
         password: passwordInput.value,
@@ -8239,7 +8287,7 @@
       const reader = new FileReader();
       reader.onload = () => {
         forumEditorStatus.textContent = '正在上传图片...';
-	        socket.emit('upload post image', { base64: reader.result, draftToken: forumDraftKey() });
+	        emitMediaEvent('upload post image', { base64: reader.result, draftToken: forumDraftKey() });
       };
       reader.onerror = () => showToast('图片读取失败');
       reader.readAsDataURL(file);
@@ -8462,7 +8510,7 @@
     avatarUpload.addEventListener('click', () => {
       if (!state.pendingAvatar) return;
       avatarStatus.textContent = '正在上传头像...';
-      socket.emit('avatar upload', { base64: state.pendingAvatar.base64 });
+      emitMediaEvent('avatar upload', { base64: state.pendingAvatar.base64 });
     });
     avatarReset.addEventListener('click', () => {
       if (!state.userId) return;
@@ -8478,7 +8526,7 @@
     bannerUpload.addEventListener('click', () => {
       if (!state.pendingBanner) return;
       bannerStatus.textContent = '正在上传主页背景...';
-      socket.emit('profile banner upload', { base64: state.pendingBanner.base64 });
+      emitMediaEvent('profile banner upload', { base64: state.pendingBanner.base64 });
     });
     bannerReset.addEventListener('click', () => {
       if (!state.userId) return;
@@ -8747,6 +8795,8 @@
       row.className = `message-row${isMe ? ' is-me' : ''}${message.recalled || message.type === 'recalled' ? ' is-recalled' : ''}`;
       if (options.animate === false) row.classList.add('is-history');
       row.dataset.messageId = message.id;
+      row.dataset.timestamp = message.timestamp;
+      row.addEventListener('load', markCurrentRoomRead, { capture: true });
 
       const avatar = attachProfileOpen(createAvatar(message.avatar || message.username, message.username), {
         id: message.userId,
@@ -8964,6 +9014,31 @@
       }, 2200);
     }
 
+    let clientSessionGeneration = 0;
+    const activeUploads = new Set();
+    async function prepareMediaPayload(event,payload) {
+      if(!payload || typeof payload.base64!=='string' || !payload.base64.startsWith('data:'))return payload;
+      if(!state.userId || !state.apiToken || !state.isConnected)throw new Error('请先重新登录');
+      if(activeUploads.size>=2)throw new Error('正在上传，请稍后重试');
+      const token=state.apiToken, generation=clientSessionGeneration, roomId=state.currentRoom && state.currentRoom.id;
+      const controller=new AbortController();activeUploads.add(controller);
+      const timer=setTimeout(()=>controller.abort(),20000);
+      try {
+        const comma=payload.base64.indexOf(','), header=payload.base64.slice(5,comma).replace(/;base64$/i,'');
+        const bytes=Uint8Array.from(atob(payload.base64.slice(comma+1)),c=>c.charCodeAt(0));
+        const response=await fetch('/api/media',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':header,'X-Uni-Media-Event':event},body:bytes,signal:controller.signal});
+        const result=await response.json();
+        if(!response.ok)throw new Error(result.error || '上传失败');
+        if(generation!==clientSessionGeneration || state.apiToken!==token || !state.isConnected || (event.startsWith('chat ') && (!state.currentRoom || state.currentRoom.id!==roomId)))throw new Error('会话已改变，请重新上传');
+        return {...payload,base64:result.ticket};
+      } catch(error) { throw new Error(error.name==='AbortError'?'上传中断，请重新选择或重试':error.message); }
+      finally {clearTimeout(timer);activeUploads.delete(controller);}
+    }
+    async function emitMediaEvent(event,payload) {
+      try { const prepared=await prepareMediaPayload(event,payload);socket.emit(event,prepared); }
+      catch(error){state.stickerBusy=false;renderStickerPanel();forumEditorStatus.textContent=error.message;avatarStatus.textContent=error.message;bannerStatus.textContent=error.message;showToast(error.message);}
+    }
+
     // Keep uncertain sends in memory so an explicit retry uses the same business ID.
     const pendingMessageRequests = new Map();
     let messageSendInFlight = false;
@@ -8977,14 +9052,16 @@
         request = { clientMessageId: crypto.randomUUID ? crypto.randomUUID() : Array.from(crypto.getRandomValues(new Uint8Array(16)), b => b.toString(16).padStart(2, '0')).join('') };
         pendingMessageRequests.set(key, request);
       }
-      request.promise = new Promise((resolve, reject) => {
+      const generation=clientSessionGeneration, originalRoom=state.currentRoom.id;
+      request.promise = prepareMediaPayload(event,payload).then(prepared => new Promise((resolve, reject) => {
+        if(generation!==clientSessionGeneration || !state.isConnected || !state.currentRoom || state.currentRoom.id!==originalRoom)return reject(new Error('会话已改变，发送已取消'));
         const timer = setTimeout(() => reject(new Error('发送结果未确认，请重试；相同请求不会重复保存')), 10000);
-        socket.emit(event, { ...payload, clientMessageId: request.clientMessageId }, (result) => {
+        socket.emit(event, { ...prepared, clientMessageId: request.clientMessageId }, (result) => {
           clearTimeout(timer);
           if (result && result.ok) resolve(result);
           else reject(new Error(result && result.error || '发送失败，请重试'));
         });
-      }).then((result) => {
+      })).then((result) => {
         pendingMessageRequests.delete(key);
         return result;
       }).finally(() => { request.promise = null; });
@@ -9250,24 +9327,42 @@
 	      return Boolean((draft.title && draft.title.trim()) || (draft.contentText && draft.contentText.trim()) || (draft.images && draft.images.length));
 	    }
 
-	    function saveForumDraftNow() {
-	      const key = forumDraftKey();
-	      const draft = currentForumDraft();
-	      if (!hasMeaningfulForumDraft(draft)) {
-	        try { localStorage.removeItem(key); } catch (error) {}
-	        return;
-	      }
+	    function cancelForumDraftSave() {
+	      window.clearTimeout(state.forumDraftTimer);
+	      state.forumDraftTimer = null;
+	      state.pendingForumDraft = null;
+	    }
+
+	    function writeForumDraftSnapshot({ key, draft }) {
 	      try {
-	        localStorage.setItem(key, JSON.stringify(draft));
-	        forumEditorStatus.textContent = `已自动保存草稿 · ${new Date(draft.savedAt).toLocaleTimeString()}`;
+	        if (hasMeaningfulForumDraft(draft)) localStorage.setItem(key, JSON.stringify(draft));
+	        else localStorage.removeItem(key);
+	        if (key === forumDraftKey()) forumEditorStatus.textContent = `已自动保存草稿 · ${new Date(draft.savedAt).toLocaleTimeString()}`;
 	      } catch (error) {
 	        forumEditorStatus.textContent = '草稿保存失败，本次内容仍在编辑器中。';
 	      }
 	    }
 
+	    function flushForumDraftSave() {
+	      const pending = state.pendingForumDraft;
+	      cancelForumDraftSave();
+	      if (pending) writeForumDraftSnapshot(pending);
+	    }
+
+	    function saveForumDraftNow() {
+	      if (forumComposerPage.hidden) { flushForumDraftSave(); return; }
+	      cancelForumDraftSave();
+	      writeForumDraftSnapshot({ key: forumDraftKey(), draft: currentForumDraft() });
+	    }
+
 	    function scheduleForumDraftSave() {
-	      window.clearTimeout(state.forumDraftTimer);
-	      state.forumDraftTimer = window.setTimeout(saveForumDraftNow, 800);
+	      if (forumComposerPage.hidden) return;
+	      cancelForumDraftSave();
+	      const pending = { key: forumDraftKey(), draft: currentForumDraft() };
+	      state.pendingForumDraft = pending;
+	      state.forumDraftTimer = window.setTimeout(() => {
+	        if (state.pendingForumDraft === pending) flushForumDraftSave();
+	      }, 800);
 	    }
 
 	    function loadForumDraft(key = forumDraftKey()) {
@@ -9284,6 +9379,7 @@
 	    }
 
 	    function clearForumDraft(key = forumDraftKey()) {
+	      if (state.pendingForumDraft && state.pendingForumDraft.key === key) cancelForumDraftSave();
 	      try { localStorage.removeItem(key); } catch (error) {}
 	      if (forumDraftBanner) forumDraftBanner.hidden = true;
 	    }
@@ -9322,6 +9418,7 @@
 	        showToast('你的账号已被限制使用社区功能');
 	        return;
 	      }
+	      flushForumDraftSave();
 	      const post = options.post ? normalizeForumPost(options.post) : null;
 	      state.forumEditPostId = post ? post.postId : '';
 	      forumComposerTitle.textContent = post ? '编辑帖子' : '发布帖子';
@@ -9345,6 +9442,7 @@
 	    }
 
 	    function closeForumComposer() {
+	      flushForumDraftSave();
 	      if (!forumComposerPage || forumComposerPage.hidden) return;
 	      forumComposerPage.hidden = true;
 	      state.forumPreviewMode = false;
@@ -9936,7 +10034,7 @@
         title.textContent = room.name;
         const meta = document.createElement('span');
         meta.className = 'admin-muted';
-        meta.textContent = `加入 ${room.joinedCount || 0} 人 · 在线 ${room.onlineCount || 0} 人`;
+        meta.textContent = `加入 ${room.joinedCount || 0} 人 · 在线 ${room.onlineCount || 0} 人${room.unreadCount > 0 ? ` · 未读 ${room.unreadCount}` : ''}`;
         button.append(title, meta);
         button.addEventListener('click', () => socket.emit('join room', room.id));
         roomList.append(button);
@@ -9974,8 +10072,6 @@
         meta.textContent = user.isAdmin ? '管理员在线' : '在线';
         button.append(titleRow, meta);
         button.addEventListener('click', () => {
-          delete state.privateUnread[user.id];
-          renderLobby();
           socket.emit('open private chat', user.id);
         });
         privateList.append(button);
@@ -10134,7 +10230,7 @@
         if (!state.pendingStickerFile || state.stickerBusy) return;
         state.stickerBusy = true;
         renderStickerPanel();
-        socket.emit('upload sticker', {
+        emitMediaEvent('upload sticker', {
           base64: state.pendingStickerFile.base64,
           name: state.pendingStickerFile.name,
           title: cleanStickerTitle(state.pendingStickerFile.name)
@@ -10225,7 +10321,7 @@
         }
         state.stickerBusy = true;
         renderStickerPanel();
-        socket.emit('submit official sticker', {
+        emitMediaEvent('submit official sticker', {
           base64: state.pendingOfficialStickerFile.base64,
           name: state.pendingOfficialStickerFile.name,
           title: title.value,
@@ -11008,7 +11104,7 @@
         row.append(name, button);
         const meta = document.createElement('div');
         meta.className = 'admin-muted';
-        meta.textContent = `加入 ${room.joinedCount || 0} 人 · 在线 ${room.onlineCount || 0} 人`;
+        meta.textContent = `加入 ${room.joinedCount || 0} 人 · 在线 ${room.onlineCount || 0} 人${room.unreadCount > 0 ? ` · 未读 ${room.unreadCount}` : ''}`;
         item.append(row, meta);
         adminRooms.append(item);
       });
@@ -11082,14 +11178,6 @@
       showAdminNotice.timer = setTimeout(() => {
         adminNotice.textContent = '';
       }, 2800);
-    }
-
-    function clearPrivateUnread(room) {
-      if (!room || room.type !== 'private') return;
-      const targetId = room.targetUserId || privateTargetFromRoomId(room.id);
-      if (!targetId) return;
-      delete state.privateUnread[targetId];
-      renderLobby();
     }
 
     function privateTargetFromRoomId(roomId) {
@@ -11275,10 +11363,17 @@
         return;
       }
 
+      let acquiredStream;
       try {
+        const generation=clientSessionGeneration, roomId=state.currentRoom && state.currentRoom.id;
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        acquiredStream=stream;
+        if(generation!==clientSessionGeneration || !state.isConnected || !state.currentRoom || state.currentRoom.id!==roomId){stream.getTracks().forEach(t=>t.stop());return;}
         const chunks = [];
-        const recorder = new MediaRecorder(stream);
+        let recordedBytes=0,recordingTooLarge=false;
+        const supported=['audio/webm;codecs=opus','audio/mp4;codecs=mp4a.40.2','audio/ogg;codecs=opus','audio/webm','audio/mp4'].find(type=>MediaRecorder.isTypeSupported(type));
+        const recorder = new MediaRecorder(stream,supported?{mimeType:supported}:undefined);
+        const recordingTimer=setTimeout(()=>{if(recorder.state!=='inactive')recorder.stop();},120000);
         state.recorder = recorder;
         state.isRecording = true;
         state.recordStartedAt = Date.now();
@@ -11287,10 +11382,15 @@
         voiceBtn.title = '停止录音并发送';
 
         recorder.addEventListener('dataavailable', (event) => {
-          if (event.data && event.data.size > 0) chunks.push(event.data);
+          if (event.data && event.data.size > 0) {
+            recordedBytes+=event.data.size;
+            if(recordedBytes>3*1024*1024){recordingTooLarge=true;if(recorder.state!=='inactive')recorder.stop();}
+            else chunks.push(event.data);
+          }
         });
 
         recorder.addEventListener('stop', async () => {
+          clearTimeout(recordingTimer);
           stream.getTracks().forEach((track) => track.stop());
           const blob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
           const duration = Math.max(1, Math.round((Date.now() - state.recordStartedAt) / 1000));
@@ -11300,7 +11400,8 @@
           voiceBtn.classList.remove('is-recording');
           voiceBtn.title = '语音消息';
 
-          if (blob.size > 3 * 1024 * 1024) {
+          if(generation!==clientSessionGeneration || !state.isConnected || !state.currentRoom || state.currentRoom.id!==roomId)return;
+          if (recordingTooLarge || blob.size > 3 * 1024 * 1024) {
             alert('语音最大只能 3MB');
             return;
           }
@@ -11309,8 +11410,9 @@
           await sendMediaWithRetry('chat voice', { base64, duration });
         });
 
-        recorder.start();
+        recorder.start(1000);
       } catch (error) {
+        if(acquiredStream)acquiredStream.getTracks().forEach(track=>track.stop());
         state.isRecording = false;
         state.recorder = null;
         voiceBtn.innerHTML = iconMarkup('mic');

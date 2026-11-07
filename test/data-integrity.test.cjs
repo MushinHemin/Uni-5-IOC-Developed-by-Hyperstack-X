@@ -1,3 +1,4 @@
+const {png,pngUrl}=require('./media-fixtures.cjs');
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs'),os=require('node:os'),path=require('node:path'),Module=require('node:module'),http=require('node:http');
@@ -42,7 +43,7 @@ test('U05 actual startup imports legacy users first and preserves all historical
  const again=fixture(t,dir);assert.equal(again.loadHistory().length,0);await again.close();again.closed=true;
 });
 test('U06 shared references survive cleanup; quarantine rollback, crash recovery and restore',t=>{
- const a=fixture(t),image=a.savePostImageUpload(a.users[0],'data:image/png;base64,YWJjZA==').image,url=image.url,html=`<img src="${url}">`;
+ const a=fixture(t),image=a.savePostImageUpload(a.users[0],pngUrl).image,url=image.url,html=`<img src="${url}">`;
  post(a,'post:a',html);post(a,'post:b',html);a.transaction(a.refreshPostImageReferences);
  assert.equal(a.db.prepare('SELECT count(*) n FROM post_image_refs').get().n,2);
  a.deleteForumPostById('post:b');a.db.prepare("UPDATE post_images SET unbound_at='2000-01-01',created_at='2000-01-01'").run();assert.equal(a.cleanupOrphanPostImages().quarantined,0);const original=path.join(a.dir,url);assert.ok(fs.existsSync(original));
@@ -51,7 +52,7 @@ test('U06 shared references survive cleanup; quarantine rollback, crash recovery
  let row=a.db.prepare('SELECT * FROM post_images').get(),q=a.quarantinePath(row);
  fs.mkdirSync(path.dirname(q),{recursive:true});fs.renameSync(original,q);a.recoverQuarantinedPostImages();assert.ok(fs.existsSync(original)); // Crash after rename, before commit.
  a.db.exec("UPDATE post_images SET unbound_at='2000-01-01'");assert.equal(a.cleanupOrphanPostImages().quarantined,1);assert.ok(fs.existsSync(q));assert.ok(!fs.existsSync(original));
- a.recoverQuarantinedPostImages(true);assert.equal(fs.readFileSync(original,'utf8'),'abcd');assert.equal(a.db.prepare('SELECT quarantined_at FROM post_images').get().quarantined_at,'');
+ a.recoverQuarantinedPostImages(true);assert.deepEqual(fs.readFileSync(original),png);assert.equal(a.db.prepare('SELECT quarantined_at FROM post_images').get().quarantined_at,'');
  a.db.exec("UPDATE post_images SET draft_token='offline-draft',unbound_at='2000-01-01'");assert.equal(a.cleanupOrphanPostImages().quarantined,0);
 });
 test('U14 tombstones preserve replies/floors and legacy orphan backfill is stable',t=>{
@@ -84,7 +85,7 @@ test('U15 archived reports stay addressable after post deletion and legacy table
  a.db.exec("UPDATE legacy_probe SET old_id='b' WHERE content='duplicate'");a.migrateForumTable(migration);assert.equal(a.db.prepare('SELECT count(*) n FROM legacy_probe').get().n,2);const archive=a.db.prepare('SELECT row_json FROM legacy_table_archive').all().map(x=>JSON.parse(x.row_json));assert.equal(archive.length,2);assert.ok(archive.some(r=>r.extra==='original extra'));
 });
 test('U06 restore metadata failure is recoverable without losing the restored file',t=>{
- const a=fixture(t),im=a.savePostImageUpload(a.users[0],'data:image/png;base64,YWJjZA==').image;
+ const a=fixture(t),im=a.savePostImageUpload(a.users[0],pngUrl).image;
  a.transaction(a.refreshPostImageReferences);a.db.exec("UPDATE post_images SET unbound_at='2000-01-01'");a.cleanupOrphanPostImages();
  a.db.exec("CREATE TRIGGER fail_restore BEFORE UPDATE OF quarantined_at ON post_images WHEN NEW.quarantined_at='' BEGIN SELECT RAISE(ABORT,'restore interrupted'); END");assert.throws(()=>a.recoverQuarantinedPostImages(true));assert.ok(fs.existsSync(path.join(a.dir,im.url)));a.db.exec('DROP TRIGGER fail_restore');a.recoverQuarantinedPostImages();assert.equal(a.db.prepare('SELECT quarantined_at FROM post_images').get().quarantined_at,'');
 });

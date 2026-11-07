@@ -56,13 +56,13 @@ See [phase 3 data integrity and recovery](docs/DATA-INTEGRITY-5.5.9.md) for lega
 - Sonoma 5.5.8: community workspace, personal content lists, local draft manager, forum sorting/filtering, profile activity summaries, and notification preferences
 - Uni 5.4.1: personalization controls, compact presence status, latency monitoring, forum persistence hardening, CORS configuration, and stability cleanup
 
-## PWA and Native App Preparation
+## Supported Platform: Web / PWA
 
 - The web app includes a lightweight PWA manifest at `/manifest.json` for standalone mobile launch experiments.
 - Uni intentionally does not register an aggressive service worker in 5.5.3, so private chat/community data and API responses are not cached offline.
 - Mobile layouts include safe-area aware spacing and a narrow-screen bottom navigation for Chat, Forum, Notifications, and My.
-- Current integration notes for future Uni 6 Nordkapp native clients live in [docs/API.md](docs/API.md).
-- Authentication is still based on the current web Socket.IO/session flow; a dedicated token flow should be evaluated before a native production app.
+- Current Web integration contracts are documented in [docs/API.md](docs/API.md). Android/Capacitor is historical and no longer maintained.
+- Authentication uses Socket-bound Web sessions; reconnect requires login, and revoked tokens cannot restore a session.
 
 ## Release Notes
 
@@ -333,7 +333,7 @@ Fixes:
 - Socket.IO
 - SQLite via Node's built-in `node:sqlite`
 - Vanilla HTML/CSS/JavaScript
-- Capacitor project files for future mobile packaging
+- Historical Capacitor project files (unmaintained; not a supported platform)
 
 ## Requirements
 
@@ -407,6 +407,6 @@ Empty templates are provided:
 - Admin access is checked on the server, not only in the UI.
 - Treat this project as a personal / small-group chat app unless you add production hardening such as HTTPS termination, hosted database backups, stronger rate limiting, and deployment monitoring.
 
-## Android / Capacitor Notes
+## Android / Capacitor — Historical, Unmaintained
 
-Capacitor files are included for future mobile packaging. The committed `capacitor.config.json` does not include a live tunnel URL. Configure mobile server targets locally when needed, and keep personal tunnel URLs out of Git.
+Android/Capacitor development has been discontinued. Web/PWA is the maintained platform. The existing Android project, Capacitor configuration, scripts and template tests are retained for historical reference only; they are not release instructions or evidence of build/device compatibility. Known application-ID/template inconsistencies and native/toolchain security advisories remain unresolved. No Android builds or native dependency upgrades are part of this maintenance batch.
