@@ -14,6 +14,19 @@ See [phase 2 identity and security lifecycle](docs/SECURITY-5.5.9.md) for U03/U0
 
 See [phase 3 data integrity and recovery](docs/DATA-INTEGRITY-5.5.9.md) for legacy import, shared images, comment tombstones, transactional deletion and room history cursors.
 
+See [Phase 05 release readiness and mobile acceptance](docs/RELEASE-READINESS-5.5.9.md) for the current release gates. Public release remains blocked by the unresolved historical-data privacy review; passing tests does not grant permission to publish that data.
+
+## Web runtime and installation
+
+Use Node **24.22.1**, pinned in `.nvmrc`, or a patched version allowed by `package.json`. With an existing Node version manager, select that version before installing:
+
+```sh
+nvm use
+npm ci --omit=dev
+```
+
+Production Web/PWA uses Express, Socket.IO and Sharp. Historical Capacitor packages are development-only and must not be included in a Web production installation. A full development install still has known native/tooling advisories; see the release-readiness record. No Android build or maintenance is supported. The runtime pin does not update an existing host's Node installation automatically.
+
 ## Features
 
 - Account registration and login
