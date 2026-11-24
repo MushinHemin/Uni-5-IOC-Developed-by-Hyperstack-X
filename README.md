@@ -1,362 +1,389 @@
 # Uni 5 Sonoma
 
-Uni 5 Sonoma is a lightweight realtime chat and community app with account login, group chat, private chat, forum posts, admin tools, message recall, image paste/upload, voice messages, and a glass-style responsive web UI.
-
-Source version: **Sonoma 5.5.9 Reliability & Security Update**
-
-See [the 5.5.9 changelog](docs/CHANGELOG-5.5.9.md) for implemented fixes, known limitations and validation status. The final UI/IME changes were not tested in this finalization pass; no deployment or GitHub Release is implied.
-
-Previous source baseline: Sonoma 5.5.8 Community Workspace Update.
-
-See [phase 1 reliability notes and test contract](docs/RELIABILITY-5.5.9.md) for U01/U02/U04 fixes, compatibility and remaining risks.
-
-See [phase 2 identity and security lifecycle](docs/SECURITY-5.5.9.md) for U03/U07/U08/U10/U28, administrator bootstrap policy and single-use invitations.
-
-See [phase 3 data integrity and recovery](docs/DATA-INTEGRITY-5.5.9.md) for legacy import, shared images, comment tombstones, transactional deletion and room history cursors.
-
-## Features
-
-- Account registration and login
-- Password storage with scrypt hash and salt
-- Realtime chat powered by Socket.IO
-- Default public group: UniIOC World Channel
-- User-created groups with admin-controlled creation code
-- Private chat and private message notifications
-- Forum MVP with posts, post detail pages, and realtime comments
-- Independent forum composer with a Sonoma-style rich text editor and post image insertion
-- Forum post likes, favorites, comment likes, comment replies, and stable floor labels
-- Display-name personalization with weekly rename limits and admin approval
-- Bulletin mailbox with unread badges, version notices, admin announcements, and rename status messages
-- Unified notification center for chat, forum, profile, Star, report, sticker, and announcement activity
-- Global search across users, forum content, accessible chat history, announcements, and stickers
-- Chat unread counters and per-room read state
-- Message Reactions with server-side visibility and banned-user checks
-- Sonoma user profiles with bio, profile banner, contact actions, and daily Stars
-- Forum report workflow, admin report review center, and basic community bans
-- Sonoma sticker system with official stickers, personal sticker uploads, sticker messages, creator applications, and admin review
-- Message recall within the configured recall window
-- Text, image, pasted image, and voice messages
-- Quote, read-aloud, and recall actions from a message context menu
-- Admin dashboard for user, room, and message management
-- SQLite persistence with JSON compatibility helpers
-- macOS/iOS-inspired glass UI, rounded controls, and spatial page transitions
-- Uni 5.1.0: smoother GPU-friendly animations, systemized frosted glass styling, and persistent light/dark mode
-- Uni 5.2.0: user avatar uploads, light/dark/system theme strategy, and optional message notification sound
-- Uni 5.3.0: forum posts, post list/detail views, and realtime comments
-- Uni 5.4.0: redesigned post-login home hub, clearer Chat / Forum module navigation, and refined module UI hierarchy
-- Uni 5.4.3: display-name identity layer, rename approval workflow, bulletin mailbox, admin announcements, and forum polish
-- Sonoma 5.4.5: user profile pages, profile banners, bio editing, daily Stars, and user list sorting
-- Sonoma 5.4.6: community safety tools, forum reports, admin review actions, bans, and stability fixes
-- Sonoma 5.5.0: official/personal stickers, sticker messages, creator applications, and official sticker review
-- Sonoma 5.5.1: sticker panel polish, mobile layout reliability, upload/review feedback, and safer sticker history fallbacks
-- Sonoma 5.5.3: PWA foundation, mobile app-style layout, bottom navigation, and API / Socket documentation for Uni 6 planning
-- Sonoma 5.5.5: notification center, chat unread state, global discovery search, and message Reactions
-- Sonoma 5.5.6: forum rich editor, post images, forum likes/favorites, comment replies/floors, and GPU/mobile performance polish
-- Sonoma 5.5.7: forum draft recovery, post editing, rich-text hardening, image lifecycle maintenance, and interaction reliability polish
-- Sonoma 5.5.8: community workspace, personal content lists, local draft manager, forum sorting/filtering, profile activity summaries, and notification preferences
-- Uni 5.4.1: personalization controls, compact presence status, latency monitoring, forum persistence hardening, CORS configuration, and stability cleanup
-
-## Supported Platform: Web / PWA
-
-- The web app includes a lightweight PWA manifest at `/manifest.json` for standalone mobile launch experiments.
-- Uni intentionally does not register an aggressive service worker in 5.5.3, so private chat/community data and API responses are not cached offline.
-- Mobile layouts include safe-area aware spacing and a narrow-screen bottom navigation for Chat, Forum, Notifications, and My.
-- Current Web integration contracts are documented in [docs/API.md](docs/API.md). Android/Capacitor is historical and no longer maintained.
-- Authentication uses Socket-bound Web sessions; reconnect requires login, and revoked tokens cannot restore a session.
-
-## Release Notes
-
-### Sonoma 5.5.8 Community Workspace Update
-
-Added:
-
-- Added a dedicated My Content / Community Workspace hub
-- Added My Posts, My Comments, My Replies, and My Favorites views
-- Added local browser draft management for 5.5.7 forum drafts
-- Added forum list sorting and filtering controls
-- Added public community activity summaries on user profiles
-- Added lightweight notification preferences for configurable interaction notifications
+**由 Hyperstack X 设计与开发的轻量级实时通信与社区平台。**
+
+Uni 5 Sonoma 集成了账户系统、群组聊天、私人聊天、社区论坛、管理员工具、消息撤回、图片上传与粘贴、语音消息等功能，并采用具有玻璃质感的响应式 Web 界面。
+
+当前源码版本：**Sonoma 5.5.9 可靠性与安全性更新**
+
+详细修复内容、已知限制及验证状态，请参阅 [5.5.9 版本更新日志](https://github.com/MushinHemin/Uni-5-IOC-Developed-by-Hyperstack-X/blob/main/docs/CHANGELOG-5.5.9.md)。
+
+最终阶段的 UI 与输入法（IME）修改尚未完成测试，本次源码更新不代表已经完成生产部署或 GitHub Release 发布。
+
+上一源码基线：Sonoma 5.5.8 社区工作台更新。
+
+相关工程文档：
+
+- [第一阶段：可靠性说明与测试约定](https://github.com/MushinHemin/Uni-5-IOC-Developed-by-Hyperstack-X/blob/main/docs/RELIABILITY-5.5.9.md)：包含 U01、U02、U04 问题修复、兼容性及剩余风险。
+- [第二阶段：身份认证与安全生命周期](https://github.com/MushinHemin/Uni-5-IOC-Developed-by-Hyperstack-X/blob/main/docs/SECURITY-5.5.9.md)：包含 U03、U07、U08、U10、U28 问题修复、管理员初始化策略及一次性邀请码机制。
+- [第三阶段：数据完整性与恢复](https://github.com/MushinHemin/Uni-5-IOC-Developed-by-Hyperstack-X/blob/main/docs/DATA-INTEGRITY-5.5.9.md)：包含历史数据导入、共享图片、评论删除标记、事务化删除及房间历史记录游标机制。
+
+---
+
+## 功能特性
+
+- 用户账户注册与登录。
+- 基于 scrypt 哈希及盐值的密码安全存储机制。
+- 基于 Socket.IO 的实时通信系统。
+- 默认公共群组：UniIOC World Channel。
+- 支持用户创建群组，并由管理员控制群组创建码。
+- 私人聊天与私聊消息通知。
+- 社区论坛基础功能，包括帖子、帖子详情及实时评论。
+- 独立的论坛发布页面，支持 Sonoma 风格富文本编辑器及帖子图片插入。
+- 帖子点赞、收藏、评论点赞、评论回复及稳定的楼层标识。
+- 个性化显示昵称、每周改名次数限制及管理员审批机制。
+- 公告信箱，支持未读角标、版本通知、管理员公告及改名审批结果。
+- 统一通知中心，涵盖聊天、论坛、个人主页、Star、举报、表情及公告活动。
+- 全局搜索，支持用户、论坛内容、有权访问的聊天历史、公告及表情。
+- 聊天未读计数及独立房间阅读状态。
+- 消息表情回应（Reactions），包含服务端可见性及封禁用户权限检查。
+- Sonoma 个人主页，支持个人简介、主页横幅、联系操作及每日 Star。
+- 论坛举报机制、管理员举报审核中心及基础社区封禁机制。
+- Sonoma 表情系统，支持官方表情、个人表情上传、表情消息、创作者申请及管理员审核。
+- 在规定时间范围内撤回消息。
+- 支持文字、图片、粘贴图片及语音消息。
+- 支持通过消息右键菜单执行引用、朗读及撤回操作。
+- 管理员控制台，支持用户、房间及消息管理。
+- 基于 SQLite 的数据持久化，并提供 JSON 兼容辅助机制。
+- 受 macOS 与 iOS 启发的玻璃界面、圆润控件及空间式页面过渡动画。
+
+### 历代功能演进
 
-Improved:
-
-- Notification creation now respects per-user preferences while keeping system and safety messages always on
-- Improved mobile layouts for workspace cards, draft management, forum filters, favorites, and profile activity
-- Kept existing notification, unread, search, Reaction, rich forum editor, draft recovery, sticker, report, Star, and bulletin systems protected
-- Preserved the Sonoma liquid-glass visual language with lightweight list rendering
-
-### Sonoma 5.5.7 Forum Stability & Draft Recovery Update
-
-Added:
-
-- Added local forum draft autosave and recovery for new posts and post edits
-- Added author/admin post editing with sanitized rich-text saving and edited timestamps
-- Added admin maintenance status for version, Node runtime, SQLite/table checks, post-image storage, orphan image counts, and weak admin password risk
-- Added admin cleanup for 24-hour-old unbound post images
+| 版本 | 主要更新内容 |
+|---|---|
+| Uni 5.1.0 | 更流畅且对 GPU 更友好的动画、系统化磨砂玻璃设计、持久化浅色与深色模式 |
+| Uni 5.2.0 | 用户头像上传、浅色／深色／跟随系统主题、可选消息提示音 |
+| Uni 5.3.0 | 社区论坛、帖子列表、帖子详情与实时评论 |
+| Uni 5.4.0 | 重构登录后首页，优化聊天与论坛导航及模块视觉层级 |
+| Uni 5.4.1 | 个性化控制、紧凑连接状态、延迟监测、论坛持久化加固、CORS 配置及稳定性优化 |
+| Uni 5.4.3 | 独立昵称身份系统、改名审批、公告信箱、管理员公告及论坛优化 |
+| Sonoma 5.4.5 | 用户个人主页、主页横幅、简介编辑、每日 Star 与用户列表排序 |
+| Sonoma 5.4.6 | 社区安全工具、论坛举报、管理员审核、用户封禁及稳定性修复 |
+| Sonoma 5.5.0 | 官方与个人表情、表情消息、创作者申请及官方表情审核 |
+| Sonoma 5.5.1 | 表情面板优化、移动端布局稳定性、上传与审核反馈、历史表情安全回退 |
+| Sonoma 5.5.3 | PWA 基础架构、移动应用式布局、底部导航及面向 Uni 6 的 API／Socket 文档 |
+| Sonoma 5.5.5 | 统一通知中心、聊天未读状态、全局搜索及消息表情回应 |
+| Sonoma 5.5.6 | 论坛富文本编辑器、帖子图片、点赞收藏、评论回复与楼层、GPU 及移动端性能优化 |
+| Sonoma 5.5.7 | 论坛草稿恢复、帖子编辑、富文本安全加固、图片生命周期管理及交互可靠性优化 |
+| Sonoma 5.5.8 | 社区工作台、个人内容列表、本地草稿管理、论坛排序筛选、个人主页活动摘要及通知偏好 |
 
-Improved:
+---
 
-- Hardened rich-text sanitization and preview safety against dangerous tags, event attributes, control-character protocol tricks, and unsafe links
-- Improved post image binding so removed images are unbound while still referenced images remain safe
-- Added pending-state guards for post likes, favorites, comment likes, and comment/reply submission
-- Improved forum editor mobile behavior, draft prompts, and non-native confirmation flows
-- Continued protecting notification, unread, search, Reaction, sticker, report, Star, and Sonoma glass UI systems
+## 支持平台：Web / PWA
 
-### Sonoma 5.5.6 Forum Editor & Performance Overhaul Update
+目前，Web 与 PWA 是 Uni 5 Sonoma 持续维护的平台。
 
-Added:
+- Web 应用在 `/manifest.json` 提供轻量级 PWA Manifest，用于移动端独立应用式启动实验。
+- Uni 5.5.3 未主动注册具有激进缓存策略的 Service Worker，因此不会将私人聊天、社区数据及 API 响应进行离线缓存。
+- 移动端布局支持系统安全区域，并提供适用于窄屏设备的聊天、论坛、通知及我的页面底部导航。
+- 当前 Web 集成协议请参阅 [docs/API.md](https://github.com/MushinHemin/Uni-5-IOC-Developed-by-Hyperstack-X/blob/main/docs/API.md)。
+- Android / Capacitor 属于历史项目，目前已停止维护。
+- 身份认证采用与 Socket 连接绑定的 Web 会话。重新连接时需要重新登录，已撤销的令牌无法恢复会话。
 
-- Added an independent forum publishing page with a Sonoma glass editor surface
-- Added a lightweight rich text editor for bold, italic, underline, strikethrough, headings, lists, quotes, code, alignment, links, image insertion, clear formatting, and preview
-- Added secure post image uploads with random filenames, size/type validation, lazy-loaded rounded images, and Git-ignored storage
-- Added SQLite-backed post likes, post favorites, comment likes, comment replies, and stable floor labels
-- Added forum interaction notifications for replies and selected engagement events
+---
 
-Improved:
+## 版本更新日志
 
-- Upgraded forum list/detail UI with like, favorite, comment, floor, and rich-content metadata
-- Added backend HTML sanitization with an allowlist for safe rich text rendering
-- Updated global search to use safe plain-text content for rich posts and replies
-- Improved mobile forum/editor layout with safe-area spacing and sticky publishing controls
-- Reduced scroll pressure with `content-visibility`, containment, lighter repeated list surfaces, and more careful image sizing
-- Preserved 5.5.5 notifications, unread chat, search, and message Reaction systems
+### Sonoma 5.5.8 社区工作台更新
 
-### Sonoma 5.5.5 Engagement & Discovery Update
+**新增功能**
 
-Added:
+- 新增独立的「我的内容 / 社区工作台」中心。
+- 新增我的帖子、我的评论、我的回复及我的收藏页面。
+- 新增针对 5.5.7 论坛草稿的浏览器本地草稿管理功能。
+- 新增论坛列表排序及筛选控件。
+- 新增个人主页公开社区活动摘要。
+- 新增轻量级通知偏好设置，支持自定义互动通知。
 
-- Added a Sonoma-style notification center for chat messages, forum comments, Stars, report decisions, account restrictions, sticker review updates, and system announcements
-- Added persistent unread state for chats with mobile and desktop unread badges
-- Added global search across users, forum posts/comments, accessible chat messages, announcements, and stickers
-- Added lightweight message Reactions with emoji summary pills and server-side permission checks
-- Added a 5.5.5 system announcement for the bulletin mailbox
+**体验优化**
 
-Improved:
+- 通知生成机制遵循用户个人偏好，同时保持系统及安全通知始终启用。
+- 优化社区工作台卡片、草稿管理、论坛筛选、收藏及个人主页活动的移动端布局。
+- 保护现有通知、未读状态、搜索、消息表情回应、富文本编辑器、草稿恢复、表情、举报、Star 及公告系统。
+- 延续 Sonoma 液态玻璃设计语言，并采用轻量级列表渲染策略。
 
-- Connected notification badges to live Socket.IO updates and read-all/read-one actions
-- Improved room read-state sync when entering chats, receiving messages, scrolling to the bottom, or opening the new-message button
-- Updated API / Socket documentation for notification, unread, search, and Reaction events
-- Preserved the Sonoma liquid glass UI style across discovery, notification, and engagement surfaces
+### Sonoma 5.5.7 论坛稳定性与草稿恢复更新
 
-### Sonoma 5.5.3 App Foundation Update
+**新增功能**
 
-Added:
+- 新增论坛新帖及帖子编辑的本地草稿自动保存与恢复机制。
+- 支持作者及管理员编辑帖子，保存经过安全净化的富文本内容，并记录编辑时间。
+- 新增管理员维护状态页面，展示版本、Node.js 运行时、SQLite 与数据表检查、帖子图片存储、孤立图片数量及管理员弱密码风险。
+- 新增管理员清理超过 24 小时未绑定帖子图片的功能。
 
-- Added PWA manifest metadata for Uni 5 Sonoma with standalone display and a local SVG app icon
-- Added mobile-only Sonoma glass bottom navigation for Chat, Forum, Bulletins, and My
-- Added a lightweight Sonoma launch state for mobile/PWA-style entry
-- Added `docs/API.md` with current Socket.IO/API notes for future Uni 6 Nordkapp native app planning
+**体验与安全优化**
 
-Improved:
+- 强化富文本净化与预览安全，防御危险标签、事件属性、控制字符协议绕过及不安全链接。
+- 优化帖子图片绑定机制，解除已移除图片的绑定，同时保护仍被引用的图片。
+- 为帖子点赞、收藏、评论点赞及评论回复提交增加请求等待状态保护。
+- 优化移动端论坛编辑器、草稿提示及非原生确认交互。
+- 持续保护通知、未读状态、搜索、消息表情回应、表情、举报、Star 及 Sonoma 玻璃界面系统。
 
-- Improved mobile app-style layout spacing, safe-area handling, and touch-friendly navigation
-- Improved mobile chat spacing so the bottom nav does not cover the input composer
-- Improved mobile modal behavior with internal scrolling for settings, profiles, reports, bulletins, and avatar crop flows
-- Improved mobile forum, admin, sticker, and profile surfaces with safer overflow handling
-- Preserved the Sonoma liquid glass UI style without adding heavy offline caching or service worker behavior
+### Sonoma 5.5.6 论坛编辑器与性能重构更新
 
-### Sonoma 5.5.1 Sticker Polish & Reliability Update
+**新增功能**
 
-Improved:
+- 新增独立论坛发布页面，采用 Sonoma 玻璃材质编辑界面。
+- 新增轻量级富文本编辑器，支持粗体、斜体、下划线、删除线、标题、列表、引用、代码、对齐、链接、图片插入、清除格式及预览。
+- 新增安全的帖子图片上传机制，包括随机文件名、大小及类型验证、圆角图片延迟加载，以及由 Git 忽略的图片存储目录。
+- 新增基于 SQLite 的帖子点赞、帖子收藏、评论点赞、评论回复及稳定楼层标识。
+- 新增论坛回复及部分互动事件的通知。
 
-- Optimized the sticker panel open/close behavior, tab highlighting, empty states, and Sonoma glass styling
-- Improved mobile sticker layout so the panel, grid, tabs, upload area, and sticker messages stay readable on small screens
-- Added clearer upload, delete, creator application, and official submission feedback states
-- Improved admin review confirmations for sticker creator applications and official sticker submissions
-- Tightened admin-side status checks for approving, rejecting, and removing official sticker submissions
+**体验与性能优化**
 
-Fixed:
+- 升级论坛列表及详情界面，展示点赞、收藏、评论、楼层及富文本相关信息。
+- 后端新增基于允许列表的 HTML 安全净化机制。
+- 全局搜索改用富文本帖子及回复的安全纯文本内容。
+- 优化移动端论坛及编辑器布局，支持安全区域与固定发布控件。
+- 通过 `content-visibility`、布局包含机制、轻量级重复列表材质及更合理的图片尺寸策略降低滚动渲染压力。
+- 保留 5.5.5 通知、聊天未读状态、搜索及消息表情回应系统。
 
-- Added safe placeholder UI when historical sticker images are missing or unavailable
-- Hardened sticker message rendering so old text messages and missing sticker references do not break chat history
-- Kept banned-user sticker restrictions and admin permission checks enforced on the server
-- Preserved the Sonoma liquid glass UI style across sticker panel, sticker messages, and admin review surfaces
+### Sonoma 5.5.5 互动与全局探索更新
 
-### Sonoma 5.5.0 Sticker System Update
+**新增功能**
 
-Added:
+- 新增 Sonoma 风格通知中心，支持聊天消息、论坛评论、Star、举报处理结果、账户限制、表情审核及系统公告。
+- 新增持久化聊天未读状态，以及移动端和桌面端未读角标。
+- 新增全局搜索，支持用户、论坛帖子与评论、有权访问的聊天消息、公告及表情。
+- 新增轻量级消息表情回应，支持 Emoji 汇总胶囊及服务端权限检查。
+- 新增 5.5.5 系统公告。
 
-- Added official sticker packs visible to all users
-- Added personal sticker uploads, sending, and deletion
-- Added persistent sticker messages in chat with Sonoma-style image bubbles
-- Added sticker creator applications and creator status tracking
-- Added creator-submitted official sticker review workflow
-- Added admin review modules for sticker creators and official sticker submissions
+**体验优化**
 
-Improved:
+- 通知角标接入 Socket.IO 实时更新，支持单条已读及全部已读。
+- 优化进入聊天、接收消息、滚动到底部及打开新消息入口时的阅读状态同步。
+- 更新通知、未读状态、搜索及消息表情回应相关 API / Socket 文档。
+- 在探索、通知及互动界面中延续 Sonoma 液态玻璃设计语言。
 
-- Sticker panel uses Uni Sonoma liquid glass styling, rounded cards, soft shadows, and mobile-safe layout
-- Banned users are blocked server-side from uploading, sending, applying, or submitting stickers
-- Official, personal, and creator sticker data persists in SQLite and stays compatible with old text messages
+### Sonoma 5.5.3 应用基础架构更新
 
-### Sonoma 5.4.6 Community Safety & Stability Update
+**新增功能**
 
-Added:
+- 新增 Uni 5 Sonoma PWA Manifest 元数据，支持独立显示模式及本地 SVG 应用图标。
+- 新增移动端专属 Sonoma 玻璃底部导航，支持聊天、论坛、公告及我的页面。
+- 新增轻量级 Sonoma 移动应用式启动状态。
+- 新增 `docs/API.md`，记录当前 Socket.IO 与 API 协议，为未来 Uni 6 Nordkapp 原生应用开发提供参考。
 
-- Added forum post reporting with Sonoma-style report dialog
-- Added SQLite-backed report persistence and duplicate-report protection
-- Added admin report center with view, dismiss, delete post, ban user, and combined moderation actions
-- Added basic community ban fields and enforcement for posting, commenting, Stars, reports, and profile edits
+**体验优化**
 
-Improved:
+- 优化移动应用式布局间距、安全区域处理及触控导航。
+- 优化移动端聊天布局，避免底部导航遮挡消息输入区域。
+- 优化设置、个人主页、举报、公告及头像裁剪窗口的内部滚动。
+- 优化移动端论坛、管理员、表情及个人主页界面的溢出处理。
+- 延续 Sonoma 液态玻璃设计语言，不引入重量级离线缓存或 Service Worker 机制。
 
-- Hardened Star and community actions with server-side permission checks
-- Improved profile fallback handling for empty bio and missing banner images
-- Refined user list sorting and Star badge consistency
-- Preserved the Sonoma liquid glass UI style across new safety surfaces
+### Sonoma 5.5.1 表情精修与可靠性更新
 
-Fixed:
+**体验优化**
 
-- Fixed community action bypasses for banned accounts
-- Fixed report and moderation status updates across admin and forum views
+- 优化表情面板开关行为、标签高亮、空状态及 Sonoma 玻璃样式。
+- 优化移动端表情面板、表情网格、标签、上传区域及消息布局。
+- 增强上传、删除、创作者申请及官方表情投稿的操作反馈。
+- 优化管理员审核表情创作者申请与官方表情投稿的确认流程。
+- 强化官方表情审批、拒绝及移除操作的服务端状态检查。
 
-### Sonoma 5.4.5 Profile & Star Update
+**问题修复**
 
-Added:
+- 为缺失或不可用的历史表情图片提供安全占位界面。
+- 强化表情消息渲染，避免历史文字消息或缺失表情引用破坏聊天记录。
+- 保持服务端对封禁用户表情权限及管理员权限的检查。
+- 在表情面板、表情消息及管理员审核界面中延续 Sonoma 液态玻璃设计语言。
 
-- Added Sonoma-style user profile pages opened from user avatars
-- Added profile bio editing and profile banner uploads in Account & Settings
-- Added contact actions with private chat entry and voice-call placeholder UI
-- Added daily user Stars with server-side SQLite enforcement
-- Added user list sorting by display name or Star count
+### Sonoma 5.5.0 表情系统更新
 
-Improved:
+**新增功能**
 
-- User profile, Star badges, banner previews, and sorting controls reuse Uni's liquid glass UI language
-- New profile surfaces support light/dark themes and liquid glass intensity settings
-- Online users, lobby users, forum posts, comments, and chat avatars can open user profiles where available
+- 新增面向所有用户的官方表情包。
+- 支持个人表情上传、发送及删除。
+- 新增采用 Sonoma 风格图片气泡的持久化表情消息。
+- 新增表情创作者申请及创作者状态跟踪。
+- 新增创作者官方表情投稿与审核机制。
+- 新增管理员表情创作者及官方表情审核模块。
 
-### Uni 5.4.3 Identity & Bulletin Update
+**体验与安全优化**
 
-Added:
+- 表情面板采用 Sonoma 液态玻璃材质、圆角卡片、柔和阴影及移动端安全布局。
+- 服务端禁止封禁用户上传、发送、申请或投稿表情。
+- 官方表情、个人表情及创作者相关数据持久化至 SQLite，并保持与历史文字消息的兼容性。
 
-- Added stable display-name identity separate from login accounts
-- Added weekly rename limits with automatic approval for free changes
-- Added admin approval workflow for rename requests beyond the free window
-- Added bulletin mailbox with unread badges and targeted system messages
-- Added admin global announcement publishing
-- Added forum post/comment deletion controls with server-side permission checks
+### Sonoma 5.4.6 社区安全与稳定性更新
 
-Improved:
+**新增功能**
 
-- Forum cards and details now use display names consistently
-- Chat, private chat, online lists, settings, and admin views share the same display-name logic
-- Rename decisions now notify users through the bulletin mailbox
-- Default avatar fallback continues to use the user's display initial
+- 新增论坛帖子举报及 Sonoma 风格举报窗口。
+- 新增基于 SQLite 的举报数据持久化及重复举报保护。
+- 新增管理员举报中心，支持查看、驳回、删除帖子、封禁用户及组合处理操作。
+- 新增基础社区封禁字段，并对发帖、评论、Star、举报及个人主页编辑操作实施限制。
 
-### Uni 5.4.1 Personalization & Presence Update
+**体验与安全优化**
 
-Added:
+- 强化 Star 及社区互动操作的服务端权限检查。
+- 优化空白个人简介及缺失主页横幅的回退处理。
+- 优化用户列表排序及 Star 角标的一致性。
+- 在新增社区安全界面中延续 Sonoma 液态玻璃设计语言。
 
-- Added unified Account & Settings hub
-- Added liquid glass intensity customization
-- Added real-time latency monitor
-- Added compact connection status card
+**问题修复**
 
-Improved:
+- 修复封禁账户绕过社区操作限制的问题。
+- 修复管理员与论坛界面之间举报及审核状态更新的问题。
 
-- Merged account and settings into one primary home module
-- Simplified the home dashboard layout
-- Refined module toolbar actions
-- Improved visual personalization controls
+### Sonoma 5.4.5 个人主页与 Star 更新
 
-Fixed:
+**新增功能**
 
-- Cleaned temporary `.gitignore` scratch entries
-- Improved CORS configuration with `ALLOWED_ORIGINS`
-- Verified forum post/comment persistence
+- 新增可通过用户头像打开的 Sonoma 风格个人主页。
+- 支持在账户与设置中编辑个人简介及上传主页横幅。
+- 新增联系操作，包括私人聊天入口及语音通话占位界面。
+- 新增由服务端 SQLite 机制控制的每日 Star 功能。
+- 新增按显示昵称或 Star 数量排列用户列表的功能。
 
-### Uni 5.4.1 Stability & Forum Persistence Fix
+**体验优化**
 
-Fixed:
+- 个人主页、Star 角标、横幅预览及排序控件复用 Uni 液态玻璃设计语言。
+- 新增个人主页界面支持浅色、深色主题及玻璃强度设置。
+- 在线用户列表、大厅用户列表、论坛帖子、评论及聊天头像可在支持的场景中打开用户个人主页。
 
-- Verified and repaired forum post/comment SQLite persistence
-- Added stricter forum input validation
-- Cleaned temporary `.gitignore` entries
-- Hardened Socket.IO CORS configuration
-- Improved module navigation edge cases
+### Uni 5.4.3 身份系统与公告更新
 
-### Uni 5.4.0 Experience Architecture Update
+**新增功能**
 
-Added:
+- 新增与登录账户相互独立的稳定显示昵称身份系统。
+- 新增每周改名次数限制，免费改名额度内自动批准。
+- 超出免费改名额度的请求由管理员审核。
+- 新增支持未读角标及定向系统消息的公告信箱。
+- 新增管理员全局公告发布功能。
+- 新增具有服务端权限检查的论坛帖子及评论删除功能。
 
-- Post-login home hub with primary Chat and Forum module cards
-- Secondary Account and Settings entry cards on the home hub
-- Clear return-to-home controls in Chat and Forum modules
+**体验优化**
 
-Improved:
+- 论坛卡片及详情页面统一使用显示昵称。
+- 聊天、私人聊天、在线列表、设置及管理员界面共享相同的显示昵称逻辑。
+- 改名审核结果通过公告信箱通知用户。
+- 默认头像继续使用用户显示昵称的首字符。
 
-- Chat and Forum are now treated as first-level product modules instead of toolbar items
-- Module toolbars are cleaner and more focused
-- Forum layout, post list cards, and detail reading area have stronger visual hierarchy
-- Home, Chat, Forum, Settings, and Admin continue to share the same glass, rounded, dark-mode-ready design language
+### Uni 5.4.1 个性化与连接状态更新
 
-### Uni 5.3.0 Forum Update
+**新增功能**
 
-Added:
+- 新增统一的账户与设置中心。
+- 新增液态玻璃强度自定义设置。
+- 新增实时网络延迟监测。
+- 新增紧凑型连接状态卡片。
 
-- Forum page entry for logged-in users
-- Post creation with title, content, author identity, avatar, and creation time
-- Reverse-chronological post list with glass-style cards
-- Post detail view with full content and author information
-- Realtime comment creation and live comment append
+**体验优化**
 
-Improved:
+- 将账户与设置整合为统一首页主模块。
+- 简化首页仪表板布局。
+- 优化各模块工具栏操作。
+- 改进视觉个性化设置控件。
 
-- SQLite persistence now includes `posts` and `comments` tables
-- Forum UI reuses the existing avatar, theme, glass, and spatial page layer systems
+**问题修复**
 
-### Uni 5.2.0 Profile & Comfort Update
+- 清理 `.gitignore` 中临时测试条目。
+- 使用 `ALLOWED_ORIGINS` 改进 CORS 配置。
+- 验证论坛帖子及评论持久化功能。
 
-Added:
+### Uni 5.4.1 稳定性与论坛持久化修复
 
-- User avatar upload, preview, update, and reset-to-default support
-- Light / dark / follow-system appearance strategy
-- Optional message notification sound with local preference storage
+**问题修复**
 
-Improved:
+- 验证并修复论坛帖子及评论的 SQLite 持久化功能。
+- 强化论坛输入内容验证。
+- 清理 `.gitignore` 中的临时条目。
+- 强化 Socket.IO CORS 配置。
+- 优化模块导航边界情况。
 
-- User identity display across chat, online lists, settings, and admin users
-- Theme preference persistence and system theme syncing
-- Comfort settings inside a glass-style settings panel
+### Uni 5.4.0 体验架构更新
 
-Fixes:
+**新增功能**
 
-- System settings now use a dedicated gear entry instead of the theme shortcut button
-- Avatar upload includes a lightweight crop step before upload
-- Chat message avatars render beside bubbles in both group and private chats
-- Default avatars use a consistent blue background with the user's initial
+- 新增登录后首页，提供聊天及论坛主模块卡片。
+- 在首页新增账户与设置次级入口卡片。
+- 在聊天与论坛模块中新增明确的返回首页控件。
 
-## Tech Stack
+**体验优化**
 
-- Node.js
-- Express
-- Socket.IO
-- SQLite via Node's built-in `node:sqlite`
-- Vanilla HTML/CSS/JavaScript
-- Historical Capacitor project files (unmaintained; not a supported platform)
+- 将聊天与论坛从工具栏功能提升为独立的一级产品模块。
+- 简化模块工具栏，使界面更加专注。
+- 强化论坛布局、帖子列表卡片及详情阅读区域的视觉层级。
+- 首页、聊天、论坛、设置及管理员模块继续共享统一的玻璃、圆角及深色模式设计语言。
 
-## Requirements
+### Uni 5.3.0 社区论坛更新
 
-- Node.js 22+ with `node:sqlite` support
-- npm
+**新增功能**
 
-## Installation
+- 为已登录用户新增论坛页面入口。
+- 支持创建包含标题、正文、作者身份、头像及创建时间的帖子。
+- 新增按时间倒序排列的玻璃风格帖子列表。
+- 新增展示完整正文及作者信息的帖子详情页面。
+- 支持实时发表评论及动态追加评论。
+
+**体验与架构优化**
+
+- SQLite 持久化新增 `posts` 与 `comments` 数据表。
+- 论坛界面复用现有头像、主题、玻璃材质及空间页面层系统。
+
+### Uni 5.2.0 个人资料与舒适体验更新
+
+**新增功能**
+
+- 支持用户头像上传、预览、更新及恢复默认头像。
+- 新增浅色、深色及跟随系统外观策略。
+- 新增可选消息通知音，并在本地保存用户偏好。
+
+**体验优化**
+
+- 统一聊天、在线用户列表、设置及管理员用户界面中的身份展示。
+- 优化主题偏好持久化及系统主题同步。
+- 在玻璃风格设置面板中提供舒适体验设置。
+
+**问题修复**
+
+- 系统设置使用独立齿轮入口，替代原主题快捷按钮。
+- 头像上传前新增轻量级裁剪流程。
+- 群组聊天及私人聊天中的消息头像正确显示于消息气泡旁。
+- 默认头像采用统一蓝色背景及用户昵称首字符。
+
+---
+
+## 技术架构
+
+| 技术 | 用途 |
+|---|---|
+| Node.js | 服务端 JavaScript 运行环境 |
+| Express | Web 服务及 API 接口 |
+| Socket.IO | 实时通信 |
+| SQLite | 本地数据持久化，通过 Node.js 内置的 `node:sqlite` 接入 |
+| HTML / CSS / JavaScript | 原生 Web 前端 |
+
+项目同时保留历史 Capacitor 工程文件，仅供参考，不属于当前支持平台。
+
+## 环境要求
+
+- Node.js 22 或更高版本，且支持 `node:sqlite`。
+- npm 包管理器。
+
+具体版本仍应满足当前分支 `package.json` 中声明的运行时要求。
+
+## 安装
+
+在项目目录下执行：
 
 ```bash
 npm install
 ```
 
-## Configuration
+## 环境配置
 
-Copy the example environment file and edit the values:
+复制示例环境配置文件，并根据实际部署环境修改参数：
 
 ```bash
 cp .env.example .env
 ```
 
-Available environment variables:
+可用环境变量：
 
-```bash
+```env
 PORT=3200
 ALLOWED_ORIGINS=http://localhost:3200,http://127.0.0.1:3200
 ADMIN_ACCOUNT=admin
@@ -364,49 +391,90 @@ ADMIN_PASSWORD=replace-with-a-strong-password
 ADMIN_USERNAME=Administrator
 ```
 
-Notes:
+### 配置说明
 
-- `.env` is ignored by Git and must not be committed.
-- Change the admin password before sharing or deploying the app.
-- `ALLOWED_ORIGINS` is a comma-separated Socket.IO CORS allowlist.
-- When testing with ngrok, add the current ngrok URL to `ALLOWED_ORIGINS` locally, but do not commit real tunnel URLs.
-- Do not commit real ngrok URLs, API keys, passwords, user data, chat history, or SQLite database files.
+| 环境变量 | 用途 |
+|---|---|
+| `PORT` | 服务端监听端口 |
+| `ALLOWED_ORIGINS` | Socket.IO CORS 来源允许列表 |
+| `ADMIN_ACCOUNT` | 管理员账户 |
+| `ADMIN_PASSWORD` | 管理员密码 |
+| `ADMIN_USERNAME` | 管理员显示名称 |
 
-## Running
+请注意：
+
+- `.env` 文件由 Git 忽略，不得提交至代码仓库。
+- 在分享或部署应用之前，必须设置安全的管理员密码。
+- `ALLOWED_ORIGINS` 使用英文逗号分隔多个允许访问的来源。
+- 使用 ngrok 测试时，应在本地将当前 ngrok 地址加入 `ALLOWED_ORIGINS`。
+- 不得提交真实 ngrok 地址、API 密钥、密码、用户数据、聊天记录或 SQLite 数据库文件。
+
+## 启动应用
+
+执行：
 
 ```bash
 npm start
 ```
 
-Then open:
+随后在浏览器中访问：
 
 ```text
 http://127.0.0.1:3200/
 ```
 
-If you use a tunnel such as ngrok for testing with friends, start the tunnel separately and do not commit the generated public URL.
+如果需要通过 ngrok 等内网穿透服务与其他用户进行测试，请单独启动隧道服务，不要将生成的真实公网地址提交至代码仓库。
 
-## Data Files
+---
 
-Runtime data is stored locally and ignored by Git:
+## 数据文件
 
-- `users.json`
-- `chat-history.json`
-- `beluga-chat.sqlite`
-- `beluga-chat.sqlite-*`
-- `uploads/`
+运行时数据存储于本地，并由 Git 忽略。
 
-Empty templates are provided:
+主要数据文件与目录：
 
-- `users.example.json`
-- `chat-history.example.json`
+```text
+users.json
+chat-history.json
+beluga-chat.sqlite
+beluga-chat.sqlite-*
+uploads/
+```
 
-## Security Notes
+项目提供以下空白数据模板：
 
-- Passwords are not stored as plain text.
-- Admin access is checked on the server, not only in the UI.
-- Treat this project as a personal / small-group chat app unless you add production hardening such as HTTPS termination, hosted database backups, stronger rate limiting, and deployment monitoring.
+```text
+users.example.json
+chat-history.example.json
+```
 
-## Android / Capacitor — Historical, Unmaintained
+请勿将包含真实用户信息、聊天记录或用户上传内容的运行时文件提交至公开仓库。
 
-Android/Capacitor development has been discontinued. Web/PWA is the maintained platform. The existing Android project, Capacitor configuration, scripts and template tests are retained for historical reference only; they are not release instructions or evidence of build/device compatibility. Known application-ID/template inconsistencies and native/toolchain security advisories remain unresolved. No Android builds or native dependency upgrades are part of this maintenance batch.
+## 安全说明
+
+- 用户密码不以明文形式存储。
+- 管理员权限由服务端进行验证，而非仅依赖前端界面限制。
+- 在完成生产环境安全加固之前，建议将 Uni 用于个人或小规模群组通信。
+- 正式生产部署应进一步完善 HTTPS 接入、数据库备份、请求频率限制及部署运行监控。
+
+## Android / Capacitor 历史工程
+
+Android / Capacitor 客户端开发已经停止维护。
+
+目前持续维护的平台为 Web / PWA。
+
+现有 Android 工程、Capacitor 配置、构建脚本及模板测试仅作为历史开发参考保留，不代表当前有效的发布流程，也不能作为构建成功或设备兼容性验证的依据。
+
+历史工程中仍存在尚未解决的应用标识、模板配置一致性及原生工具链安全问题。
+
+本次维护不包含 Android 构建或原生依赖升级。
+
+---
+
+## 关于 Uni
+
+Uni 5 Sonoma
+
+由 Hyperstack X 设计与开发。
+
+Designed and developed by Hyperstack X.
