@@ -1,0 +1,49 @@
+/* Liquid Crystal pilot: known-wallpaper refraction on the three home cards only.
+   Optical displacement and reading protection are independently budgeted. */
+:root {
+  /* All distances are CSS px, independent of framebuffer DPR.
+     Dispersion is the total red-to-blue separation, not each channel's offset. */
+  --crystal-band:22;
+  --crystal-displacement:6;
+  --crystal-corner-displacement:12;
+  --crystal-dispersion:3;
+  --crystal-rim-relief:1;
+  --crystal-core-softness:1.8;
+}
+/* Explicit diagnostic profile; never selected automatically or persisted. */
+html[data-crystal-profile="debug"] {
+  --crystal-band:24;--crystal-displacement:16;--crystal-corner-displacement:28;
+  --crystal-dispersion:7.2;--crystal-rim-relief:1.8;
+}
+.home-card > .crystal-sample {
+  position:absolute;inset:0;width:100%;height:100%;border-radius:inherit;
+  pointer-events:none;z-index:-1;display:none;
+}
+.home-card.crystal-ready > .crystal-sample { display:block; }
+.home-card.crystal-ready.napa-glass { background:transparent;--napa-rim:1px; }
+.home-card.crystal-ready > :is(.napa-material-core,.napa-material-transition) { display:none; }
+/* The shader already renders the bevel. Keep the existing living reflection but
+   remove decorative RGB rim paint from this opt-in surface. */
+.home-card.crystal-ready::before {
+  background:conic-gradient(from 115deg,rgba(255,255,255,.08),rgba(8,22,44,.38) 22%,rgba(255,255,255,.25) 36%,rgba(255,255,255,.62) 48%,transparent 62%,rgba(8,22,44,.26) 80%,rgba(255,255,255,.08));
+}
+.home-card.crystal-ready h3,.home-card.crystal-ready p { color:var(--crystal-text-ink,#f5f9ff); }
+.home-card.crystal-ready .home-card-meta { color:var(--crystal-meta-ink,#f5f9ff); }
+.home-card.crystal-ready .home-card-meta span { background:transparent;border-color:currentColor; }
+/* No GPU / unsupported backdrop: readable local text islands, not an opaque card. */
+.home-card.crystal-fallback :is(h3,p) {
+  width:fit-content;max-width:100%;color:#f5f9ff;background:rgba(9,23,40,.86);
+  border-radius:6px;box-shadow:0 0 10px 4px rgba(9,23,40,.62);
+}
+.home-card.crystal-fallback .home-card-meta span { color:#f5f9ff;background:rgba(9,23,40,.86); }
+@media (prefers-contrast:more),(forced-colors:active) {
+  .home-card.crystal-ready > .crystal-sample { display:none; }
+  .home-card.crystal-ready.napa-glass { background:var(--napa-fallback); }
+  .home-card.crystal-ready :is(h3,p,.home-card-meta) { color:var(--ink); }
+  .home-card.crystal-fallback :is(h3,p,.home-card-meta span) { color:var(--ink);background:transparent;box-shadow:none; }
+}
+@media (forced-colors:active) {
+  .home-card.crystal-ready.napa-glass { background:Canvas; }
+  .home-card.crystal-ready :is(h3,p,.home-card-meta) { color:CanvasText; }
+  .home-card.crystal-fallback :is(h3,p,.home-card-meta span) { color:CanvasText; }
+}

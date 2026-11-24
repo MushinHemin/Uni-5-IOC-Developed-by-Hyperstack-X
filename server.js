@@ -8,6 +8,7 @@ const sharp = require('sharp');
 sharp.cache(false);
 sharp.concurrency(1);
 const { DatabaseSync } = require('node:sqlite');
+const { createUniCall } = require('./lib/uni-call');
 
 loadDotEnv();
 
@@ -63,6 +64,7 @@ const MAX_STICKER_BYTES = 2 * 1024 * 1024;
 const MAX_POST_IMAGES = 9;
 const MAX_PERSONAL_STICKERS = 50;
 const MAX_VOICE_BYTES = 3 * 1024 * 1024;
+const CALL_RESULTS = new Set(['completed', 'missed', 'declined', 'canceled', 'busy', 'failed', 'offline']);
 const MAX_HISTORY_MESSAGES = 300;
 const MAX_FORUM_POSTS = 120;
 const TYPING_TIMEOUT_MS = 3000;
@@ -603,7 +605,7 @@ function normalizeMessage(message) {
     : typeof message.message === 'string'
       ? message.message
       : '';
-  const type = ['image', 'voice', 'sticker', 'recalled'].includes(message.type) ? message.type : 'text';
+  const type = ['image', 'voice', 'sticker', 'recalled', 'call'].includes(message.type) ? message.type : 'text';
   const timestamp = Number.isNaN(Date.parse(message.timestamp))
     ? new Date().toISOString()
     : message.timestamp;
@@ -674,6 +676,17 @@ function normalizeMessage(message) {
       stickerId,
       timestamp,
       recalled: false
+    };
+  }
+
+  if (type === 'call') {
+    if (!/^call:[0-9a-f-]{36}$/.test(message.id || '') || !roomId.startsWith('dm:') || !CALL_RESULTS.has(content)) return null;
+    const duration = Number(message.duration);
+    return {
+      id: message.id, roomId, type, userId: message.userId || null, username,
+      avatar: message.avatar || makeAvatar(username), content, stickerId: '',
+      duration: Number.isSafeInteger(duration) && duration >= 0 ? Math.min(duration, 28800) : 0,
+      timestamp, recalled: false
     };
   }
 
@@ -2327,6 +2340,7 @@ function banUser(user, reason = '') {
   user.bannedAt = new Date().toISOString();
   user.bannedReason = cleanAdminNote(reason) || '违反社区规则';
   saveUsers();
+  uniCall.revoke(user.id);
   createNotification({
     userId: user.id,
     type: 'account_restricted',
@@ -3330,8 +3344,9 @@ function currentSocketUser(socket) {
   return user && socket.authPasswordHash === user.passwordHash ? user : null;
 }
 
-function clearSocketIdentity(socket, notify = false) {
+function clearSocketIdentity(socket, notify = false, transportDisconnected = false) {
   const previous = socket.user;
+  if (previous) uniCall.detach(socket, transportDisconnected);
   const previousRoom = socket.currentRoomId;
   clearTyping(socket);
   for (const room of Array.from(socket.rooms)) if (room !== socket.id) socket.leave(room);
@@ -3349,6 +3364,7 @@ function clearSocketIdentity(socket, notify = false) {
 }
 
 function revokeUserSessions(userId) {
+  uniCall.revoke(userId);
   for (const [token, session] of apiSessions) if (session.userId === userId) apiSessions.delete(token);
   for (const socket of io.sockets.sockets.values()) {
     if (socket.user && socket.user.id === userId) clearSocketIdentity(socket, true);
@@ -4070,6 +4086,44 @@ let rooms = loadRooms();
 const onlineUsers = new Map();
 const typingTimers = new Map();
 
+const uniCall = createUniCall({
+  userFor: currentSocketUser,
+  findUser: userById,
+  socketsFor: socketsForUser,
+  socketById: id => io.sockets.sockets.get(id),
+  publicPeer: user => user && ({
+    id: user.id, displayName: displayNameOf(user), avatar: user.avatar || makeAvatar(displayNameOf(user))
+  }),
+  canCall: (from, to) => {
+    const roomId = privateRoomId(from.id, to.id);
+    return canUserAccessRoom(from, roomId) && canUserAccessRoom(to, roomId);
+  },
+  record: recordCallResult
+});
+
+function recordCallResult(result) {
+  const caller = userById(result.callerId);
+  const callee = userById(result.calleeId);
+  if (!caller || !callee) return;
+  const roomId = privateRoomId(caller.id, callee.id);
+  const latest = lastMessageForRoom(roomId);
+  const data = {
+    id: 'call:' + result.id, roomId, type: 'call', userId: caller.id,
+    username: displayNameOf(caller), avatar: caller.avatar || makeAvatar(displayNameOf(caller)),
+    content: result.reason, duration: result.seconds,
+    timestamp: new Date(Math.max(result.endedAt, latest ? Date.parse(latest.created_at) + 1 : 0)).toISOString()
+  };
+  const insert = db.prepare(`
+    INSERT INTO messages (id, room_id, type, user_id, username, avatar, content, duration, created_at)
+    VALUES (?, ?, 'call', ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO NOTHING
+  `).run(data.id, roomId, data.userId, data.username, data.avatar, data.content, data.duration, data.timestamp);
+  if (!insert.changes) return;
+  messages = trimHistory([...messages, data]);
+  emitAuthorizedRoom(roomId, 'chat message', data);
+  for (const id of [caller.id, callee.id]) emitUnreadUpdate(id);
+  broadcastLobby();
+}
+
 fs.mkdirSync(AVATAR_UPLOAD_DIR, { recursive: true });
 fs.mkdirSync(BANNER_UPLOAD_DIR, { recursive: true });
 fs.mkdirSync(STICKER_UPLOAD_DIR, { recursive: true });
@@ -4295,6 +4349,7 @@ function persistAndPublishMessage(socket, data, payload, reply) {
 }
 
 io.on('connection', (socket) => {
+  uniCall.register(socket);
   installMediaBoundary(socket);
   socket.emit('onlineUsers', { count: onlineUsers.size, users: Array.from(onlineUsers.values()).map(publicUser) });
   emitLobby(socket);
@@ -4339,7 +4394,7 @@ io.on('connection', (socket) => {
     recordLogin(socket, user);
     bindUser(socket, user);
     const apiToken = createApiToken(socket, user);
-    socket.emit('authSuccess', { user: publicUser(user), apiToken });
+    socket.emit('authSuccess', { user: publicUser(user), apiToken, features: { uniCall: true } });
     emitRenameStatus(socket);
     emitBulletins(socket);
     emitNotifications(socket);
@@ -4365,7 +4420,7 @@ io.on('connection', (socket) => {
     bindUser(socket, user);
     const apiToken = createApiToken(socket, user);
     clearAuthLimit(socket, input.account);
-    socket.emit('authSuccess', { user: publicUser(user), apiToken });
+    socket.emit('authSuccess', { user: publicUser(user), apiToken, features: { uniCall: true } });
     emitRenameStatus(socket);
     emitBulletins(socket);
     emitNotifications(socket);
@@ -5212,6 +5267,10 @@ io.on('connection', (socket) => {
       socket.emit('messageError', '只能撤回自己发出的消息');
       return;
     }
+    if (message.type === 'call') {
+      socket.emit('messageError', '系统通话记录不可撤回');
+      return;
+    }
     if (Date.now() - new Date(message.timestamp).getTime() > RECALL_WINDOW_MS) {
       socket.emit('messageError', '消息超过 2 分钟后不可撤回');
       return;
@@ -5641,7 +5700,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
-    clearSocketIdentity(socket);
+    clearSocketIdentity(socket, false, true);
     broadcastOnlineUsers();
     broadcastAdminDashboards();
   });

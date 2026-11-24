@@ -5,6 +5,8 @@ const root=path.resolve(__dirname,'..');
 function fixture(t,existing,password="Synthetic-Test-Password-Only"){
  const dir=existing||fs.mkdtempSync(path.join(os.tmpdir(),'uni-reliability-'));
  for(const name of ['server.js','package.json'])fs.copyFileSync(path.join(root,name),path.join(dir,name));
+ fs.mkdirSync(path.join(dir,'lib'),{recursive:true});
+ fs.copyFileSync(path.join(root,'lib','uni-call.js'),path.join(dir,'lib','uni-call.js'));
  process.env.PORT='0';process.env.ADMIN_ACCOUNT='testadmin';process.env.ADMIN_PASSWORD=password;
  const original=http.Server.prototype.listen;
  http.Server.prototype.listen=function(_port,cb){return original.call(this,0,'127.0.0.1',cb)};
@@ -156,7 +158,7 @@ test('U27 client visibility, focus, viewport, dialog and delayed room-switch gua
 test('U16 client disconnect clears buffered work and requires login; media completion cannot cross identities',async()=>{
  const vm=require('node:vm'),html=fs.readFileSync(path.join(root,'public/index.html'),'utf8');
  const start=html.indexOf("    socket.on('disconnect', () => {");const end=html.indexOf("    socket.on('loggedOut'",start);let handler;
- const c={socket:{sendBuffer:[1,2],on:(_e,h)=>handler=h},setConnection(v){c.connected=v},resetClientSession(){c.reset=true},loginError:{textContent:''}};vm.createContext(c);vm.runInContext(html.slice(start,end),c);handler();assert.equal(c.connected,false);assert.equal(c.reset,true);assert.equal(c.socket.sendBuffer.length,0);assert.match(c.loginError.textContent,/重新登录/);
+ const c={socket:{sendBuffer:[1,2],on:(_e,h)=>handler=h},callController:{disconnect(){c.callDisconnected=true}},setConnection(v){c.connected=v},resetClientSession(options){c.reset=options},loginError:{textContent:''}};vm.createContext(c);vm.runInContext(html.slice(start,end),c);handler();assert.equal(c.connected,false);assert.equal(c.callDisconnected,true);assert.equal(c.reset.preserveCall,true);assert.equal(c.socket.sendBuffer.length,0);assert.match(c.loginError.textContent,/重新登录/);
  const uploadCode=html.slice(html.indexOf('    let clientSessionGeneration'),html.indexOf('    // Keep uncertain sends'));
  let complete;const scope={state:{apiToken:'old',userId:'a',isConnected:true,currentRoom:{id:'room'}},Set,Uint8Array,atob,AbortController,setTimeout,clearTimeout,Error,fetch:async()=>new Promise(r=>complete=r)};
  vm.createContext(scope);vm.runInContext(uploadCode,scope);const pending=scope.prepareMediaPayload('chat image',{base64:pngUrl});scope.state.apiToken='new';complete({ok:true,json:async()=>({ticket:'upload:synthetic'})});await assert.rejects(pending,/会话已改变/);

@@ -1,20 +1,24 @@
-# Uni 5 Sonoma
+# Uni 5.6 Napa Valley Release Candidate 1
 
-Uni 5 Sonoma is a lightweight realtime chat and community app with account login, group chat, private chat, forum posts, admin tools, message recall, image paste/upload, voice messages, and a glass-style responsive web UI.
+Napa Valley is the final major update in the Uni 5 Sonoma generation, developed by Hyperstack X. It brings Liquid Crystal to the home screen and adds Uni Call, a one-to-one voice calling experience that follows you across the app.
 
-Source version: **Sonoma 5.5.9 Reliability & Security Update**
+**Source version** `5.6.0-rc.1`
 
-See [the 5.5.9 changelog](docs/CHANGELOG-5.5.9.md) for implemented fixes, known limitations and validation status. The final UI/IME changes were not tested in this finalization pass; no deployment or GitHub Release is implied.
+**Candidate status** Blocked by Privacy Gate (U11).
 
-Previous source baseline: Sonoma 5.5.8 Community Workspace Update.
+The candidate is prepared for local evaluation. The repository's reachable history still contains chat data whose publication authorization remains unresolved. See the [RC1 release notes](docs/RELEASE-NOTES-5.6.0-rc.1.md), [changelog](docs/CHANGELOG-5.6.0-rc.1.md), and [acceptance report](docs/RELEASE-READINESS-5.6.0-rc.1.md).
+
+Homepage cards use WebGL to refract the known Sonoma wallpaper. Uni Call Island uses CSS backdrop transmission and edge materials. For calling and deployment, see the [Uni Call architecture](docs/UNI-CALL-ARCHITECTURE.md) and [TURN deployment guide](docs/UNI-CALL-TURN-DEPLOYMENT.md).
+
+Safari WebRTC and interaction, iPhone Safari/PWA, physical microphones and Bluetooth devices, cross-network calling, forced TURN relay, VoiceOver, and sustained power/GPU behavior are pending real-world acceptance. Chromium validation uses synthetic microphones with actual bidirectional Opus media.
+
+The previous Sonoma 5.5.9 baseline is recorded in the [5.5.9 changelog](docs/CHANGELOG-5.5.9.md) and [Phase 05 release-readiness record](docs/RELEASE-READINESS-5.5.9.md).
 
 See [phase 1 reliability notes and test contract](docs/RELIABILITY-5.5.9.md) for U01/U02/U04 fixes, compatibility and remaining risks.
 
 See [phase 2 identity and security lifecycle](docs/SECURITY-5.5.9.md) for U03/U07/U08/U10/U28, administrator bootstrap policy and single-use invitations.
 
 See [phase 3 data integrity and recovery](docs/DATA-INTEGRITY-5.5.9.md) for legacy import, shared images, comment tombstones, transactional deletion and room history cursors.
-
-See [Phase 05 release readiness and mobile acceptance](docs/RELEASE-READINESS-5.5.9.md) for the current release gates. Public release remains blocked by the unresolved historical-data privacy review; passing tests does not grant permission to publish that data.
 
 ## Web runtime and installation
 
@@ -72,7 +76,7 @@ Production Web/PWA uses Express, Socket.IO and Sharp. Historical Capacitor packa
 ## Supported Platform: Web / PWA
 
 - The web app includes a lightweight PWA manifest at `/manifest.json` for standalone mobile launch experiments.
-- Uni intentionally does not register an aggressive service worker in 5.5.3, so private chat/community data and API responses are not cached offline.
+- Uni does not register a service worker. Application files use HTTP revalidation and private chat, community data, and API responses are outside an offline cache.
 - Mobile layouts include safe-area aware spacing and a narrow-screen bottom navigation for Chat, Forum, Notifications, and My.
 - Current Web integration contracts are documented in [docs/API.md](docs/API.md). Android/Capacitor is historical and no longer maintained.
 - Authentication uses Socket-bound Web sessions; reconnect requires login, and revoked tokens cannot restore a session.
