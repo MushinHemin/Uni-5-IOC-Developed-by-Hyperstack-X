@@ -1,0 +1,214 @@
+/* Beta 2 · Sonoma Crystal Glass: structural / content / control materials.
+   Finite masked backdrop samples and edge lighting approximate lensing; no physical refraction. */
+:root {
+  --napa-tint:235,242,249; --napa-core-alpha:.33; --napa-edge-alpha:.065;
+  --napa-fallback:#e9f0fb; --napa-core-feather:22%; --napa-core-weight:1;
+  --napa-transition-blur:2.5px;
+  --napa-window-radius:clamp(36px,3.3vw,48px);
+  --napa-card-radius:clamp(30px,2.9vw,40px);
+  --napa-modal-radius:clamp(30px,3vw,42px); --napa-control-radius:28px;
+  --optical-border-highlight:rgba(255,255,255,.92);
+  --optical-edge-reflection:rgba(255,255,255,.88);
+  --optical-edge-dark:rgba(26,44,66,.40);
+  --optical-lens-strength:.86;
+  --optical-spectral-cool:rgba(120,193,255,.16);
+  --optical-spectral-warm:rgba(255,188,208,.09);
+  --muted:#303e52;
+}
+html[data-theme="dark"] {
+  --napa-tint:20,29,47; --napa-core-alpha:.66; --napa-edge-alpha:.12;
+  --napa-fallback:#142139;
+  --optical-border-highlight:rgba(229,242,255,.64);
+  --optical-edge-reflection:rgba(220,239,255,.7);
+  --optical-edge-dark:rgba(0,6,22,.48);
+  --optical-lens-strength:.80; --muted:#d9e4f6;
+}
+/* The unmodified Sonoma asset supplies its own soft gradients. No global blur/white veil. */
+body::before {
+  background:url('/assets/backgrounds/sonoma.jpg') center / cover no-repeat;
+  filter:none; transform:scale(1.02);
+}
+body::after { background:linear-gradient(180deg,transparent,rgba(3,12,28,.035)); }
+html[data-theme="dark"] body::before { filter:none; }
+html[data-theme="dark"] body::after { background:rgba(4,12,28,.12); }
+.login { background:radial-gradient(ellipse at 50% 44%,rgba(var(--napa-tint),.035),transparent 65%); }
+/* Preserve the parent perspective and each page's 3D navigation transform, but flatten
+   its 2D content. In Chromium preserve-3d prevented the masked children sampling wallpaper. */
+.page-layer { transform-style:flat; }
+/* An inactive chat plane must not become an extra white/blur layer under the home cards.
+   Visibility preserves its DOM, drafts and geometry. Auth retains Stage B's spatial scene. */
+body:is(.view-home,.view-lobby,.view-forum,.view-workspace,.view-admin) .app { visibility:hidden; }
+:is(.shell,.home-shell,.lobby-shell,.workspace-shell,.admin-shell,.home-card,.confirm-card) { position:relative; }
+.napa-glass {
+  isolation:isolate;
+  --napa-core-weight:1;--napa-diffusion:calc(var(--glass-blur-lg) + 12px);
+  --napa-feather:28px;--napa-rim:2px;--napa-inner-edge:rgba(20,40,65,.18);
+  --napa-light-x:26%;--napa-light-y:0px;--napa-light-rx:110px;--napa-light-ry:20px;--napa-light-gain:.34;
+  background:rgba(var(--napa-tint),var(--napa-edge-alpha));
+  border-color:transparent;
+  box-shadow:0 16px 36px -22px rgba(17,39,79,.34),inset 0 1px 1px rgba(255,255,255,.28),inset 0 -1px 2px rgba(15,33,68,.16);
+  -webkit-backdrop-filter:none; backdrop-filter:none;
+}
+html[data-theme="dark"] .napa-glass {
+  border-color:transparent;
+  box-shadow:0 24px 52px -26px rgba(0,4,14,.48),inset 0 -1px 1px rgba(0,5,17,.32);
+}
+/* Material roles inherit the original 0–100 preference, with distinct optical budgets.
+   Reading tint is neutral; background colors are transmitted rather than sampled in JS. */
+[data-napa-material="structural"] {
+  --napa-core-weight:.36;--napa-diffusion:calc(var(--glass-blur-md) + 3px);--napa-feather:52px;
+  --napa-rim:1.5px;
+}
+[data-napa-material="content"] {
+  --napa-core-weight:.88;--napa-diffusion:calc(var(--glass-blur-lg) + 16px);--napa-feather:38px;
+  --napa-edge-alpha:.10;--napa-rim:2px;
+}
+[data-napa-material="control"] {
+  --napa-core-weight:.94;--napa-diffusion:calc(var(--glass-blur-md) + 14px);--napa-feather:18px;
+  --napa-edge-alpha:.13;--napa-rim:2px;
+}
+html[data-theme="dark"] [data-napa-material="content"] { --napa-edge-alpha:.15;--napa-core-weight:.92; }
+html[data-theme="dark"] [data-napa-material="control"] { --napa-edge-alpha:.20;--napa-core-weight:.92; }
+/* Beta 2 refinement 1: a clearer inner shoulder on the three reading surfaces.
+   Keep structural windows, compact controls, tint and diffusion budgets unchanged. */
+.home-card.napa-glass,.login-panel.napa-glass,.composer.napa-glass {
+  --napa-rim:2.25px;--napa-inner-edge:rgba(20,40,65,.24);
+}
+html[data-theme="dark"] :is(.home-card.napa-glass,.login-panel.napa-glass,.composer.napa-glass) {
+  --napa-inner-edge:rgba(0,8,22,.40);
+}
+/* Two finite samples. Clear outer 2px -> lightly softened shoulder -> diffuse core.
+   Masks blend smoothly over a bounded distance, not half of the entire card. */
+.napa-material-transition,.napa-material-core {
+  position:absolute;inset:1px;border-radius:inherit;pointer-events:none;z-index:-1;
+  --napa-mask-x:linear-gradient(90deg,transparent 2px,rgba(0,0,0,.22) calc(var(--napa-feather)*.25),rgba(0,0,0,.76) calc(var(--napa-feather)*.65),#000 var(--napa-feather),#000 calc(100% - var(--napa-feather)),rgba(0,0,0,.76) calc(100% - var(--napa-feather)*.65),rgba(0,0,0,.22) calc(100% - var(--napa-feather)*.25),transparent calc(100% - 2px));
+  --napa-mask-y:linear-gradient(0deg,transparent 2px,rgba(0,0,0,.22) calc(var(--napa-feather)*.25),rgba(0,0,0,.76) calc(var(--napa-feather)*.65),#000 var(--napa-feather),#000 calc(100% - var(--napa-feather)),rgba(0,0,0,.76) calc(100% - var(--napa-feather)*.65),rgba(0,0,0,.22) calc(100% - var(--napa-feather)*.25),transparent calc(100% - 2px));
+  -webkit-mask-image:var(--napa-mask-x),var(--napa-mask-y);-webkit-mask-composite:source-in;
+  mask-image:var(--napa-mask-x),var(--napa-mask-y);mask-composite:intersect;
+}
+.napa-material-transition {
+  z-index:-2;--napa-feather:10px;background:transparent;
+  -webkit-backdrop-filter:blur(calc(var(--napa-transition-blur) + 2px));backdrop-filter:blur(calc(var(--napa-transition-blur) + 2px));
+}
+.napa-material-core {
+  background:linear-gradient(145deg,rgba(var(--napa-tint),calc(var(--napa-core-alpha)*var(--napa-core-weight)*.86)),rgba(var(--napa-tint),calc(var(--napa-core-alpha)*var(--napa-core-weight))));
+  -webkit-backdrop-filter:blur(var(--napa-diffusion));backdrop-filter:blur(var(--napa-diffusion));
+}
+/* The home window supplies a light shoulder; each card owns its reading diffusion.
+   No second structural blur behind those three independently diffused surfaces. */
+.home-shell>.napa-material-core { -webkit-backdrop-filter:none;backdrop-filter:none; }
+.home-card>.napa-material-transition,.mobile-nav>.napa-material-transition,.engagement-tools>.napa-material-transition { display:none; }
+.home-card.napa-glass:hover { background:rgba(var(--napa-tint),.12);border-color:transparent; }
+.sidebar,.chat,.chat-header,.forum-sidebar,.home-header,.lobby-header,.forum-header,.workspace-header,.admin-header {
+  background:transparent; -webkit-backdrop-filter:none; backdrop-filter:none;
+}
+.messages { background:transparent; }
+.home-status-card,.home-profile,.metric,.profile-chip { background:rgba(var(--napa-tint),.12); -webkit-backdrop-filter:none;backdrop-filter:none; }
+/* Broad diffusion protects reading now; remove Beta 1's separate pale text spots. */
+.home-card>span:not(.home-card-icon):not(.napa-material-core):not(.napa-material-transition) { background:transparent; }
+.home-card h3 { color:var(--ink); }
+.home-card p,.home-card-meta { color:var(--muted); }
+.home-card-meta { background:transparent; }
+.home-card-meta span { background:rgba(var(--napa-tint),.32); }
+.home-header { background:linear-gradient(180deg,rgba(var(--napa-tint),.12),transparent); }
+html[data-theme="dark"] .home-header { background:linear-gradient(180deg,rgba(var(--napa-tint),.45),rgba(var(--napa-tint),.18)); }
+.post-detail,.forum-rich-content,.comment-form,.workspace-item,.notification-item { background-color:rgba(var(--napa-tint),var(--napa-core-alpha)); }
+.bubble { background:var(--received); }
+.copyright-footer { color:var(--muted); }
+.composer textarea,.login input {
+  background:rgba(var(--napa-tint),.30);
+  box-shadow:inset 0 1px 2px rgba(19,43,78,.12),0 1px 0 rgba(255,255,255,.44);
+}
+html[data-theme="dark"] :is(.composer textarea,.login input) { background:rgba(12,22,41,.58); }
+/* Beta 2 refinement 2: explicit readable hints and a focus ring that survives the
+   later glass rules. This changes neither the field's fill nor its geometry. */
+.composer textarea::placeholder,.login input::placeholder { color:#43516a;opacity:1; }
+html[data-theme="dark"] :is(.composer textarea,.login input)::placeholder { color:#afbed5; }
+.composer textarea:focus {
+  border-color:var(--brand);
+  box-shadow:0 0 0 2px color-mix(in srgb,var(--brand) 22%,transparent),inset 0 1px 2px rgba(19,43,78,.12);
+}
+.composer.napa-glass:focus-within { border-color:transparent;box-shadow:0 12px 34px -20px rgba(17,39,79,.3),0 0 0 2px rgba(0,122,255,.10); }
+/* Compact controls borrow the parent's diffuse backdrop: no extra filter per button. */
+.napa-glass[data-napa-compact] {
+  position:relative;--napa-light-rx:44px;--napa-light-ry:10px;--napa-rim:1.5px;
+  background:linear-gradient(160deg,rgba(var(--napa-tint),.34),rgba(var(--napa-tint),.12));
+  box-shadow:0 4px 8px -5px rgba(18,45,80,.3),inset 0 1px 1px rgba(255,255,255,.38),inset 0 -1px 2px rgba(35,55,78,.12);
+  transition:transform var(--motion-press) var(--motion-ease),box-shadow var(--motion-focus) var(--motion-ease);
+}
+.composer .send-btn.napa-glass,.login-panel .join-btn.napa-glass {
+  background:radial-gradient(ellipse at 12% 0%,rgba(169,153,255,.65),transparent 48%),linear-gradient(160deg,#60baff,#0784ff 60%,#0067df);
+  color:#fff;box-shadow:inset 0 1px 1px rgba(255,255,255,.58),inset 0 -2px 3px rgba(0,38,110,.22),0 5px 12px -7px rgba(0,87,210,.65);
+}
+html[data-theme="dark"] :is(.composer .send-btn.napa-glass,.login-panel .join-btn.napa-glass) {
+  background:radial-gradient(ellipse at 12% 0%,rgba(189,168,255,.5),transparent 50%),linear-gradient(160deg,#90caff,#408ef4);color:#061b38;
+}
+.napa-glass[data-napa-compact]:active:not(:disabled) { transform:scale(.976); }
+.napa-nav-lens { background:linear-gradient(155deg,rgba(171,209,255,.48),rgba(88,158,249,.18));box-shadow:inset 0 1px 0 rgba(255,255,255,.72),inset 0 -1px 2px rgba(31,73,132,.2); }
+/* Crystal rim: an outer reflection, inset dark shoulder and narrow corner dispersion. */
+.napa-glass::before {
+  content:"";position:absolute;inset:0;padding:var(--napa-rim);border-radius:inherit;z-index:1;pointer-events:none;
+  background:radial-gradient(ellipse 100px 60px at 2% 0%,rgba(255,255,255,.85),transparent 75%),radial-gradient(ellipse 40px 70px at 100% 94%,var(--optical-spectral-cool),transparent 75%),conic-gradient(from 115deg,rgba(255,255,255,.22),var(--optical-edge-dark) 22%,rgba(255,255,255,.60) 36%,var(--optical-border-highlight) 48%,rgba(255,255,255,.18) 60%,var(--optical-spectral-cool) 73%,var(--optical-edge-dark) 80%,var(--optical-spectral-warm) 87%,rgba(255,255,255,.22));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.8),inset 0 -1px 0 rgba(255,255,255,.52),inset 1px 0 1px var(--napa-inner-edge),inset -1px 0 1px var(--napa-inner-edge);
+  opacity:var(--optical-lens-strength);
+  -webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;
+  mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);mask-composite:exclude;
+}
+.napa-glass::after {
+  content:"";position:absolute;inset:0;padding:4px;border-radius:inherit;pointer-events:none;z-index:1;
+  background:radial-gradient(ellipse calc(var(--napa-light-rx,110px)*var(--napa-light-compression,1)) calc(var(--napa-light-ry,20px)*var(--napa-light-compression,1)) at var(--napa-light-x,26%) var(--napa-light-y,0px),var(--optical-edge-reflection),rgba(204,228,255,.12) 40%,transparent 78%);
+  opacity:var(--napa-light-gain,.34);
+  -webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;
+  mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);mask-composite:exclude;
+  transition:opacity var(--motion-focus) var(--motion-ease);
+}
+/* Override Stage B's focus flood. Light always stays inside the same narrow rim. */
+:is(.composer,.login-panel):focus-within::after { opacity:var(--napa-light-gain,.48); }
+.napa-glass.napa-pressed { --napa-light-compression:.68; }
+.napa-glass.napa-pressed::after { opacity:.92; }
+.napa-theme-response::after { animation:napa-edge-settle var(--motion-overlay) var(--motion-ease) both; }
+@keyframes napa-edge-settle { from {opacity:.15} to {opacity:var(--napa-light-gain,.34)} }
+:is(.composer,.login-panel) :is(button,input):active:not(:disabled) { transform:scale(.978); }
+/* Concentric radii. No dimensions/spacing change and no rounded full-screen phone window. */
+.shell,.home-shell,.lobby-shell,.forum-shell,.workspace-shell,.admin-shell { border-radius:var(--napa-window-radius); }
+/* Preserve the entrance/stagger, release its retained opacity/transform compositing root
+   once it ends so the card core samples the backdrop and hover can take over. */
+.home-card { border-radius:var(--napa-card-radius);animation-fill-mode:backwards; }
+@media (hover:none) { .home-card:hover:not(:active) { transform:none; } }
+.confirm-card,.login-panel { border-radius:var(--napa-modal-radius); }
+.composer,.message-menu,.reaction-picker,.sticker-panel,.mobile-nav { border-radius:var(--napa-control-radius); }
+:is(.composer,.login-panel,.mobile-nav,.home-toolbar,.engagement-tools) :is(button,input,textarea),.napa-nav-lens,.filter-pill,.forum-action-pill { border-radius:999px; }
+.composer textarea { border-radius:calc(var(--napa-control-radius) - 12px); }
+.message-menu button { border-radius:calc(var(--napa-control-radius) - 8px); }
+.admin-btn,.admin-open-btn,.theme-toggle-btn,.settings-toggle-btn,.switch-user-btn,.bulletin-btn,
+.auth-tab,.segmented button,.user-sort button,.reaction-pill { border-radius:999px; }
+@media (max-width:820px), (pointer:coarse) and (max-height:500px) {
+  :root { --napa-window-radius:0px;--napa-card-radius:30px;--napa-modal-radius:32px;--napa-control-radius:26px; }
+  [data-napa-material="content"] { --napa-feather:24px; }
+  /* Only one backdrop sample per surface on mobile; nested cards borrow the window sample. */
+  .napa-material-transition { display:none; }
+  .home-card>.napa-material-core { -webkit-backdrop-filter:none;backdrop-filter:none; }
+  .home-shell>.napa-material-core { -webkit-backdrop-filter:blur(var(--glass-blur-lg));backdrop-filter:blur(var(--glass-blur-lg)); }
+  .composer textarea { border-radius:calc(var(--napa-control-radius) - 10px); }
+}
+@supports not ((mask-composite:exclude) or (-webkit-mask-composite:xor)) {
+  .napa-glass::before,.napa-glass::after,.napa-material-transition { display:none; }
+  .napa-material-core { -webkit-mask:none;mask:none;background:rgba(var(--napa-tint),var(--napa-core-alpha)); }
+}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))) {
+  .napa-glass { background:var(--napa-fallback); }
+  .napa-material-core,.napa-material-transition { display:none; }
+}
+@media (prefers-contrast:more) {
+  .napa-glass { background:var(--napa-fallback);border-color:var(--muted); }
+  .napa-glass::before,.napa-glass::after,.napa-material-transition,.napa-material-core { display:none; }
+}
+@media (forced-colors:active) {
+  .napa-material-core,.napa-material-transition,.napa-glass::before,.napa-glass::after { display:none; }
+  .napa-glass { background:Canvas;border:1px solid CanvasText; }
+  .composer textarea::placeholder,.login input::placeholder { color:GrayText; }
+  .composer textarea:focus { border-color:Highlight;outline:2px solid Highlight;outline-offset:2px;box-shadow:none; }
+}
+@media (prefers-reduced-motion:reduce) {
+  .napa-glass::after { transition:none;animation:none; }
+}

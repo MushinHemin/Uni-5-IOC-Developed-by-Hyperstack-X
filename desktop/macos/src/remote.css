@@ -1,0 +1,38 @@
+.uni-desktop-remember {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: .52rem;
+  font-size: .86rem;
+  margin-block: .25rem .45rem;
+  cursor: pointer;
+}
+.uni-desktop-remember input {
+  width: auto;
+  padding: 0;
+  margin: 0;
+  accent-color: #0a75f4;
+}
+
+.uni-desktop-image {
+  color: inherit;
+  background: light-dark(#ecf5ff, #142338);
+  border: 1px solid #829bb16b;
+  border-radius: 20px;
+  max-width: calc(100vw - 32px);
+  padding: 14px;
+}
+.uni-desktop-image::backdrop { background: #07162bac; }
+.uni-desktop-image img {
+  display: block;
+  max-width: min(86vw, 1120px);
+  max-height: 76vh;
+  object-fit: contain;
+  border-radius: 10px;
+}
+.uni-desktop-image button {
+  display: block;
+  margin: 10px 0 0 auto;
+  padding: 6px 16px;
+  border-radius: 999px;
+}

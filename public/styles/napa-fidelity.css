@@ -1,0 +1,123 @@
+/* Apple HIG informs roles, not these numbers. All tokens below are Uni/Web
+   choices. Pilot scope: home + notification interaction, plus accessibility. */
+:root {
+  --uni-reading-surface:#f1f5fc;
+  --uni-reading-ink:#142238;
+  --uni-reading-secondary:#42526b;
+  --uni-functional-tint:rgba(235,242,253,.82);
+  --uni-functional-line:rgba(30,59,97,.20);
+}
+html[data-theme="dark"] {
+  --uni-reading-surface:#17243a;
+  --uni-reading-ink:#f2f6ff;
+  --uni-reading-secondary:#c0cee3;
+  --uni-functional-tint:rgba(23,36,58,.90);
+  --uni-functional-line:rgba(206,226,255,.22);
+}
+/* One optical layer: the existing three destination buttons. The surrounding
+   home window is now a quiet standard surface, not a second lens. */
+.home-shell.napa-glass {
+  background:rgba(var(--napa-tint),.055);border-color:var(--uni-functional-line);
+  box-shadow:0 16px 42px -28px rgba(5,22,50,.35);
+}
+.home-shell.napa-glass::before,.home-shell.napa-glass::after,
+.home-shell > .napa-material-core,.home-shell > .napa-material-transition { display:none; }
+.home-card {
+  --crystal-dispersion:1.4;--crystal-rim-relief:.52;--crystal-core-softness:3;
+}
+/* Explicit diagnostics retain their strong calibration profile. */
+html[data-crystal-profile="debug"] .home-card {
+  --crystal-dispersion:7.2;--crystal-rim-relief:1.8;
+}
+.home-card.crystal-ready::before { opacity:.38; }
+.home-card.crystal-ready .home-card-meta span {
+  border-color:transparent;background:transparent;
+}
+/* Related icon actions share their parent's material. Do not coat every inner
+   button in another optical layer. Labels and primary actions keep their roles. */
+.engagement-tools > .napa-glass[data-napa-compact] {
+  background:transparent;box-shadow:none;border-color:transparent;
+}
+.engagement-tools > .napa-glass[data-napa-compact]::before,
+.engagement-tools > .napa-glass[data-napa-compact]::after { display:none; }
+.engagement-tools > button:is(:hover,:focus-visible,[aria-expanded="true"]) {
+  background:rgba(var(--napa-tint),.32);
+}
+/* A regular-like functional surface; ordinary filled rows carry the content.
+   This is a CSS approximation, not Apple's native regular material API. */
+#notificationModal {
+  place-items:start end;padding:72px max(22px,env(safe-area-inset-right)) 22px;
+  background:rgba(6,16,34,.22);backdrop-filter:none;-webkit-backdrop-filter:none;
+  transition:none;
+}
+#notificationModal > .confirm-card {
+  width:min(560px,100%);max-height:calc(var(--app-viewport-height,100dvh) - 94px);
+  background:var(--uni-functional-tint);border:1px solid var(--uni-functional-line);
+  color:var(--uni-reading-ink);border-radius:var(--napa-control-radius);
+  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  box-shadow:0 20px 55px -22px rgba(0,12,34,.42),inset 0 1px 0 rgba(255,255,255,.38);
+  animation:none;transition:none;transform:none;opacity:1;
+  transform-origin:var(--uni-origin-x,90%) var(--uni-origin-y,0%);
+}
+#notificationModal > .confirm-card > :is(.napa-material-core,.napa-material-transition) { display:none; }
+#notificationModal > .confirm-card::before { opacity:.23;padding:1px; }
+#notificationModal .engagement-header { align-items:start; }
+#notificationModal :is(.engagement-header p,.settings-status,.notification-main p) { color:var(--uni-reading-secondary); }
+#notificationModal .notification-list {
+  min-height:0;overscroll-behavior:contain;scrollbar-gutter:stable;
+}
+#notificationModal .notification-item {
+  color:var(--uni-reading-ink);background:var(--uni-reading-surface);
+  border:1px solid transparent;border-radius:calc(var(--napa-control-radius) - 12px);
+  box-shadow:none;backdrop-filter:none;transform:none;
+}
+#notificationModal .notification-item.is-unread { border-color:var(--brand); }
+#notificationModal .notification-item:hover { background:color-mix(in srgb,var(--brand) 7%,var(--uni-reading-surface)); }
+#notificationModal .filter-pill { box-shadow:none;background:transparent; }
+#notificationModal .filter-pill.is-active { background:var(--brand);color:white; }
+#notificationModal .admin-btn { min-height:40px; }
+#notificationModal .admin-btn.primary { color:var(--uni-reading-ink);background:var(--uni-reading-surface); }
+#notificationModal :is(button,a):focus-visible,.home-card:focus-visible {
+  outline:3px solid var(--brand);outline-offset:3px;
+}
+.transparency-setting { display:grid;gap:6px;margin-top:14px; }
+.transparency-setting select { width:100%;min-height:40px; }
+@media(max-width:600px) {
+  #notificationModal {
+    top:var(--app-viewport-top,0px);height:var(--app-viewport-height,100dvh);bottom:auto;
+    padding:calc(64px + env(safe-area-inset-top)) 12px max(12px,env(safe-area-inset-bottom));
+  }
+  #notificationModal > .confirm-card {
+    padding:16px;max-height:calc(var(--app-viewport-height,100dvh) - 88px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  }
+  #notificationModal .engagement-header { flex-wrap:wrap; }
+  #notificationModal .admin-btn { min-height:44px; }
+}
+/* Explicit Web preference covers browsers without the media query. Original
+   glass intensity remains stored separately and is restored when this is off. */
+html[data-transparency="reduced"] .napa-glass,
+html[data-transparency="reduced"] #notificationModal > .confirm-card {
+  background:var(--uni-reading-surface);color:var(--uni-reading-ink);
+  backdrop-filter:none;-webkit-backdrop-filter:none;
+  border-color:var(--uni-functional-line);box-shadow:none;
+}
+html[data-transparency="reduced"] :is(.napa-material-core,.napa-material-transition,.crystal-sample),
+html[data-transparency="reduced"] .napa-glass::before,
+html[data-transparency="reduced"] .napa-glass::after { display:none; }
+html[data-transparency="reduced"] .home-card :is(h3,p,.home-card-meta,.home-card-meta span) {
+  background:transparent;color:var(--uni-reading-ink);box-shadow:none;
+}
+html[data-transparency="reduced"] .home-card .home-card-meta span { border-color:currentColor; }
+@media (prefers-contrast:more) {
+  #notificationModal > .confirm-card { background:var(--uni-reading-surface);border:2px solid currentColor;backdrop-filter:none;-webkit-backdrop-filter:none; }
+  #notificationModal > .confirm-card::before,#notificationModal > .confirm-card::after { display:none; }
+}
+@media (forced-colors:active) {
+  #notificationModal > .confirm-card,#notificationModal .notification-item,
+  html[data-transparency="reduced"] .napa-glass { background:Canvas;color:CanvasText;box-shadow:none; }
+  #notificationModal :is(p,.settings-status),html[data-transparency="reduced"] .home-card :is(h3,p,.home-card-meta,.home-card-meta span) { color:CanvasText; }
+  #notificationModal .notification-item.is-unread { border:2px solid Highlight; }
+}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))) {
+  #notificationModal > .confirm-card { background:var(--uni-reading-surface); }
+}

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Uni 5 Sonoma</title>
+  <title>Uni 5.6 Napa Valley</title>
   <meta name="theme-color" content="#f5f7fb">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -83,7 +83,10 @@
       --stage-width: min(90vw, 1720px);
       --stage-height: min(90dvh, 980px);
       --stage-padding: max(18px, 5dvh);
-      --mobile-nav-height: 72px;
+      --mobile-nav-content-height: 58px;
+      --mobile-nav-gap: 12px;
+      --mobile-nav-bottom: max(10px, env(safe-area-inset-bottom));
+      --mobile-nav-height: calc(var(--mobile-nav-content-height) + var(--mobile-nav-gap) + var(--mobile-nav-bottom));
     }
 
     html[data-theme="dark"] {
@@ -3939,7 +3942,7 @@
       }
     }
 
-    @media (max-width: 820px) {
+    @media (max-width: 820px), (pointer: coarse) and (max-height: 500px) {
       :root {
         --stage-width: 100vw;
         --stage-height: 100dvh;
@@ -3947,8 +3950,15 @@
       }
 
       .app {
-        padding: 0;
-        padding-bottom: var(--mobile-nav-height);
+        position: fixed;
+        top: var(--app-viewport-top, 0px);
+        left: 0;
+        width: 100%;
+        height: var(--app-viewport-height, 100dvh);
+        padding: env(safe-area-inset-top) env(safe-area-inset-right) var(--mobile-nav-height) env(safe-area-inset-left);
+        justify-content: flex-start;
+        gap: 0;
+        container: chat-viewport / size;
       }
 
       body.view-auth .app,
@@ -3962,7 +3972,9 @@
       }
 
       .shell {
-        height: calc(100dvh - var(--mobile-nav-height) - 24px);
+        width: 100%;
+        height: 100%;
+        flex: 1;
         min-height: 0;
         grid-template-columns: 1fr;
         grid-template-rows: auto minmax(0, 1fr);
@@ -3988,6 +4000,22 @@
       .chat-header {
         min-height: 64px;
         padding: 13px 14px;
+      }
+
+      .chat-title {
+        flex: 1 1 auto;
+      }
+
+      .chat-title strong,
+      .chat-title span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .chat-header .header-actions {
+        flex: 0 1 auto;
+        max-width: 75%;
       }
 
       .switch-user-btn span {
@@ -4032,7 +4060,8 @@
       }
 
       .messages {
-        padding: 14px 14px calc(var(--mobile-nav-height) + 18px);
+        padding: 14px;
+        scroll-padding-block: 14px;
       }
 
       .bubble {
@@ -4041,7 +4070,11 @@
 
       .composer {
         grid-template-columns: 1fr auto;
-        padding-bottom: max(14px, env(safe-area-inset-bottom));
+        padding-bottom: 14px;
+      }
+
+      .composer textarea {
+        max-height: min(130px, calc(var(--app-viewport-height, 100dvh) / 5));
       }
 
       .tool-row {
@@ -4235,7 +4268,7 @@
       right: max(12px, env(safe-area-inset-right));
       bottom: max(10px, env(safe-area-inset-bottom));
       z-index: 82;
-      height: 58px;
+      min-height: 58px;
       display: none;
       grid-template-columns: repeat(4, 1fr);
       gap: 6px;
@@ -4276,20 +4309,43 @@
       transform: scale(0.96);
     }
 
-    @media (max-width: 820px) {
+    @media (max-width: 820px), (pointer: coarse) and (max-height: 500px) {
       body:not(.view-auth) .mobile-nav {
         display: grid;
       }
 
-      body.view-chat .mobile-nav {
-        bottom: calc(82px + env(safe-area-inset-bottom));
+      .mobile-nav {
+        top: calc(var(--app-viewport-top, 0px) + var(--app-viewport-height, 100dvh) - var(--mobile-nav-bottom) - var(--mobile-nav-content-height));
+        bottom: auto;
+      }
+
+      html.is-chat-keyboard-open {
+        --mobile-nav-height: 0px;
+      }
+
+      html.is-chat-keyboard-open .mobile-nav {
+        display: none;
+      }
+
+      html.is-chat-keyboard-open .sidebar {
+        display: none;
+      }
+
+      html.is-chat-keyboard-open .shell {
+        grid-template-rows: minmax(0, 1fr);
+      }
+
+      .confirm-modal {
+        top: var(--app-viewport-top, 0px);
+        bottom: auto;
+        height: var(--app-viewport-height, 100dvh);
       }
     }
 
-    @media (min-width: 821px) {
-      .mobile-nav {
-        display: none !important;
-      }
+    /* Short landscape/keyboard windows retain the chat header and its actions. */
+    @container chat-viewport (max-height: 32rem) {
+      .sidebar { display: none; }
+      .shell { grid-template-rows: minmax(0, 1fr); }
     }
 
     .reaction-trigger {
@@ -4795,11 +4851,16 @@
       .user-profile-card,
       .crop-card {
         width: min(100%, calc(100vw - 20px));
-        max-height: calc(100dvh - 22px);
+        max-height: calc(var(--app-viewport-height, 100dvh) - max(10px, env(safe-area-inset-top)) - max(10px, env(safe-area-inset-bottom)));
         overflow: auto;
       }
     }
   </style>
+  <link rel="stylesheet" href="/styles/napa-optics.css">
+  <link rel="stylesheet" href="/styles/napa-transparency.css">
+  <link rel="stylesheet" href="/styles/napa-crystal.css">
+  <link rel="stylesheet" href="/styles/napa-fidelity.css">
+  <link rel="stylesheet" href="/styles/uni-call.css">
 </head>
 <body class="view-auth">
   <div id="appLaunch" class="app-launch" aria-hidden="true">
@@ -4864,6 +4925,9 @@
             <span id="subtitle">选择频道开始</span>
           </div>
           <div class="header-actions">
+            <button id="privateCallOpen" class="admin-btn" type="button" aria-label="发起语音通话" title="发起语音通话" hidden>
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3H4v3a14 14 0 0 0 14 14h3v-4l-5-2-2 2a11 11 0 0 1-6-6l2-2z"/></svg>
+            </button>
             <button class="bulletin-btn" data-bulletin-open type="button" aria-label="公告信箱" title="公告信箱">
               <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v12H4z"/><path d="M4 7l8 6 8-6"/></svg>
               <span class="bulletin-badge" data-bulletin-badge hidden>0</span>
@@ -5593,6 +5657,14 @@
             <span>更柔和</span>
           </div>
           <div class="settings-status">拖动后立即预览，并会保存在当前浏览器。</div>
+          <label class="transparency-setting" for="transparencyMode">
+            <span>透明效果辅助设置</span>
+            <select id="transparencyMode">
+              <option value="auto">跟随系统</option>
+              <option value="reduced">减少透明度</option>
+            </select>
+            <span class="settings-status">减少透明度可提高内容稳定性；原有玻璃强度会保留。</span>
+          </label>
         </div>
         <div id="themeStatus" class="settings-status"></div>
       </section>
@@ -5653,7 +5725,7 @@
           <h4>联系方式</h4>
           <div class="profile-actions">
             <button id="profilePrivateChat" class="admin-btn primary" type="button">私聊</button>
-            <button id="profileVoiceCall" class="admin-btn" type="button">语音通话</button>
+            <button id="profileVoiceCall" class="admin-btn" type="button" hidden>语音通话</button>
             <button id="profileStar" class="admin-btn" type="button">点亮 Star</button>
           </div>
           <div id="userProfileStatus" class="settings-status"></div>
@@ -5736,6 +5808,104 @@
     </button>
   </nav>
 
+  <section id="uniCall" class="uni-call" aria-label="Uni Call 语音通话" popover="manual" hidden>
+    <div class="uni-call-surface">
+      <div class="uni-call-header">
+        <button class="uni-call-identity" data-call="toggle" type="button" aria-expanded="false" aria-controls="uniCallDetails">
+          <span class="uni-call-avatar" data-call="avatar" aria-hidden="true"></span>
+          <span class="uni-call-identity-copy">
+            <strong class="uni-call-name" data-call="name"></strong>
+            <span class="uni-call-status-line">
+              <span class="uni-call-dot" aria-hidden="true"></span>
+              <span class="uni-call-status" data-call="status"></span>
+              <time class="uni-call-time" data-call="time" aria-label="通话时长" hidden></time>
+            </span>
+          </span>
+          <svg class="uni-call-icon uni-call-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg>
+        </button>
+        <div class="uni-call-actions">
+          <button class="uni-call-button" data-call="play" type="button" aria-label="播放通话音频" title="播放通话音频" hidden>
+            <svg class="uni-call-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 10 7-10 7z"/></svg>
+          </button>
+          <button class="uni-call-button" data-call="mute" type="button" aria-label="静音麦克风" title="静音麦克风" aria-pressed="false" hidden>
+            <svg class="uni-call-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2m-7 9v3m-3 0h6"/><path class="uni-call-muted-stroke" d="m3 3 18 18"/></svg>
+          </button>
+          <div class="uni-call-ring" data-call="ring" hidden>
+            <button class="uni-call-button uni-call-danger" data-call="decline" type="button" aria-label="拒绝来电" title="拒绝来电">
+              <svg class="uni-call-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 15v-2a15 15 0 0 1 18 0v2a1 1 0 0 1-1 1h-3l-1-3a10 10 0 0 0-8 0l-1 3H4a1 1 0 0 1-1-1Z"/></svg>
+            </button>
+            <button class="uni-call-button uni-call-accept" data-call="accept" type="button" aria-label="接听来电" title="接听来电">
+              <svg class="uni-call-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4H5a1 1 0 0 0-1 1 15 15 0 0 0 15 15 1 1 0 0 0 1-1v-3l-4-2-2 2a10 10 0 0 1-6-6l2-2Z"/></svg>
+            </button>
+          </div>
+          <button class="uni-call-button uni-call-danger" data-call="hangup" type="button" aria-label="挂断通话" title="挂断通话" hidden>
+            <svg class="uni-call-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 15v-2a15 15 0 0 1 18 0v2a1 1 0 0 1-1 1h-3l-1-3a10 10 0 0 0-8 0l-1 3H4a1 1 0 0 1-1-1Z"/></svg>
+          </button>
+        </div>
+      </div>
+      <div id="uniCallDetails" class="uni-call-details" data-call="details" inert>
+        <div class="uni-call-detail-clip">
+          <div class="uni-call-detail-content">
+            <div class="uni-call-summary">
+              <div class="uni-call-detail-copy">
+                <span class="uni-call-network"><span class="uni-call-dot" aria-hidden="true"></span><span data-call="network"></span></span>
+                <span class="uni-call-activity" data-call="activity" hidden><span class="uni-call-meter" aria-hidden="true"><i></i><i></i><i></i></span>对方语音活动</span>
+              </div>
+              <button class="uni-call-button" data-call="settings" type="button" aria-label="音频设置" title="音频设置" aria-expanded="false" aria-controls="uniCallAudioSettings" hidden>
+                <svg class="uni-call-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h8m4 0h4M4 12h3m4 0h9m-16 6h12m4 0h0"/><circle cx="14" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>
+              </button>
+              <button class="uni-call-button uni-call-collapse" data-call="collapse" type="button" aria-label="收起通话" title="收起通话">
+                <svg class="uni-call-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 14 5-5 5 5"/></svg>
+              </button>
+            </div>
+            <div id="uniCallAudioSettings" class="uni-call-settings" data-call="audio-settings" role="group" aria-labelledby="uniCallAudioTitle" inert>
+              <div class="uni-call-settings-clip">
+                <div class="uni-call-controls">
+                  <strong id="uniCallAudioTitle">音频设置</strong>
+                  <div class="uni-call-device" data-call-device="mic" hidden>
+                    <span class="uni-call-device-label" id="uniCallMicLabel">麦克风</span>
+                    <button type="button" class="uni-call-device-trigger" aria-labelledby="uniCallMicLabel uniCallMicName" aria-expanded="false" aria-controls="uniCallMicOptions">
+                      <svg class="uni-call-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2m-7 9v3m-3 0h6"/></svg>
+                      <span class="uni-call-device-name" id="uniCallMicName"></span>
+                      <svg class="uni-call-icon uni-call-device-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg>
+                    </button>
+                    <div class="uni-call-device-options" id="uniCallMicOptions" inert>
+                      <div class="uni-call-device-clip">
+                        <div class="uni-call-device-list" role="group" aria-labelledby="uniCallMicLabel"></div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="uni-call-device" data-call-device="output" hidden>
+                    <span class="uni-call-device-label" id="uniCallOutputLabel">音频输出</span>
+                    <button type="button" class="uni-call-device-trigger" aria-labelledby="uniCallOutputLabel uniCallOutputName" aria-expanded="false" aria-controls="uniCallOutputOptions">
+                      <svg class="uni-call-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4Zm12 0a4 4 0 0 1 0 6m2.5-8a7 7 0 0 1 0 10"/></svg>
+                      <span class="uni-call-device-name" id="uniCallOutputName"></span>
+                      <svg class="uni-call-icon uni-call-device-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg>
+                    </button>
+                    <div class="uni-call-device-options" id="uniCallOutputOptions" inert>
+                      <div class="uni-call-device-clip">
+                        <div class="uni-call-device-list" role="group" aria-labelledby="uniCallOutputLabel"></div>
+                      </div>
+                    </div>
+                  </div>
+                  <button class="uni-call-device-choice" type="button" data-call="choose-output" hidden>选择其他输出设备</button>
+                  <div class="uni-call-volume">
+                    <label for="uniCallVolume">通话音量</label>
+                    <output for="uniCallVolume" data-call="volume-value" aria-hidden="true">100%</output>
+                    <input id="uniCallVolume" data-call="volume" type="range" min="0" max="1" step=".05" value="1" aria-valuetext="100%">
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <span class="uni-call-sr" data-call="announce" role="status"></span>
+    <audio data-call="audio" autoplay playsinline></audio>
+  </section>
+
+  <script src="/scripts/uni-call.js"></script>
   <script>
     const socket = io();
     // Never retain mutations/password submissions in Socket.IO's offline queue.
@@ -5759,6 +5929,7 @@
       profileBanner: '',
       isAdmin: false,
       isBanned: false,
+      uniCallEnabled: false,
       isMessageComposing: false,
       messageCompositionEndedAt: -Infinity,
       currentRoom: null,
@@ -5867,6 +6038,14 @@
     const imagePreviewMeta = document.getElementById('imagePreviewMeta');
     const imagePreviewClear = document.getElementById('imagePreviewClear');
     const voiceBtn = document.getElementById('voiceBtn');
+    const privateCallOpen = document.getElementById('privateCallOpen');
+    const callController = window.UniCall?.create({
+      socket,
+      currentUser: () => ({ id: state.userId, isBanned: state.isBanned }),
+      recorderActive: () => state.isRecording,
+      avatar: createAvatar,
+      toast: showToast
+    });
     const mentionBtn = document.getElementById('mentionBtn');
     const mentionMenu = document.getElementById('mentionMenu');
     const stickerBtn = document.getElementById('stickerBtn');
@@ -5879,6 +6058,7 @@
     const stickerOfficialInput = document.getElementById('stickerOfficialInput');
     const stickerTabs = Array.from(document.querySelectorAll('[data-sticker-tab]'));
     const appLaunch = document.getElementById('appLaunch');
+    const mobileNav = document.getElementById('mobileNav');
     const mobileNavButtons = Array.from(document.querySelectorAll('[data-mobile-nav]'));
     const notificationOpen = document.getElementById('notificationOpen');
     const notificationBadge = document.getElementById('notificationBadge');
@@ -6186,15 +6366,18 @@
       const glassRgb = isDark ? '20, 27, 44' : '255, 255, 255';
       const borderRgb = '255, 255, 255';
       const shadowRgb = isDark ? '0, 0, 0' : '40, 60, 120';
-      const lightAlpha = (isDark ? 0.46 : 0.38) + level * (isDark ? 0.24 : 0.28);
-      const baseAlpha = (isDark ? 0.38 : 0.30) + level * (isDark ? 0.20 : 0.24);
-      const softAlpha = (isDark ? 0.26 : 0.20) + level * (isDark ? 0.18 : 0.20);
+      const lightAlpha = (isDark ? 0.16 : 0.12) + level * (isDark ? 0.20 : 0.14);
+      const baseAlpha = (isDark ? 0.10 : 0.06) + level * (isDark ? 0.14 : 0.12);
+      const softAlpha = (isDark ? 0.06 : 0.04) + level * (isDark ? 0.12 : 0.08);
       const borderAlpha = (isDark ? 0.12 : 0.34) + level * (isDark ? 0.1 : 0.18);
       const highlightAlpha = (isDark ? 0.08 : 0.42) + level * (isDark ? 0.08 : 0.28);
       const shadowAlpha = (isDark ? 0.22 : 0.08) + level * (isDark ? 0.14 : 0.1);
-      const blurSm = 6 + level * 8;
-      const blurMd = 10 + level * 12;
-      const blurLg = 14 + level * 16;
+      const blurSm = 2 + level * 4;
+      const blurMd = 6 + level * 10;
+      const blurLg = 10 + level * 12;
+      document.documentElement.style.setProperty('--napa-core-alpha', (isDark ? 0.58 + level * 0.16 : 0.22 + level * 0.22).toFixed(3));
+      document.documentElement.style.setProperty('--napa-edge-alpha', (isDark ? 0.08 + level * 0.08 : 0.04 + level * 0.05).toFixed(3));
+      document.documentElement.style.setProperty('--napa-transition-blur', `${(1 + level * 3).toFixed(1)}px`);
 
       document.documentElement.style.setProperty('--glass-bg-light', alphaColor(glassRgb, lightAlpha));
       document.documentElement.style.setProperty('--glass-bg', alphaColor(glassRgb, baseAlpha));
@@ -6340,6 +6523,8 @@
       userProfileBio.textContent = profile.bio && profile.bio.trim() ? profile.bio.trim() : '这个用户还没有填写简介。';
       userProfileStatus.textContent = profile.isSelf ? '这是你的个人主页。' : '';
       profilePrivateChat.disabled = !state.userId || profile.isSelf;
+      profileVoiceCall.hidden = !state.uniCallEnabled || !callController;
+      profileVoiceCall.disabled = !state.userId || profile.isSelf || profile.isBanned || state.isBanned;
       profileStar.disabled = !state.userId || profile.isSelf;
       profileStar.textContent = profile.isSelf
         ? '自己的主页'
@@ -6611,13 +6796,21 @@
         showToast('登录后可以查看通知');
         return;
       }
-      notificationModal.classList.remove('is-closing');
-      notificationModal.hidden = false;
       renderNotifications();
+      if (window.NapaPresentation) {
+        window.NapaPresentation.openNotifications(document.activeElement === document.body ? notificationOpen : document.activeElement);
+      } else {
+        notificationModal.classList.remove('is-closing');
+        notificationModal.hidden = false;
+      }
       socket.emit('get notifications', { unreadOnly: state.notificationFilter === 'unread' });
     }
 
-    function closeNotificationModal() {
+    function closeNotificationModal(options) {
+      if (window.NapaPresentation) {
+        window.NapaPresentation.closeNotifications(options && typeof options === 'object' && !('target' in options) ? options : undefined);
+        return;
+      }
       if (notificationModal.hidden) return;
       notificationModal.classList.add('is-closing');
       const delay = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 20 : 220;
@@ -6631,13 +6824,13 @@
       if (!item || !item.id) return;
       socket.emit('mark notification read', item.id);
       if (item.targetType === 'post' && item.targetId) {
-        closeNotificationModal();
+        closeNotificationModal({ restoreFocus: false, immediate: true });
         openForumPage();
         socket.emit('get forum post', item.targetId);
         return;
       }
       if (item.targetType === 'chat' && item.targetId) {
-        closeNotificationModal();
+        closeNotificationModal({ restoreFocus: false, immediate: true });
         if (item.targetId.startsWith('dm:')) {
           showToast('请从聊天列表进入对应私聊');
         } else {
@@ -6646,11 +6839,12 @@
         return;
       }
       if (item.targetType === 'user' && item.targetId) {
+        closeNotificationModal({ restoreFocus: false, immediate: true });
         openUserProfile(item.targetId);
         return;
       }
       if (item.targetType === 'announcement') {
-        closeNotificationModal();
+        closeNotificationModal({ restoreFocus: false, immediate: true });
         openBulletinModal();
         return;
       }
@@ -7416,6 +7610,7 @@
         state.viewTransitionTimer = window.setTimeout(() => {
           document.body.classList.remove('is-page-transitioning');
           cleanupViews(view);
+          scheduleMobileViewport();
           markCurrentRoomRead();
         }, delay);
       });
@@ -7462,7 +7657,8 @@
       }, delay);
     }
 
-    function resetClientSession() {
+    function resetClientSession({ preserveCall = false } = {}) {
+      if (!preserveCall) callController?.reset();
       flushForumDraftSave();
       clientSessionGeneration++;
       activeUploads.forEach(controller=>controller.abort());
@@ -7476,6 +7672,7 @@
       state.profileBanner = '';
       state.isAdmin = false;
       state.isBanned = false;
+      state.uniCallEnabled = false;
       state.isMessageComposing = false;
       state.messageCompositionEndedAt = -Infinity;
       state.currentRoom = null;
@@ -7578,7 +7775,8 @@
       setConnection(false);
       // Server revokes the socket-bound token. Never replay it or buffered emits.
       socket.sendBuffer.length = 0;
-      resetClientSession();
+      callController?.disconnect();
+      resetClientSession({ preserveCall: true });
       loginError.textContent = '连接已断开。恢复连接后请重新登录；未确认消息请进入原会话核对后重试。';
     });
 
@@ -7612,6 +7810,8 @@
       state.isAdmin = Boolean(user.isAdmin);
       state.isBanned = Boolean(user.isBanned);
       state.apiToken = data && data.apiToken ? String(data.apiToken) : '';
+      state.uniCallEnabled = data?.features?.uniCall === true;
+      callController?.auth(user);
       state.stickers.creator = {
         isCreator: Boolean(user.isStickerCreator),
         status: user.stickerCreatorStatus || '',
@@ -8484,8 +8684,14 @@
       });
     });
     profileVoiceCall.addEventListener('click', () => {
-      userProfileStatus.textContent = '语音通话功能敬请期待。';
-      showToast('语音通话功能敬请期待。');
+      const profile = state.profileUser;
+      if (profile?.id && callController) callController.start(profile, profileVoiceCall);
+    });
+    privateCallOpen.addEventListener('click', () => {
+      const room = state.currentRoom;
+      if (room?.type !== 'private' || !room.targetUserId || !callController) return;
+      const peer = state.onlineUsers.find(user => user?.id === room.targetUserId);
+      callController.start(peer || { id: room.targetUserId, displayName: room.name }, privateCallOpen);
     });
     profileStar.addEventListener('click', () => {
       if (!state.profileUser || !state.profileUser.id) return;
@@ -8689,6 +8895,74 @@
       }
     });
 
+    // One coalesced viewport update; do not resize the app during pinch zoom.
+    let mobileViewportFrame = 0;
+    let mobileViewportWidth = 0;
+    let unfocusedViewportHeight = 0;
+    let chatPinnedToBottom = true;
+    const mobileViewportQuery = window.matchMedia('(max-width: 820px), (pointer: coarse) and (max-height: 500px)');
+    function syncMobileViewport() {
+      mobileViewportFrame = 0;
+      const root = document.documentElement;
+      if (!mobileViewportQuery.matches) {
+        root.style.removeProperty('--app-viewport-height');
+        root.style.removeProperty('--app-viewport-top');
+        root.classList.remove('is-chat-keyboard-open');
+        unfocusedViewportHeight = 0;
+        return;
+      }
+      const viewport = window.visualViewport;
+      if (viewport && Math.abs(viewport.scale - 1) > 0.05) return;
+      const height = Math.round(viewport ? viewport.height : window.innerHeight);
+      const top = Math.max(0, Math.round(viewport ? viewport.offsetTop : 0));
+      const width = window.innerWidth;
+      const focused = Boolean(document.activeElement && composer.contains(document.activeElement));
+      const layoutHeight = root.clientHeight;
+      if (width !== mobileViewportWidth) {
+        mobileViewportWidth = width;
+        unfocusedViewportHeight = layoutHeight;
+      }
+      if (!focused) unfocusedViewportHeight = Math.max(height, layoutHeight);
+      const reference = Math.max(unfocusedViewportHeight, layoutHeight);
+      const keyboardOpen = focused && state.view === 'chat' && reference - height > reference * 0.2;
+      const heightValue = height + 'px', topValue = top + 'px';
+      if (root.style.getPropertyValue('--app-viewport-height') !== heightValue) root.style.setProperty('--app-viewport-height', heightValue);
+      if (root.style.getPropertyValue('--app-viewport-top') !== topValue) root.style.setProperty('--app-viewport-top', topValue);
+      root.classList.toggle('is-chat-keyboard-open', keyboardOpen);
+      // Preserve readers' position; only follow the bottom if already following it.
+      if (state.view === 'chat' && chatPinnedToBottom) requestAnimationFrame(() => {
+        if (state.view === 'chat' && chatPinnedToBottom) scrollToBottom();
+      });
+    }
+    function scheduleMobileViewport() {
+      if (!mobileViewportFrame) mobileViewportFrame = requestAnimationFrame(syncMobileViewport);
+    }
+    messagesDiv.addEventListener('scroll', () => { chatPinnedToBottom = isNearBottom(); }, { passive: true });
+    window.addEventListener('resize', scheduleMobileViewport, { passive: true });
+    window.addEventListener('orientationchange', scheduleMobileViewport, { passive: true });
+    document.addEventListener('focusin', scheduleMobileViewport);
+    document.addEventListener('focusout', scheduleMobileViewport);
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', scheduleMobileViewport, { passive: true });
+      window.visualViewport.addEventListener('scroll', scheduleMobileViewport, { passive: true });
+    }
+    mobileViewportQuery.addEventListener('change', scheduleMobileViewport);
+    if (window.ResizeObserver) {
+      const navObserver = new ResizeObserver(entries => {
+        const size = entries[0].borderBoxSize;
+        const height = size && (size[0] || size).blockSize;
+        if (height > 0) {
+          const value = Math.ceil(height) + 'px';
+          if (document.documentElement.style.getPropertyValue('--mobile-nav-content-height') !== value) {
+            document.documentElement.style.setProperty('--mobile-nav-content-height', value);
+            scheduleMobileViewport();
+          }
+        }
+      });
+      navObserver.observe(mobileNav);
+    }
+    scheduleMobileViewport();
+
     window.addEventListener('resize', () => {
       closeMessageMenu();
       closeReactionPicker();
@@ -8837,6 +9111,11 @@
         content.className = 'content';
         content.textContent = isMe ? '你撤回了一条消息' : `${message.username} 撤回了一条消息`;
         bubble.append(content);
+      } else if (message.type === 'call') {
+        const label = document.createElement('div');
+        label.className = 'uni-call-history';
+        label.textContent = window.UniCall?.historyLabel(message.content, message.duration) || '语音通话';
+        bubble.append(label);
       } else if (message.type === 'image') {
         const img = document.createElement('img');
         img.className = 'chat-img';
@@ -8921,13 +9200,14 @@
     }
 
     function canRecallMessage(message) {
+      if (message.type === 'call') return false;
       const time = new Date(message.timestamp).getTime();
       return !Number.isNaN(time) && Date.now() - time <= 2 * 60 * 1000;
     }
 
     function normalizeMessage(data) {
       if (!data || typeof data !== 'object') return null;
-      const type = ['image', 'voice', 'sticker', 'recalled'].includes(data.type) ? data.type : 'text';
+      const type = ['image', 'voice', 'sticker', 'recalled', 'call'].includes(data.type) ? data.type : 'text';
       const username = typeof data.username === 'string' && data.username.trim() ? data.username.trim() : '匿名';
       const content = typeof data.content === 'string'
         ? data.content
@@ -11165,6 +11445,7 @@
     }
 
     function adminMessageText(message) {
+      if (message.type === 'call') return window.UniCall?.historyLabel(message.content, message.duration) || '语音通话';
       if (message.recalled || message.type === 'recalled') return '已撤回的消息';
       if (message.type === 'image') return '[图片消息]';
       if (message.type === 'voice') return `[语音消息] ${message.duration || 0}s`;
@@ -11249,6 +11530,8 @@
 
     function setChatEnabled(enabled) {
       const active = enabled && state.isConnected && Boolean(state.currentRoom);
+      privateCallOpen.hidden = !active || state.currentRoom.type !== 'private' || !state.uniCallEnabled || !callController;
+      privateCallOpen.disabled = state.isBanned;
       input.disabled = !active;
       sendBtn.disabled = !canSendText();
       mentionBtn.disabled = !active;
@@ -11358,6 +11641,10 @@
     }
 
     async function startRecording() {
+      if (callController?.usesMicrophone()) {
+        showToast('请先结束 Uni Call 后再录制语音消息');
+        return;
+      }
       if (!navigator.mediaDevices || !window.MediaRecorder) {
         alert('当前浏览器不支持录音');
         return;
@@ -11368,7 +11655,7 @@
         const generation=clientSessionGeneration, roomId=state.currentRoom && state.currentRoom.id;
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         acquiredStream=stream;
-        if(generation!==clientSessionGeneration || !state.isConnected || !state.currentRoom || state.currentRoom.id!==roomId){stream.getTracks().forEach(t=>t.stop());return;}
+        if(generation!==clientSessionGeneration || !state.isConnected || !state.currentRoom || state.currentRoom.id!==roomId || callController?.usesMicrophone()){stream.getTracks().forEach(t=>t.stop());return;}
         const chunks = [];
         let recordedBytes=0,recordingTooLarge=false;
         const supported=['audio/webm;codecs=opus','audio/mp4;codecs=mp4a.40.2','audio/ogg;codecs=opus','audio/webm','audio/mp4'].find(type=>MediaRecorder.isTypeSupported(type));
@@ -11464,5 +11751,8 @@
     window.addEventListener('load', () => window.setTimeout(hideLaunchScreen, 220), { once: true });
     window.setTimeout(hideLaunchScreen, 1200);
   </script>
+  <script src="/scripts/napa-optics.js"></script>
+  <script src="/scripts/napa-presentation.js"></script>
+  <script src="/scripts/napa-crystal.js"></script>
 </body>
 </html>

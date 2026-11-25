@@ -5,6 +5,8 @@ const root=path.resolve(__dirname,'..');
 function fixture(t,existing,password="Synthetic-Test-Password-Only"){
  const dir=existing||fs.mkdtempSync(path.join(os.tmpdir(),'uni-reliability-'));
  for(const name of ['server.js','package.json'])fs.copyFileSync(path.join(root,name),path.join(dir,name));
+ fs.mkdirSync(path.join(dir,'lib'),{recursive:true});
+ fs.copyFileSync(path.join(root,'lib','uni-call.js'),path.join(dir,'lib','uni-call.js'));
  process.env.PORT='0';process.env.ADMIN_ACCOUNT='testadmin';process.env.ADMIN_PASSWORD=password;
  const original=http.Server.prototype.listen;
  http.Server.prototype.listen=function(_port,cb){return original.call(this,0,'127.0.0.1',cb)};
@@ -89,5 +91,5 @@ test('U30 documented socket events and HTTP paths exist; native support is expli
   }
  }
  assert.match(doc,/Android\/Capacitor is an unmaintained historical project/);
- assert.match(fs.readFileSync(path.join(root,'README.md'),'utf8'),/Android\/Capacitor development has been discontinued/);
+ assert.match(fs.readFileSync(path.join(root,'README.md'),'utf8'),/\| Android \/ Capacitor \| 历史工程，已停止维护 \|/);
 });

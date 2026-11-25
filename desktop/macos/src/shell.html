@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self'; style-src 'self'; script-src 'self'; base-uri 'none'; form-action 'none'">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Uni</title>
+  <link rel="stylesheet" href="shell.css">
+  <script src="shell.js" defer></script>
+</head>
+<body>
+  <header class="titlebar">
+    <span aria-hidden="true">Uni</span>
+    <button id="settings" type="button" aria-label="连接设置" title="连接设置">⚙</button>
+  </header>
+  <main id="screen" hidden>
+    <img class="brand" src="../build/uni-icon.svg" alt="Uni" width="66" height="66">
+    <h1 id="heading">连接 Uni</h1>
+    <p id="status" role="status">输入你的 Uni 服务器地址。</p>
+    <form id="form">
+      <label for="address">服务器地址</label>
+      <input id="address" type="url" required placeholder="https://uni.example.com" autocomplete="off" spellcheck="false">
+      <label class="toggle"><input id="background" type="checkbox"> 关闭窗口后保持连接</label>
+      <label class="toggle"><input id="notifications" type="checkbox"> 启用 macOS 通知</label>
+      <label class="toggle"><input id="previews" type="checkbox"> 显示通知预览</label>
+      <p id="form-error" role="alert"></p>
+      <div class="actions">
+        <button id="back" type="button" hidden>返回 Uni</button>
+        <button id="retry" type="button" hidden>重新连接</button>
+        <button id="connect" type="submit">连接</button>
+      </div>
+    </form>
+    <button id="forget" class="subtle" type="button">清除此服务器的已保存登录</button>
+    <footer>Uni 5.6 Napa Valley · 5.6.0</footer>
+  </main>
+</body>
+</html>

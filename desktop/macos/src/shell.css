@@ -1,0 +1,31 @@
+:root { color-scheme: light dark; font: 14px -apple-system, BlinkMacSystemFont, sans-serif; }
+* { box-sizing: border-box; }
+body { margin: 0; height: 100vh; color: #132b49; background: #e4effa; }
+[hidden] { display: none !important; }
+.titlebar { height: 36px; display: grid; place-items: center; -webkit-app-region: drag;
+  background: linear-gradient(160deg,#d9edfc,#cddff5); border-bottom: 1px solid #728aaa55; font-weight: 650; }
+.titlebar button { position: absolute; right: 10px; top: 4px; padding: 0; width: 28px; height: 27px; font-size: 16px; -webkit-app-region: no-drag; }
+main { min-height: calc(100vh - 36px); overflow: auto; padding: 24px max(24px, calc((100% - 420px) / 2));
+  background: radial-gradient(ellipse at 17% 8%,#b1d9f8 0,transparent 58%), linear-gradient(135deg,#eef6ff,#daf3ee); }
+.brand { border-radius: 18px; box-shadow: 0 8px 25px #217cc53a; }
+h1 { margin: 12px 0 6px; font-size: 27px; letter-spacing: -.035em; }
+p { margin: 0 0 18px; color: #365675; line-height: 1.55; }
+label:not(.toggle) { display: block; font-weight: 600; margin-bottom: 6px; }
+input[type="url"] { width: 100%; padding: 11px 13px; font: inherit; border-radius: 13px; border: 1px solid #36629772; background: #ffffffb9; color: inherit; }
+.toggle { display: flex; align-items: center; gap: 6px; margin-top: 10px; }
+input[type="checkbox"] { accent-color: #0072ed; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+button { font: inherit; border-radius: 10px; padding: 7px 13px; color: inherit; border: 1px solid #5276995c; background: #ffffff7d; cursor: pointer; }
+button:focus-visible, input:focus-visible { outline: 2px solid #217cec; outline-offset: 3px; }
+#connect { color: white; background: #0564d6; border-color: #0f63b8; font-weight: 600; }
+#form-error { color: #9b2233; margin: 10px 0; }
+.subtle { background: none; border: 0; padding: 4px 0; margin-top: 12px; text-decoration: underline; }
+footer { margin-top: 14px; color: #385875; font-size: 12px; }
+@media (prefers-color-scheme: dark) {
+  body { color: #e8f2ff; background: #172538; }
+  .titlebar { background: linear-gradient(160deg,#22384f,#162b43); }
+  main { background: radial-gradient(ellipse at 17% 8%,#28476a 0,transparent 58%),linear-gradient(135deg,#142136,#1a353b); }
+  input[type="url"], button { background: #112742c9; }
+  p, footer { color: #bad1e6; }
+  #form-error { color: #ffadb5; }
+}
